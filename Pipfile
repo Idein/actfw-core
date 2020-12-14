@@ -4,7 +4,7 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-actfw = {editable = true, path = "."}
+actfw-core = {editable = true, path = "."}
 # Packaging Python Projects
 setuptools = "*"
 wheel = "*"
