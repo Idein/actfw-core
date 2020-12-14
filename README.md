@@ -60,3 +60,21 @@ app.register_task(c)
 ~~~~python
 app.run()
 ~~~~
+
+## Development Guide
+
+### Installation of dev requirements
+
+```console
+pip3 install pipenv
+pipenv install --dev -e .
+```
+
+### Uploading package to PyPI
+
+See https://packaging.python.org/tutorials/packaging-projects/ first.
+
+```console
+pipenv run python setup.py sdist bdist_wheel
+pipenv run python -m twine upload --repository pypi dist/*
+```

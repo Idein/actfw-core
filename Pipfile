@@ -5,3 +5,7 @@ verify_ssl = true
 
 [dev-packages]
 actfw = {editable = true, path = "."}
+# Packaging Python Projects
+setuptools = "*"
+wheel = "*"
+twine = "*"
