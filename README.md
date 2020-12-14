@@ -8,8 +8,8 @@ for Raspberry Pi
 
 ```
 sudo apt-get update
-sudo apt-get install -y python3-pil python3-setuptools python3-wheel
-pip3 install .
+sudo apt-get install -y python3-pil python3-pip
+pip3 install actfw-core
 ```
 
 ## Document
