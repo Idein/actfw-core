@@ -15,7 +15,7 @@ setup(
     description='Core components of actfw, independent of specific devices',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/Idein/actcast-app-python',
+    url='https://github.com/Idein/actfw-core',
     author=author,
     author_email='n.ohkawa@idein.jp, sho.nakatani@idein.jp',
     license='MIT',
