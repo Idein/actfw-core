@@ -6,18 +6,18 @@ exec(open(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'actfw', '_ve
 with open(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
-name = 'actfw'
+name = 'actfw-core'
 author = 'Idein Inc.'
 
 setup(
     name=name,
     version=__version__,
-    description='Actcast Application Framework',
+    description='Core components of actfw, independent of specific devices',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/Idein/actcast-app-python',
     author=author,
-    author_email='n.ohkawa@idein.jp',
+    author_email='n.ohkawa@idein.jp, sho.nakatani@idein.jp',
     license='MIT',
     classifiers=[
         'Development Status :: 4 - Beta',
