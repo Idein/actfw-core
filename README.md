@@ -24,7 +24,6 @@ Construct your application with a task parallel model
     * `actfw.Application` : Main application
 * Workers
     * `actfw.task.Producer` : Task generator
-        * `actfw.capture.PiCameraCapture` : Generate CSI camera capture image
         * `actfw.capture.V4LCameraCapture` : Generate UVC camera capture image
     * `actfw.task.Pipe` : Task to Task converter
     * `actfw.task.Consumer` : Task terminator
