@@ -19,12 +19,12 @@ pip3 install actfw-core
 Construct your application with a task parallel model
 
 * Application
-  * `actfw.core.Application` : Main application
+  * `actfw_core.Application` : Main application
 * Workers
-  * `actfw.core.task.Producer` : Task generator
-    * `actfw.core.capture.V4LCameraCapture` : Generate UVC camera capture image
-  * `actfw.core.task.Pipe` : Task to Task converter
-  * `actfw.core.task.Consumer` : Task terminator
+  * `actfw_core.task.Producer` : Task generator
+    * `actfw_core.capture.V4LCameraCapture` : Generate UVC camera capture image
+  * `actfw_core.task.Pipe` : Task to Task converter
+  * `actfw_core.task.Consumer` : Task terminator
 
 Each worker is executed in parallel.
 
@@ -33,7 +33,7 @@ User should
 * Define subclass of `Producer/Pipe/Consumer`
 
 ```python
-class MyPipe(actfw.core.task.Pipe):
+class MyPipe(actfw_core.task.Pipe):
     def proc(self, i):
         ...
 ```
@@ -53,7 +53,7 @@ f2.connect(c)
 * Register to `Application`
 
 ```python
-app = actfw.Application()
+app = actfw_core.Application()
 app.register_task(p)
 app.register_task(f1)
 app.register_task(f2)
