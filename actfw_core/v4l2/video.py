@@ -6,8 +6,8 @@ import mmap
 import select
 from ctypes import *
 from ctypes.util import find_library
-from actfw.core.v4l2.types import *
-from actfw.core.v4l2.control import *
+from actfw_core.v4l2.types import *
+from actfw_core.v4l2.control import *
 import io
 
 

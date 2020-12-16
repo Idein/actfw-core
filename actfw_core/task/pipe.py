@@ -81,7 +81,7 @@ class Pipe(Task):
         Connect following task.
 
         Args:
-            follow (:class:`~actfw.core.task.Task`): following task
+            follow (:class:`~actfw_core.task.Task`): following task
         """
         q = Queue(1)
         follow._add_in_queue(q)

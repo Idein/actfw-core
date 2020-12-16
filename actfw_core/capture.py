@@ -1,7 +1,7 @@
 import io
 from queue import Full
 from .task import Producer
-from actfw.core.v4l2.video import Video, VideoPort, V4L2_PIX_FMT
+from actfw_core.v4l2.video import Video, VideoPort, V4L2_PIX_FMT
 import enum
 
 
@@ -47,8 +47,8 @@ class V4LCameraCapture(Producer):
             device (str): v4l device path
             size (int, int): expected capture resolution
             framerate (int): expected capture framerate
-            expected_format (:class:`~actfw.core.v4l2.video.V4L2_PIX_FMT`): expected capture format
-            fallback_formats (list of :class:`~actfw.core.v4l2.video.V4L2_PIX_FMT`): fallback capture format
+            expected_format (:class:`~actfw_core.v4l2.video.V4L2_PIX_FMT`): expected capture format
+            fallback_formats (list of :class:`~actfw_core.v4l2.video.V4L2_PIX_FMT`): fallback capture format
 
         Notes:
             If a camera doesn't support the expected_format,
@@ -115,7 +115,7 @@ class V4LCameraCapture(Producer):
         Run user defined video configurator.
 
         Args:
-            configurator : unary function (`actfw.core.v4l2.video.Video` -> a)
+            configurator : unary function (`actfw_core.v4l2.video.Video` -> a)
 
         Returns:
             object: return type of configurator

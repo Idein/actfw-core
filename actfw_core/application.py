@@ -2,7 +2,7 @@ import os
 import signal
 import time
 import json
-from actfw.core.task import Task
+from actfw_core.task import Task
 
 
 class Application:
@@ -54,10 +54,10 @@ class Application:
         Register the application task.
 
         Args:
-            task (:class:`~actfw.core.task.Task`): task
+            task (:class:`~actfw_core.task.Task`): task
         """
         if not issubclass(type(task), Task):
-            raise TypeError("type(task) must be a subclass of actfw.core.task.Task.")
+            raise TypeError("type(task) must be a subclass of actfw_core.task.Task.")
         self.tasks.append(task)
 
     def run(self):
