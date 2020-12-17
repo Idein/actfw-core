@@ -1,12 +1,13 @@
-# Actcast Application Framework for Python
+# actfw-core
 
-This package provides a Python API for developing Actcast apps.
+Core components of actfw, a framework for Actcast Application written in Python.
+actfw-core is intended to be independent of any specific device.
 
 ## Installation
 
 ```console
 sudo apt-get update
-sudo apt-get install -y python3-pil python3-pip
+sudo apt-get install -y python3-pip python3-pil 
 pip3 install actfw-core
 ```
 
