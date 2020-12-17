@@ -5,6 +5,8 @@ verify_ssl = true
 
 [dev-packages]
 actfw-core = {editable = true, path = "."}
+# Lint
+autopep8 = "*"
 # Packaging Python Projects
 setuptools = "*"
 wheel = "*"
