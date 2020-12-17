@@ -4,7 +4,6 @@ from pathlib import Path
 import actfw_core.task
 import actfw_core.capture
 from .application import Application
-from .display import Display
 from .command_server import CommandServer
 
 from actfw import _version
