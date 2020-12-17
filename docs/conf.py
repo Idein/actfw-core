@@ -23,12 +23,12 @@ def setup(app):
 # -- Project information -----------------------------------------------------
 
 
-project = 'actfw'
+project = 'actfw-core'
 copyright = '2019, Idein Inc.'
 author = 'Idein Inc.'
 
 # The full version, including alpha/beta/rc tags
-exec(open(os.path.join(os.path.dirname(os.path.abspath(os.path.dirname(__file__))), 'actfw', '_version.py')).read())
+exec(open(os.path.join(os.path.dirname(os.path.abspath(os.path.dirname(__file__))), 'actfw_core', '_version.py')).read())
 release = __version__
 
 
