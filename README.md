@@ -8,6 +8,7 @@ actfw-core is intended to be independent of any specific device.
 ```console
 sudo apt-get update
 sudo apt-get install -y python3-pip python3-pil 
+sudo apt-get install -y libv4l-0 libv4lconvert0  # if using `V4LCameraCapture`
 pip3 install actfw-core
 ```
 
@@ -74,6 +75,12 @@ app.run()
 ```console
 pip3 install pipenv
 pipenv install --dev -e .
+```
+
+### Running tests
+
+```console
+pipenv run nose2 -v
 ```
 
 ### Uploading package to PyPI
