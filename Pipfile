@@ -5,6 +5,8 @@ verify_ssl = true
 
 [dev-packages]
 actfw-core = {editable = true, path = "."}
+# Tests
+nose2 = "*"
 # Lint
 autopep8 = "*"
 # Packaging Python Projects
