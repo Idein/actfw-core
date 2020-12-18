@@ -1,10 +1,8 @@
-version: 2
-jobs:
-  build-wheel:
-    docker:
-      - image: python:3-buster
+version: 2.1
+
+commands:
+  install-python-dev-tools:
     steps:
-      - checkout
       - run:
           name: Install python dev tools
           command: |
@@ -12,10 +10,35 @@ jobs:
             apt-get install -y ca-certificates python3-pip
             pip3 install pipenv
             pipenv install --dev -e .
+
+jobs:
+  lint:
+    docker:
+      - image: python:3-buster
+    steps:
+      - checkout
+      - install-python-dev-tools
       - run:
           name: Check code format
           command: |
             [ $(pipenv run autopep8 --diff --max-line-length 128 -r . | wc -l) = 0 ]
+
+  test:
+    docker:
+      - image: python:3-buster
+    steps:
+      - checkout
+      - install-python-dev-tools
+      - run:
+          name: nose2
+          command: pipenv run nose2 -v
+
+  build-wheel:
+    docker:
+      - image: python:3-buster
+    steps:
+      - checkout
+      - install-python-dev-tools
       - run:
           name: Make wheel
           command: |
@@ -44,4 +67,6 @@ workflows:
   version: 2
   commit:
     jobs:
+      - lint
+      - test
       - build-wheel
