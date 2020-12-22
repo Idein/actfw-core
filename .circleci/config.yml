@@ -34,6 +34,16 @@ commands:
           fingerprints:
             - "1b:7a:57:1b:eb:5d:b8:c4:cd:02:e2:d2:81:d8:65:ee"
 
+  prepare-pypi-user:
+    steps:
+      - run:
+          name: Configure PyPI user
+          command: |
+            echo > ~/.pypirc
+            echo "[pypi]" > ~/.pypirc
+            echo "username = ideinbot" >> ~/.pypirc
+            echo "password = $PYPI_PASSWORD" >> ~/.pypirc
+
 jobs:
   lint:
     docker:
@@ -135,10 +145,11 @@ jobs:
       - install-python-dev-tools
       - attach_workspace:
           at: /tmp/workspace
+      - prepare-pypi-user
       - run:
           name: Publish wheel & sdist to PyPI
           command: |
-            pipenv run python -m twine upload --repository testpypi dist/*
+            pipenv run python -m twine upload --repository testpypi /tmp/workspace/dist/*
 
 workflows:
   version: 2
