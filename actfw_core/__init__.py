@@ -1,13 +1,12 @@
 import os
 import json
 from pathlib import Path
-import actfw.task
-import actfw.capture
+import actfw_core.task
+import actfw_core.capture
 from .application import Application
-from .display import Display
 from .command_server import CommandServer
 
-from actfw import _version
+from actfw_core import _version
 
 __version__ = _version.__version__
 
@@ -22,8 +21,8 @@ def notify(notification, *args, **kwargs):
 
     Example:
 
-        >>> import actfw
-        >>> actfw.notify([{'msg': 'Hello!'}])
+        >>> import actfw_core
+        >>> actfw_core.notify([{'msg': 'Hello!'}])
         [{"msg": "Hello!"}]
 
     """
@@ -53,11 +52,11 @@ def set_heartbeat_function(f):
 
     Example:
 
-        >>> import actfw
+        >>> import actfw_core
         >>> def heartbeat(): print("working!")
         ...
-        >>> actfw.set_heartbeat_function(heartbeat)
-        >>> actfw.heartbeat()
+        >>> actfw_core.set_heartbeat_function(heartbeat)
+        >>> actfw_core.heartbeat()
         working!
 
     """

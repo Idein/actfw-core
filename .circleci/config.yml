@@ -1,26 +1,48 @@
-version: 2
-jobs:
-  build-wheel:
-    docker:
-      - image: ubuntu:18.04
+version: 2.1
+
+commands:
+  install-python-dev-tools:
     steps:
-      - checkout
       - run:
           name: Install python dev tools
           command: |
             apt-get update
-            apt-get install -y ca-certificates python3-wheel python3-setuptools python3-pip
-            pip3 install autopep8
-            pip3 install sphinx
-            pip3 install sphinx_theme
+            apt-get install -y ca-certificates python3-pip
+            pip3 install pipenv
+            pipenv install --dev -e .
+
+jobs:
+  lint:
+    docker:
+      - image: python:3-buster
+    steps:
+      - checkout
+      - install-python-dev-tools
       - run:
           name: Check code format
           command: |
-            [ $(autopep8 --diff --max-line-length 128 -r . | wc -l) = 0 ]
+            [ $(pipenv run autopep8 --diff --max-line-length 128 -r . | wc -l) = 0 ]
+
+  test:
+    docker:
+      - image: python:3-buster
+    steps:
+      - checkout
+      - install-python-dev-tools
+      - run:
+          name: nose2
+          command: pipenv run nose2 -v
+
+  build-wheel:
+    docker:
+      - image: python:3-buster
+    steps:
+      - checkout
+      - install-python-dev-tools
       - run:
           name: Make wheel
           command: |
-            python3 setup.py bdist_wheel
+            pipenv run python setup.py bdist_wheel
       - run:
           name: Put artifacts
           command: |
@@ -32,7 +54,7 @@ jobs:
       - run:
           name: Documentation
           command: |
-            sphinx-build docs build/sphinx/html
+            pipenv run sphinx-build docs build/sphinx/html
             tar cvjf build/sphinx/html.tar.bz2 -C build/sphinx html
       - store_artifacts:
           path: build/sphinx/html
@@ -45,4 +67,6 @@ workflows:
   version: 2
   commit:
     jobs:
+      - lint
+      - test
       - build-wheel

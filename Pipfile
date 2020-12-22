@@ -1,0 +1,18 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+actfw-core = {editable = true, path = "."}
+# Tests
+nose2 = "*"
+# Lint
+autopep8 = "*"
+# Packaging Python Projects
+setuptools = "*"
+wheel = "*"
+twine = "*"
+# Document
+sphinx = "*"
+sphinx-theme = "*"
