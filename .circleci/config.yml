@@ -13,10 +13,13 @@ commands:
             apt-get install -y ca-certificates python3-pip
             pip3 install pipenv
             pipenv install --dev -e .
+          environment:
+            PIPENV_VENV_IN_PROJECT: true
       - save_cache:
           key: *cache-key-pipenv
           paths:
             - ".venv"
+            - "Pipfile.lock"
             - "/usr/local/bin"
             - "/usr/local/lib/python*/site-packages"
 
@@ -35,8 +38,6 @@ jobs:
   lint:
     docker:
       - image: python:3-buster
-        environment:
-          PIPENV_VENV_IN_PROJECT: true
     steps:
       - checkout
       - install-python-dev-tools
@@ -48,8 +49,6 @@ jobs:
   test:
     docker:
       - image: python:3-buster
-        environment:
-          PIPENV_VENV_IN_PROJECT: true
     steps:
       - checkout
       - install-python-dev-tools
@@ -60,8 +59,6 @@ jobs:
   build-api-doc:
     docker:
       - image: python:3-buster
-        environment:
-          PIPENV_VENV_IN_PROJECT: true
     steps:
       - checkout
       - install-python-dev-tools
@@ -77,8 +74,6 @@ jobs:
   build-wheel:
     docker:
       - image: python:3-buster
-        environment:
-          PIPENV_VENV_IN_PROJECT: true
     steps:
       - checkout
       - install-python-dev-tools
@@ -98,8 +93,6 @@ jobs:
   validate-version-with-tag:
     docker:
       - image: python:3-buster
-        environment:
-          PIPENV_VENV_IN_PROJECT: true
     steps:
       - checkout
       - install-python-dev-tools
