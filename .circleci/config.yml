@@ -140,8 +140,8 @@ jobs:
           command: |
             pipenv run python -m twine upload --non-interactive --repository pypi /tmp/workspace/dist/*
           environment:
-            - TWINE_USERNAME: ideinbot
-            - TWINE_PASSWORD: $PYPI_PASSWORD
+            - TWINE_USERNAME: __token__
+            - TWINE_PASSWORD: $PYPI_API_TOKEN
 
 workflows:
   version: 2
