@@ -3,16 +3,22 @@ version: 2.1
 commands:
   install-python-dev-tools:
     steps:
-      # See: https://circleci.com/docs/2.0/language-python/#cache-dependencies
-      - restore_cache:
-          key: &cache-key-pipenv cache-pipenv-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "Pipfile.lock" }}
       - run:
           name: Install python dev tools
           command: |
             apt-get update
             apt-get install -y ca-certificates python3-pip
+  pipenv-sync:
+    steps:
+      # See: https://circleci.com/docs/2.0/language-python/#cache-dependencies
+      - restore_cache:
+          key: &cache-key-pipenv cache-pipenv-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "Pipfile.lock" }}
+      - install-python-dev-tools
+      - run:
+          name: pipenv sync
+          command: |
             pip3 install pipenv
-            pipenv install --dev -e .
+            pipenv sync --dev
           environment:
             PIPENV_VENV_IN_PROJECT: true
       - save_cache:
@@ -21,6 +27,16 @@ commands:
             - ".venv"
             - "/usr/local/bin"
             - "/usr/local/lib/python*/site-packages"
+  pipenv-install-skipping-lock:
+    steps:
+      - install-python-dev-tools
+      - run:
+          name: pipenv install --skip-lock
+          command: |
+            pip3 install pipenv
+            pipenv install --skip-lock --dev -e .
+          environment:
+            PIPENV_VENV_IN_PROJECT: true
 
   prepare-github-writable-user:
     steps:
@@ -42,7 +58,7 @@ jobs:
           password: $DOCKER_PASS
     steps:
       - checkout
-      - install-python-dev-tools
+      - pipenv-sync
       - run:
           name: Check code format
           command: |
@@ -54,7 +70,17 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
+      - pipenv-sync
+      - run:
+          name: nose2
+          command: pipenv run nose2 -v
+  test-skip-lock:
+    docker:
+      - image: python:3-buster
+        auth: *docker-hub-auth
+    steps:
+      - checkout
+      - pipenv-install-skipping-lock
       - run:
           name: nose2
           command: pipenv run nose2 -v
@@ -65,7 +91,7 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
+      - pipenv-sync
       - run:
           name: sphinx-build
           command: |
@@ -81,7 +107,7 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
+      - pipenv-sync
       - run:
           name: Make wheel & sdist
           command: |
@@ -97,7 +123,7 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
+      - pipenv-sync
       - run:
           name: Check if git tag name is appropriate for package version
           command: |
@@ -140,7 +166,7 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
+      - pipenv-sync
       - attach_workspace:
           at: /tmp/workspace
       - run:
@@ -200,3 +226,27 @@ workflows:
           requires:
             - build-package
           filters: *release-filter
+  nightly:
+    triggers:
+      - schedule:
+          cron: "31 23 * * *"  # in UTC
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - lint:
+          context:
+            - docker-hub-creds
+      - test:
+          context:
+            - docker-hub-creds
+      - test-skip-lock:
+          context:
+            - docker-hub-creds
+      - build-api-doc:
+          context:
+            - docker-hub-creds
+      - build-package:
+          context:
+            - docker-hub-creds
