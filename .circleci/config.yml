@@ -5,7 +5,7 @@ commands:
     steps:
       # See: https://circleci.com/docs/ja/2.0/language-python/#%E4%BE%9D%E5%AD%98%E9%96%A2%E4%BF%82%E3%81%AE%E3%82%AD%E3%83%A3%E3%83%83%E3%82%B7%E3%83%A5
       - restore_cache:
-          key: &cache-key-pipenv cache-pipenv-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "Pipfile" }}
+          key: &cache-key-pipenv cache-pipenv-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "Pipfile.lock" }}
       - run:
           name: Install python dev tools
           command: |
@@ -19,7 +19,6 @@ commands:
           key: *cache-key-pipenv
           paths:
             - ".venv"
-            - "Pipfile.lock"
             - "/usr/local/bin"
             - "/usr/local/lib/python*/site-packages"
 
