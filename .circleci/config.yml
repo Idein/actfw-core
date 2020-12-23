@@ -96,14 +96,13 @@ jobs:
           name: sphinx-build
           command: |
             pipenv run sphinx-build docs build/sphinx/html
-            tar cvjf build/sphinx/html.tar.bz2 -C build/sphinx html
       - persist_to_workspace:
           root: build/sphinx
           paths:
             - html
       - store_artifacts:  # for reviewers to check generated doc
-          path: build/sphinx/html.tar.bz2
-          destination: html.tar.bz2
+          path: build/sphinx/html
+          destination: html
 
   build-package:
     docker:
