@@ -186,9 +186,6 @@ workflows:
       - test:
           context:
             - docker-hub-creds
-      - test-skip-lock:
-          context:
-            - docker-hub-creds
       - build-api-doc:
           context:
             - docker-hub-creds
