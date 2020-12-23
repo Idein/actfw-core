@@ -138,10 +138,9 @@ jobs:
       - run:
           name: Publish wheel & sdist to PyPI
           command: |
+            export TWINE_USERNAME=__token__
+            export TWINE_PASSWORD=$PYPI_API_TOKEN
             pipenv run python -m twine upload --non-interactive --repository pypi /tmp/workspace/dist/*
-          environment:
-            - TWINE_USERNAME: __token__
-            - TWINE_PASSWORD: $PYPI_API_TOKEN
 
 workflows:
   version: 2
