@@ -108,7 +108,7 @@ jobs:
       - checkout
       - run:
           name: checkout gh-pages branch
-          command: git checkout gh-pages-test
+          command: git checkout gh-pages
       - attach_workspace:
           at: /tmp/workspace
       - run:
@@ -125,7 +125,7 @@ jobs:
           command: |
             git add .
             git commit -m '[skip ci] updates API doc'
-            git push origin gh-pages-test
+            git push origin gh-pages
 
   deploy-package:
     docker:
