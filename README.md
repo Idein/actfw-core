@@ -14,7 +14,7 @@ pip3 install actfw-core
 
 ## Document
 
-* [API References](https://idein.github.io/actfw-docs/latest/)
+* [API References](https://idein.github.io/actfw-core/latest/)
 
 ## Usage
 
