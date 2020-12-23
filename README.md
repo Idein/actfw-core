@@ -14,7 +14,7 @@ pip3 install actfw-core
 
 ## Document
 
-* [API References](https://idein.github.io/actfw-docs/latest/)
+* [API References](https://idein.github.io/actfw-core/latest/)
 
 ## Usage
 
@@ -74,7 +74,7 @@ app.run()
 
 ```console
 pip3 install pipenv
-pipenv install --dev -e .
+pipenv sync --dev
 ```
 
 ### Running tests
@@ -83,11 +83,12 @@ pipenv install --dev -e .
 pipenv run nose2 -v
 ```
 
-### Uploading package to PyPI
+### Releasing package & API doc
 
-See <https://packaging.python.org/tutorials/packaging-projects/> first.
+CI will automatically do.
+Follow the following branch/tag rules.
 
-```console
-pipenv run python setup.py sdist bdist_wheel
-pipenv run python -m twine upload --repository pypi dist/*
-```
+1. Make changes for next version in `master` branch (via pull-requests).
+2. Update `actfw_core/_version.py` with new version in `master` branch.
+3. Create Git tag from `master` branch's HEAD named `release-<New version>`. E.g. `release-1.4.0`.
+4. Then CI will build/upload package to PyPI & API doc to GitHub Pages.

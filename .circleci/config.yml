@@ -8,16 +8,57 @@ commands:
           command: |
             apt-get update
             apt-get install -y ca-certificates python3-pip
+  pipenv-sync:
+    steps:
+      # See: https://circleci.com/docs/2.0/language-python/#cache-dependencies
+      - restore_cache:
+          key: &cache-key-pipenv cache-pipenv-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "Pipfile.lock" }}
+      - install-python-dev-tools
+      - run:
+          name: pipenv sync
+          command: |
             pip3 install pipenv
-            pipenv install --dev -e .
+            pipenv sync --dev
+          environment:
+            PIPENV_VENV_IN_PROJECT: true
+      - save_cache:
+          key: *cache-key-pipenv
+          paths:
+            - ".venv"
+            - "/usr/local/bin"
+            - "/usr/local/lib/python*/site-packages"
+  pipenv-install-skipping-lock:
+    steps:
+      - install-python-dev-tools
+      - run:
+          name: pipenv install --skip-lock
+          command: |
+            pip3 install pipenv
+            pipenv install --skip-lock --dev -e .
+          environment:
+            PIPENV_VENV_IN_PROJECT: true
+
+  prepare-github-writable-user:
+    steps:
+      - run:
+          name: Configure git user
+          command: |
+            git config user.email "bot+actfw-core-ci@idein.jp"
+            git config user.name "ideinbot"
+      - add_ssh_keys:
+          fingerprints:
+            - "1b:7a:57:1b:eb:5d:b8:c4:cd:02:e2:d2:81:d8:65:ee"
 
 jobs:
   lint:
     docker:
       - image: python:3-buster
+        auth: &docker-hub-auth
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
     steps:
       - checkout
-      - install-python-dev-tools
+      - pipenv-sync
       - run:
           name: Check code format
           command: |
@@ -26,47 +67,189 @@ jobs:
   test:
     docker:
       - image: python:3-buster
+        auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
+      - pipenv-sync
+      - run:
+          name: nose2
+          command: pipenv run nose2 -v
+  test-skip-lock:
+    docker:
+      - image: python:3-buster
+        auth: *docker-hub-auth
+    steps:
+      - checkout
+      - pipenv-install-skipping-lock
       - run:
           name: nose2
           command: pipenv run nose2 -v
 
-  build-wheel:
+  build-api-doc:
     docker:
       - image: python:3-buster
+        auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
+      - pipenv-sync
       - run:
-          name: Make wheel
-          command: |
-            pipenv run python setup.py bdist_wheel
-      - run:
-          name: Put artifacts
-          command: |
-            mkdir /root/artifacts
-            mv /root/project/dist/*.whl /root/artifacts/
-      - store_artifacts:
-          path: /root/artifacts
-          destination: artifacts
-      - run:
-          name: Documentation
+          name: sphinx-build
           command: |
             pipenv run sphinx-build docs build/sphinx/html
-            tar cvjf build/sphinx/html.tar.bz2 -C build/sphinx html
-      - store_artifacts:
+      - persist_to_workspace:
+          root: build/sphinx
+          paths:
+            - html
+      - store_artifacts:  # for reviewers to check generated doc
           path: build/sphinx/html
           destination: html
-      - store_artifacts:
-          path: build/sphinx/html.tar.bz2
-          destination: html.tar.bz2
+
+  build-package:
+    docker:
+      - image: python:3-buster
+        auth: *docker-hub-auth
+    steps:
+      - checkout
+      - pipenv-sync
+      - run:
+          name: Make wheel & sdist
+          command: |
+            pipenv run python setup.py sdist bdist_wheel
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist
+
+  validate-version-with-tag:
+    docker:
+      - image: python:3-buster
+        auth: *docker-hub-auth
+    steps:
+      - checkout
+      - pipenv-sync
+      - run:
+          name: Check if git tag name is appropriate for package version
+          command: |
+            export TAG=$(echo ${CIRCLE_TAG} |sed -e 's/release-//')
+            export VERSION=$(pipenv run python -c 'import actfw_core; print(actfw_core.__version__)')
+            echo "Git tag: $TAG"
+            echo "Package version: $VERSION"
+            test "$VERSION" = "$TAG"
+
+  deploy-api-doc:
+    docker:
+      - image: alpine/git
+        auth: *docker-hub-auth
+    steps:
+      - checkout
+      - run:
+          name: checkout gh-pages branch
+          command: git checkout gh-pages
+      - attach_workspace:
+          at: /tmp/workspace
+      - run:
+          name: Place doc contents in version directory (linked by `latest` symlink)
+          command: |
+            export TAG=$(echo ${CIRCLE_TAG} |sed -e 's/release-//')
+            rm -rf $TAG latest
+            mkdir $TAG
+            cp -rf /tmp/workspace/html/* $TAG/
+            ln -s $TAG latest
+      - prepare-github-writable-user
+      - run:
+          name: Deploy docs to gh-pages branch
+          command: |
+            git add .
+            git commit -m '[skip ci] updates API doc'
+            git push origin gh-pages
+
+  deploy-package:
+    docker:
+      - image: python:3-buster
+        auth: *docker-hub-auth
+    steps:
+      - checkout
+      - pipenv-sync
+      - attach_workspace:
+          at: /tmp/workspace
+      - run:
+          name: Publish wheel & sdist to PyPI
+          command: |
+            export TWINE_USERNAME=__token__
+            export TWINE_PASSWORD=$PYPI_API_TOKEN
+            pipenv run python -m twine upload --non-interactive --repository pypi /tmp/workspace/dist/*
 
 workflows:
   version: 2
   commit:
     jobs:
-      - lint
-      - test
-      - build-wheel
+      - lint:
+          context:
+            - docker-hub-creds
+      - test:
+          context:
+            - docker-hub-creds
+      - build-api-doc:
+          context:
+            - docker-hub-creds
+      - build-package:
+          context:
+            - docker-hub-creds
+  release:
+    jobs:
+      - validate-version-with-tag:
+          context:
+            - docker-hub-creds
+          filters: &release-filter
+            tags:
+              only: /^release-[0-9]+(\.[0-9]+){2}((a|b|rc)[0-9]+)?(.post[0-9])?(.dev[0-9])?$/
+            branches:
+              ignore: /.*/
+      - build-api-doc:
+          context:
+            - docker-hub-creds
+          requires:
+            - validate-version-with-tag
+          filters: *release-filter
+      - build-package:
+          context:
+            - docker-hub-creds
+          requires:
+            - validate-version-with-tag
+          filters: *release-filter
+      - deploy-api-doc:
+          context:
+            - docker-hub-creds
+          requires:
+            - build-api-doc
+          filters: *release-filter
+      - deploy-package:
+          context:
+            - docker-hub-creds
+          requires:
+            - build-package
+          filters: *release-filter
+  nightly:
+    triggers:
+      - schedule:
+          cron: "31 23 * * *"  # in UTC
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - lint:
+          context:
+            - docker-hub-creds
+      - test:
+          context:
+            - docker-hub-creds
+      - test-skip-lock:
+          context:
+            - docker-hub-creds
+      - build-api-doc:
+          context:
+            - docker-hub-creds
+      - build-package:
+          context:
+            - docker-hub-creds

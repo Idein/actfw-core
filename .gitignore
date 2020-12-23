@@ -328,4 +328,5 @@ $RECYCLE.BIN/
 
 # End of https://www.gitignore.io/api/c,osx,vim,emacs,linux,python,windows,visualstudiocode
 
-Pipfile.lock
+docs/*.rst
+!docs/index.rst
