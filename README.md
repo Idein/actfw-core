@@ -74,7 +74,7 @@ app.run()
 
 ```console
 pip3 install pipenv
-pipenv install --dev -e .
+pipenv sync --dev
 ```
 
 ### Running tests
