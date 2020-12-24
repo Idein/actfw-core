@@ -18,7 +18,7 @@ commands:
           name: pipenv sync
           command: |
             pip3 install pipenv
-            pipenv sync --dev
+            pipenv install --dev --dev -e .
           environment:
             PIPENV_VENV_IN_PROJECT: true
       - save_cache:
@@ -195,6 +195,11 @@ workflows:
       - build-package:
           context:
             - docker-hub-creds
+      - deploy-package:
+          context:
+            - docker-hub-creds
+          requires:
+            - build-package
   release:
     jobs:
       - validate-version-with-tag:
