@@ -37,6 +37,12 @@ commands:
             pipenv install --skip-lock --dev -e .
           environment:
             PIPENV_VENV_IN_PROJECT: true
+  install-python-packaging-tools:
+    steps:
+      - run:
+          name: Install python packaging tools
+          command: |
+            pip3 install setuptools wheel twine
 
   prepare-github-writable-user:
     steps:
@@ -110,11 +116,11 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - pipenv-sync
+      - install-python-packaging-tools
       - run:
           name: Make wheel & sdist
           command: |
-            pipenv run python setup.py sdist bdist_wheel
+            python setup.py sdist bdist_wheel
       - persist_to_workspace:
           root: .
           paths:
@@ -169,7 +175,7 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - pipenv-sync
+      - install-python-packaging-tools
       - attach_workspace:
           at: /tmp/workspace
       - run:
@@ -177,7 +183,7 @@ jobs:
           command: |
             export TWINE_USERNAME=__token__
             export TWINE_PASSWORD=$PYPI_API_TOKEN
-            pipenv run python -m twine upload --non-interactive --repository pypi /tmp/workspace/dist/*
+            python -m twine upload --non-interactive --repository pypi /tmp/workspace/dist/*
 
 workflows:
   version: 2
