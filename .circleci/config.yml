@@ -177,6 +177,7 @@ jobs:
           command: |
             export TWINE_USERNAME=__token__
             export TWINE_PASSWORD=$PYPI_API_TOKEN
+            find /tmp/workspace/dist/
             pipenv run python -m twine upload --non-interactive --repository pypi /tmp/workspace/dist/*
 
 workflows:
