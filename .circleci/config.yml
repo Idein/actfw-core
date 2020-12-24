@@ -18,7 +18,7 @@ commands:
           name: pipenv sync
           command: |
             pip3 install pipenv
-            pipenv install --dev --dev -e .
+            pipenv sync --dev
           environment:
             PIPENV_VENV_IN_PROJECT: true
       - save_cache:
@@ -177,7 +177,6 @@ jobs:
           command: |
             export TWINE_USERNAME=__token__
             export TWINE_PASSWORD=$PYPI_API_TOKEN
-            find /tmp/workspace/dist/
             pipenv run python -m twine upload --non-interactive --repository pypi /tmp/workspace/dist/*
 
 workflows:
@@ -196,11 +195,6 @@ workflows:
       - build-package:
           context:
             - docker-hub-creds
-      - deploy-package:
-          context:
-            - docker-hub-creds
-          requires:
-            - build-package
   release:
     jobs:
       - validate-version-with-tag:
