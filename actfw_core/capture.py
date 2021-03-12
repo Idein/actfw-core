@@ -49,7 +49,7 @@ class V4LCameraCapture(Producer):
             framerate (int): expected capture framerate
             expected_format (:class:`~actfw_core.v4l2.video.V4L2_PIX_FMT`): expected capture format
             fallback_formats (list of :class:`~actfw_core.v4l2.video.V4L2_PIX_FMT`): fallback capture format
-            format_selector (:class:`~actfw_core.capture.V4LCameraCapture.FormatSelector): DEFAULT selects the first format. PROPER selects the most proper format. MAXIMUM selects the largest resolution (and ignores framerate) format as a camera can.
+            format_selector (:class:`~actfw_core.capture.V4LCameraCapture.FormatSelector): DEFAULT selects the first format. PROPER selects the most proper format. MAXIMUM selects the largest resolution format as a camera can. **MAXIMUM ignores framerate parameters (uses appropriate framerate for the selected resolution).**
 
         Notes:
             If a camera doesn't support the expected_format,
