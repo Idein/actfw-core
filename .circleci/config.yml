@@ -68,7 +68,8 @@ jobs:
       - run:
           name: Check code format
           command: |
-            [ $(pipenv run autopep8 --diff --max-line-length 128 -r . | wc -l) = 0 ]
+            pipenv run autopep8 --diff --max-line-length 128 -r . | tee /tmp/lint.log
+            [ $(cat /tmp/lint.log | wc -l) = 0 ]
 
   test:
     docker:
