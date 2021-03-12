@@ -86,7 +86,8 @@ class V4LCameraCapture(Producer):
         config = None
         fmts = [expected_format] + fallback_formats
         for fmt in fmts:
-            candidates = self.video.lookup_config(width, height, 1 if format_selector == V4LCameraCapture.FormatSelector.MAXIMUM else framerate, fmt, expected_format)
+            expected_framerate = 1 if format_selector == V4LCameraCapture.FormatSelector.MAXIMUM else framerate
+            candidates = self.video.lookup_config(width, height, expected_framerate, fmt, expected_format)
             candidates = sorted(candidates, key=cmp)
             if len(candidates) > 0:
                 config = candidates[-1 if format_selector == V4LCameraCapture.FormatSelector.MAXIMUM else 0]
