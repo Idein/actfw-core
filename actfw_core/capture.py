@@ -1,4 +1,4 @@
-import io
+import traceback
 from queue import Full
 from .task import Producer
 from actfw_core.v4l2.video import Video, VideoPort, V4L2_PIX_FMT
@@ -33,7 +33,7 @@ class Frame(object):
 
 class V4LCameraCapture(Producer):
 
-    FormatSelector = enum.Enum('FormatSelector', 'DEFAULT PROPER')
+    FormatSelector = enum.Enum('FormatSelector', 'DEFAULT PROPER MAXIMUM')
 
     """Captured Frame Producer for Video4Linux"""
 
@@ -49,6 +49,7 @@ class V4LCameraCapture(Producer):
             framerate (int): expected capture framerate
             expected_format (:class:`~actfw_core.v4l2.video.V4L2_PIX_FMT`): expected capture format
             fallback_formats (list of :class:`~actfw_core.v4l2.video.V4L2_PIX_FMT`): fallback capture format
+            format_selector (:class:`~actfw_core.capture.V4LCameraCapture.FormatSelector): DEFAULT selects the first format. PROPER selects the most proper format. MAXIMUM selects the largest resolution (and ignores framerate) format as a camera can.
 
         Notes:
             If a camera doesn't support the expected_format,
@@ -71,7 +72,7 @@ class V4LCameraCapture(Producer):
             candidates = self.video.lookup_config(64, 64, 5, V4L2_PIX_FMT.RGB24, V4L2_PIX_FMT.RGB24)
             self.video.set_format(candidates[0], 64, 64, V4L2_PIX_FMT.RGB24)
 
-        if format_selector == V4LCameraCapture.FormatSelector.PROPER:
+        if format_selector in [V4LCameraCapture.FormatSelector.PROPER, V4LCameraCapture.FormatSelector.MAXIMUM]:
             def cmp(config):
                 return (
                     config.width * config.height,
@@ -85,10 +86,10 @@ class V4LCameraCapture(Producer):
         config = None
         fmts = [expected_format] + fallback_formats
         for fmt in fmts:
-            candidates = self.video.lookup_config(width, height, framerate, fmt, expected_format)
+            candidates = self.video.lookup_config(width, height, 1 if format_selector == V4LCameraCapture.FormatSelector.MAXIMUM else framerate, fmt, expected_format)
             candidates = sorted(candidates, key=cmp)
             if len(candidates) > 0:
-                config = candidates[0]
+                config = candidates[-1 if format_selector == V4LCameraCapture.FormatSelector.MAXIMUM else 0]
                 break
         if config is None:
             raise RuntimeError("expected capture format is unsupported")
