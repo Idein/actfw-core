@@ -69,7 +69,6 @@ jobs:
           name: Check code format
           command: |
             pipenv run autopep8 --diff --max-line-length 128 -r . | tee /tmp/lint.log
-            cat /tmp/lint.log
             [ $(cat /tmp/lint.log | wc -l) = 0 ]
 
   test:
