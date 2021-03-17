@@ -100,7 +100,7 @@ class V4LCameraCapture(Producer):
                 break
         if config is None:
             raise RuntimeError("expected capture format is unsupported")
-        fmt = self.video.set_format(config, width, height, expected_format)
+        fmt = self.video.set_format(config, expected_format=expected_format)
         self.capture_width, self.capture_height, self.capture_format = fmt
         self.video.set_framerate(config)
         # video.set_rotation(90)
