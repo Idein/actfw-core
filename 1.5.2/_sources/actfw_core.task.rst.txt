@@ -1,0 +1,53 @@
+actfw\_core.task package
+========================
+
+Submodules
+----------
+
+actfw\_core.task.consumer module
+--------------------------------
+
+.. automodule:: actfw_core.task.consumer
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.task.isolated module
+--------------------------------
+
+.. automodule:: actfw_core.task.isolated
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.task.pipe module
+----------------------------
+
+.. automodule:: actfw_core.task.pipe
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.task.producer module
+--------------------------------
+
+.. automodule:: actfw_core.task.producer
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.task.task module
+----------------------------
+
+.. automodule:: actfw_core.task.task
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: actfw_core.task
+   :members:
+   :undoc-members:
+   :show-inheritance:
