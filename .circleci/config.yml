@@ -4,10 +4,10 @@ commands:
   install-python-dev-tools:
     steps:
       - run:
-          name: Install python dev tools
+          name: Install python dev tools and dependencies
           command: |
             apt-get update
-            apt-get install -y ca-certificates python3-pip
+            apt-get install -y --no-install-recommends python3-pip
   poetry-install:
     steps:
       # See: https://circleci.com/docs/2.0/language-python/#cache-dependencies
@@ -35,7 +35,7 @@ commands:
       - run:
           name: Configure git user
           command: |
-            git config user.email "bot+actfw-core-ci@idein.jp"
+            git config user.email "bot@idein.jp"
             git config user.name "ideinbot"
       - add_ssh_keys:
           fingerprints:
@@ -66,7 +66,7 @@ jobs:
       - run:
           name: nose2
           command: poetry run nose2 -v
-  test-skip-lock:
+  test-with-up-to-date-dependencies:
     docker:
       - image: python:3-buster
         auth: *docker-hub-auth
@@ -125,7 +125,7 @@ jobs:
       - run:
           name: Check if git tag name is appropriate for package version
           command: |
-            export TAG=$(echo ${CIRCLE_TAG} |sed -e 's/release-//')
+            TAG=$(echo ${CIRCLE_TAG} |sed -e 's/release-//')
             VERSION=$(poetry run python -c 'import pkg_resources; print(pkg_resources.get_distribution("actfw-core").version)')
             echo "Git tag: $TAG"
             echo "Package version: $VERSION"
@@ -145,7 +145,7 @@ jobs:
       - run:
           name: Place doc contents in version directory (linked by `latest` symlink)
           command: |
-            export TAG=$(echo ${CIRCLE_TAG} |sed -e 's/release-//')
+            TAG=$(echo ${CIRCLE_TAG} |sed -e 's/release-//')
             rm -rf $TAG latest
             mkdir $TAG
             cp -rf /tmp/workspace/html/* $TAG/
@@ -238,7 +238,7 @@ workflows:
       - test:
           context:
             - docker-hub-creds
-      - test-skip-lock:
+      - test-with-up-to-date-dependencies:
           context:
             - docker-hub-creds
       - build-api-doc:
