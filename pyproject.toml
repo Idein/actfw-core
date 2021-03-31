@@ -6,19 +6,18 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3 :: Only",
 ]
-description = "actfw's additional components for Jetson series"
+description = "Core components of actfw, independent of specific devices"
 keywords = ['actcast']
 license = "MIT"
-name = "actfw-jetson"
+name = "actfw-core"
 readme = "README.md"
-repository = "https://github.com/Idein/actfw-jetson"
-version = "0.1.0"
+repository = "https://github.com/Idein/actfw-core"
+version = "1.5.2"
 
 [tool.poetry.dependencies]
 python = "^3.6"
 
-actfw-core = "^1.5.2"
-actfw-gstreamer = "*"
+Pillow = "^8.1.2"
 
 [tool.poetry.dev-dependencies]
 Sphinx = "^3.5.3"

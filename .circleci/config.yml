@@ -8,41 +8,27 @@ commands:
           command: |
             apt-get update
             apt-get install -y ca-certificates python3-pip
-  pipenv-sync:
+  poetry-install:
     steps:
       # See: https://circleci.com/docs/2.0/language-python/#cache-dependencies
       - restore_cache:
-          key: &cache-key-pipenv cache-pipenv-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "Pipfile.lock" }}
+          key: &cache-key-poetry cache-poetry-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "poetry.lock" }}
       - install-python-dev-tools
       - run:
-          name: pipenv sync
+          name: install poetry && poetry install
           command: |
-            pip3 install pipenv
-            pipenv sync --dev
-          environment:
-            PIPENV_VENV_IN_PROJECT: true
+            curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
+            echo 'export PATH=$HOME/.poetry/bin:$PATH' >> $BASH_ENV
+            source $BASH_ENV
+
+            poetry config virtualenvs.in-project true
+            poetry install
       - save_cache:
-          key: *cache-key-pipenv
+          key: *cache-key-poetry
           paths:
             - ".venv"
             - "/usr/local/bin"
             - "/usr/local/lib/python*/site-packages"
-  pipenv-install-skipping-lock:
-    steps:
-      - install-python-dev-tools
-      - run:
-          name: pipenv install --skip-lock
-          command: |
-            pip3 install pipenv
-            pipenv install --skip-lock --dev -e .
-          environment:
-            PIPENV_VENV_IN_PROJECT: true
-  install-python-packaging-tools:
-    steps:
-      - run:
-          name: Install python packaging tools
-          command: |
-            pip3 install setuptools wheel twine
 
   prepare-github-writable-user:
     steps:
@@ -64,12 +50,11 @@ jobs:
           password: $DOCKER_PASS
     steps:
       - checkout
-      - pipenv-sync
+      - poetry-install
       - run:
-          name: Check code format
+          name: Lint
           command: |
-            pipenv run autopep8 --diff --max-line-length 128 -r . | tee /tmp/lint.log
-            [ $(cat /tmp/lint.log | wc -l) = 0 ]
+            poetry run pysen run lint
 
   test:
     docker:
@@ -77,20 +62,23 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - pipenv-sync
+      - poetry-install
       - run:
           name: nose2
-          command: pipenv run nose2 -v
+          command: poetry run nose2 -v
   test-skip-lock:
     docker:
       - image: python:3-buster
         auth: *docker-hub-auth
     steps:
       - checkout
-      - pipenv-install-skipping-lock
+      - run:
+          name: remove lock file to get up-to-date dependencies
+          command: rm poetry.lock
+      - poetry-install
       - run:
           name: nose2
-          command: pipenv run nose2 -v
+          command: poetry run nose2 -v
 
   build-api-doc:
     docker:
@@ -98,11 +86,11 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - pipenv-sync
+      - poetry-install
       - run:
           name: sphinx-build
           command: |
-            pipenv run sphinx-build docs build/sphinx/html
+            poetry run sphinx-build docs build/sphinx/html
       - persist_to_workspace:
           root: build/sphinx
           paths:
@@ -117,11 +105,11 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-packaging-tools
+      - poetry-install
       - run:
           name: Make wheel & sdist
           command: |
-            python setup.py sdist bdist_wheel
+            poetry build
       - persist_to_workspace:
           root: .
           paths:
@@ -133,12 +121,12 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - pipenv-sync
+      - poetry-install
       - run:
           name: Check if git tag name is appropriate for package version
           command: |
             export TAG=$(echo ${CIRCLE_TAG} |sed -e 's/release-//')
-            export VERSION=$(pipenv run python -c 'import actfw_core; print(actfw_core.__version__)')
+            VERSION=$(poetry run python -c 'import pkg_resources; print(pkg_resources.get_distribution("actfw-core").version)')
             echo "Git tag: $TAG"
             echo "Package version: $VERSION"
             test "$VERSION" = "$TAG"
@@ -176,15 +164,14 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-packaging-tools
+      - poetry-install
       - attach_workspace:
           at: /tmp/workspace
       - run:
           name: Publish wheel & sdist to PyPI
           command: |
-            export TWINE_USERNAME=__token__
-            export TWINE_PASSWORD=$PYPI_API_TOKEN
-            python -m twine upload --non-interactive --repository pypi /tmp/workspace/dist/*
+            mv /tmp/workspace/dist .
+            poetry publish --username "__token__" --password "$PYPI_API_TOKEN" --no-interaction
 
 workflows:
   version: 2
