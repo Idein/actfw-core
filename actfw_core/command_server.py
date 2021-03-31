@@ -1,29 +1,30 @@
+import base64
 import io
 import os
 import socket
-import base64
-from threading import Lock
 import traceback
+from threading import Lock
+
 from .task import Isolated
 
 
 def _read_tokens(conn, n):
     result = []
-    s = b''
+    s = b""
     x = n
     while x > 0:
         c = conn.recv(1)
-        if c == b' ':
+        if c == b" ":
             x -= 1
             result.append(s)
-            s = b''
+            s = b""
         else:
             s += c
     return result
 
 
 def _read_bytes(conn, n):
-    result = b''
+    result = b""
     while len(result) < n:
         result += conn.recv(1024)
     return result
@@ -43,7 +44,7 @@ class CommandServer(Isolated):
     def __init__(self, sock_path=None):
         super(CommandServer, self).__init__()
         self.sock_path = None
-        env = 'ACTCAST_COMMAND_SOCK'
+        env = "ACTCAST_COMMAND_SOCK"
         if env in os.environ:
             self.sock_path = os.environ[env]
         if sock_path is not None:
@@ -80,10 +81,13 @@ class CommandServer(Isolated):
                     header = "data:image/png;base64,"
                     with self.img_lock:
                         pngimg = io.BytesIO()
-                        self.img.save(pngimg, format='PNG')
+                        self.img.save(pngimg, format="PNG")
                         b64img = base64.b64encode(pngimg.getbuffer())
-                    conn.sendall("{} {} {} {}{}\n".format(request_id, 0, len(header) +
-                                                          len(b64img), header, b64img.decode('utf-8')).encode('utf-8'))
+                    conn.sendall(
+                        "{} {} {} {}{}\n".format(
+                            request_id, 0, len(header) + len(b64img), header, b64img.decode("utf-8")
+                        ).encode("utf-8")
+                    )
                 else:
                     conn.sendall("{} 2 0\n".format(request_id))
                 conn.close()

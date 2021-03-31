@@ -1,8 +1,10 @@
-import os
 import json
+import os
 from pathlib import Path
-import actfw_core.task
+
 import actfw_core.capture
+import actfw_core.task
+
 from .application import Application
 from .command_server import CommandServer
 
@@ -23,12 +25,12 @@ def notify(notification, *args, **kwargs):
 
     """
     if type(notification) != list:
-        raise TypeError('must be a list of JSON encodable objects.')
-    kwargs['flush'] = True
+        raise TypeError("must be a list of JSON encodable objects.")
+    kwargs["flush"] = True
     print(json.dumps(notification), *args, **kwargs)
 
 
-_default_heartbeat_file = Path('/root/heartbeat')
+_default_heartbeat_file = Path("/root/heartbeat")
 
 
 def _default_heartbeat(*args, **kwargs):

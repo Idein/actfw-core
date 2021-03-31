@@ -9,10 +9,10 @@ class Consumer(Pipe):
         super(Consumer, self).__init__()
 
     def _add_out_queue(self, q):
-        raise NotImplementedError('This is consumer')
+        raise NotImplementedError("This is consumer")
 
     def _outlet(self, o):
-        raise NotImplementedError('This is consumer')
+        raise NotImplementedError("This is consumer")
 
     def run(self):
         """Run and start the activity"""
@@ -30,4 +30,4 @@ class Consumer(Pipe):
         """
         if not issubclass(type(follow), Task):
             raise TypeError("type(follow) must be a subclass of actfw_core.task.Task.")
-        raise NotImplementedError('This is consumer')
+        raise NotImplementedError("This is consumer")

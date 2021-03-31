@@ -1,7 +1,8 @@
-from threading import Thread
-from queue import Queue, Empty, Full
-import traceback
 import inspect
+import traceback
+from queue import Empty, Full, Queue
+from threading import Thread
+
 from .task import Task
 
 
@@ -10,8 +11,7 @@ class Pipe(Task):
     """Straightforward Pipeline Task."""
 
     def __init__(self):
-        """
-        """
+        """"""
         super(Pipe, self).__init__()
         self.running = True
         self.in_queues = []

@@ -12,21 +12,24 @@
 #
 import os
 import sys
+
 import pkg_resources
 import sphinx.ext.apidoc
 import sphinx_theme
-sys.path.insert(0, os.path.abspath('../'))
+
+sys.path.insert(0, os.path.abspath("../"))
 
 
 def setup(app):
-    sphinx.ext.apidoc.main(['-f', '-o', 'docs', '.'])
+    sphinx.ext.apidoc.main(["-f", "-o", "docs", "."])
+
 
 # -- Project information -----------------------------------------------------
 
 
-project = 'actfw-core'
-copyright = '2019-2020, Idein Inc.'
-author = 'Idein Inc.'
+project = "actfw-core"
+copyright = "2019-2020, Idein Inc."
+author = "Idein Inc."
 
 # The full version, including alpha/beta/rc tags
 release = pkg_resources.get_distribution(project).version
@@ -38,15 +41,15 @@ release = pkg_resources.get_distribution(project).version
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 # extensions = ['sphinx.ext.autodoc']
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon']
+extensions = ["sphinx.ext.autodoc", "sphinx.ext.napoleon"]
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -54,7 +57,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'neo_rtd_theme'
+html_theme = "neo_rtd_theme"
 html_theme_path = [sphinx_theme.get_html_theme_path(html_theme)]
 
 # Add any paths that contain custom static files (such as style sheets) here,
@@ -63,4 +66,4 @@ html_theme_path = [sphinx_theme.get_html_theme_path(html_theme)]
 html_static_path = []
 
 
-autoclass_content = 'both'
+autoclass_content = "both"

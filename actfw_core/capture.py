@@ -1,8 +1,10 @@
+import enum
 import traceback
 from queue import Full
+
+from actfw_core.v4l2.video import V4L2_PIX_FMT, Video, VideoPort
+
 from .task import Producer
-from actfw_core.v4l2.video import Video, VideoPort, V4L2_PIX_FMT
-import enum
 
 
 class Frame(object):
@@ -33,14 +35,19 @@ class Frame(object):
 
 class V4LCameraCapture(Producer):
 
-    FormatSelector = enum.Enum('FormatSelector', 'DEFAULT PROPER MAXIMUM')
+    FormatSelector = enum.Enum("FormatSelector", "DEFAULT PROPER MAXIMUM")
 
     """Captured Frame Producer for Video4Linux"""
 
-    def __init__(self, device='/dev/video0', size=(640, 480), framerate=30,
-                 expected_format=V4L2_PIX_FMT.RGB24,
-                 fallback_formats=[V4L2_PIX_FMT.YUYV, V4L2_PIX_FMT.MJPEG],
-                 format_selector=FormatSelector.DEFAULT):
+    def __init__(
+        self,
+        device="/dev/video0",
+        size=(640, 480),
+        framerate=30,
+        expected_format=V4L2_PIX_FMT.RGB24,
+        fallback_formats=[V4L2_PIX_FMT.YUYV, V4L2_PIX_FMT.MJPEG],
+        format_selector=FormatSelector.DEFAULT,
+    ):
         """
 
         Args:
@@ -79,16 +86,20 @@ class V4LCameraCapture(Producer):
             self.video.set_format(candidates[0], 64, 64, V4L2_PIX_FMT.RGB24)
 
         if format_selector in [V4LCameraCapture.FormatSelector.PROPER, V4LCameraCapture.FormatSelector.MAXIMUM]:
+
             def cmp(config):
                 return (
                     config.width * config.height,
                     config.height,
                     config.width,
-                    config.interval.denominator / config.interval.numerator
+                    config.interval.denominator / config.interval.numerator,
                 )
+
         else:
+
             def cmp(config):
                 return 1
+
         config = None
         fmts = [expected_format] + fallback_formats
         for fmt in fmts:
@@ -145,7 +156,7 @@ class V4LCameraCapture(Producer):
                             updated += 1
                         else:
                             break
-                    self.frames = self.frames[len(self.frames) - updated:]
+                    self.frames = self.frames[len(self.frames) - updated :]
                     frame = Frame(value)
                     if self._outlet(frame):
                         self.frames.append(frame)
