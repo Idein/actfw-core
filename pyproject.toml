@@ -29,13 +29,9 @@ sphinx-theme = "^1.0"
 enable_black = true
 enable_flake8 = false # FIXME: too many warns/errors.
 enable_isort = true
-enable_mypy = true
-mypy_preset = "entry"
+enable_mypy = false
 line_length = 128
 py_version = "py38"
-
-[[tool.pysen.lint.mypy_targets]]
-paths = ["."]
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
