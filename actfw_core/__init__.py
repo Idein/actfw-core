@@ -6,10 +6,6 @@ import actfw_core.capture
 from .application import Application
 from .command_server import CommandServer
 
-from actfw_core import _version
-
-__version__ = _version.__version__
-
 
 def notify(notification, *args, **kwargs):
     """

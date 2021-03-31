@@ -12,6 +12,7 @@
 #
 import os
 import sys
+import pkg_resources
 import sphinx.ext.apidoc
 import sphinx_theme
 sys.path.insert(0, os.path.abspath('../'))
@@ -28,8 +29,7 @@ copyright = '2019-2020, Idein Inc.'
 author = 'Idein Inc.'
 
 # The full version, including alpha/beta/rc tags
-exec(open(os.path.join(os.path.dirname(os.path.abspath(os.path.dirname(__file__))), 'actfw_core', '_version.py')).read())
-release = __version__
+release = pkg_resources.get_distribution(project).version
 
 
 # -- General configuration ---------------------------------------------------
