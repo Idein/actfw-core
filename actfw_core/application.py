@@ -1,7 +1,8 @@
+import json
 import os
 import signal
 import time
-import json
+
 from actfw_core.task import Task
 
 
@@ -15,7 +16,7 @@ class Application:
         signal.signal(signal.SIGTERM, self._handler)
         self.tasks = []
         self.settings = None
-        env = 'ACT_SETTINGS_PATH'
+        env = "ACT_SETTINGS_PATH"
         if env in os.environ:
             try:
                 with open(os.environ[env]) as f:

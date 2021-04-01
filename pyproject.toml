@@ -1,0 +1,38 @@
+[tool.poetry]
+authors = ["Idein Inc."]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3 :: Only",
+]
+description = "Core components of actfw, independent of specific devices"
+keywords = ['actcast']
+license = "MIT"
+name = "actfw-core"
+readme = "README.md"
+repository = "https://github.com/Idein/actfw-core"
+version = "1.5.2"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+
+Pillow = "^8.1.2"
+
+[tool.poetry.dev-dependencies]
+Sphinx = "^3.5.3"
+nose2 = "^0.10.0"
+pysen = {version = "^0.9.1", extras = ["lint"]}
+sphinx-theme = "^1.0"
+
+[tool.pysen.lint]
+enable_black = true
+enable_flake8 = false # FIXME: too many warns/errors.
+enable_isort = true
+enable_mypy = false
+line_length = 128
+py_version = "py38"
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0"]

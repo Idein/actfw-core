@@ -1,2 +1,1 @@
-from . import video
-from . import types
+from . import types, video
