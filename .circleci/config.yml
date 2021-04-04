@@ -1,5 +1,8 @@
 version: 2.1
 
+references:
+  python-versions: &python-versions ["3.6", "3.7", "3.8", "3.9"]
+
 commands:
   install-python-dev-tools:
     steps:
@@ -57,8 +60,11 @@ jobs:
             poetry run pysen run lint
 
   test:
+    parameters:
+      python-version:
+        type: string
     docker:
-      - image: python:3-buster
+      - image: python:<<parameters.python-version>>-buster
         auth: *docker-hub-auth
     steps:
       - checkout
@@ -67,8 +73,11 @@ jobs:
           name: nose2
           command: poetry run nose2 -v
   test-with-up-to-date-dependencies:
+    parameters:
+      python-version:
+        type: string
     docker:
-      - image: python:3-buster
+      - image: python:<<parameters.python-version>>-buster
         auth: *docker-hub-auth
     steps:
       - checkout
@@ -183,6 +192,9 @@ workflows:
       - test:
           context:
             - docker-hub-creds
+          matrix:
+            parameters:
+              python-version: *python-versions
       - build-api-doc:
           context:
             - docker-hub-creds
@@ -238,9 +250,15 @@ workflows:
       - test:
           context:
             - docker-hub-creds
+          matrix:
+            parameters:
+              python-version: *python-versions
       - test-with-up-to-date-dependencies:
           context:
             - docker-hub-creds
+          matrix:
+            parameters:
+              python-version: *python-versions
       - build-api-doc:
           context:
             - docker-hub-creds
