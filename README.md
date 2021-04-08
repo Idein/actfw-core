@@ -79,7 +79,7 @@ The table of current versions provided by apt:
 | -------------------- | ------------ | ----------- |
 | pithon3-pil (Pillow) | 5.4.1        | 5.1.0       |
 
-For example, the version constraint of python package `Pillow` should be `^5.1.0`.
+For example, the version constraint of python package `Pillow` should be `^5`.
 
 ## Development Guide
 
