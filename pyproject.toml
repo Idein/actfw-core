@@ -17,7 +17,8 @@ version = "1.5.2"
 [tool.poetry.dependencies]
 python = "^3.6"
 
-Pillow = "^8.1.2"
+# See README.md
+Pillow = "^5.4.1"
 
 [tool.poetry.dev-dependencies]
 Sphinx = "^3.5.3"

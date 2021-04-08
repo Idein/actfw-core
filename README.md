@@ -68,6 +68,19 @@ app.register_task(c)
 app.run()
 ```
 
+## About dependencies
+
+This library is intended to be used to implement [Actcast application](https://actcast.io/docs/ForVendor/ApplicationDevelopment/).
+So, dependencies should be compatible with those provided by apt on the target envirenments.
+
+The table of current versions provided by apt:
+
+|                      | Raspberry Pi | Jetson Nano |
+| -------------------- | ------------ | ----------- |
+| pithon3-pil (Pillow) | 5.4.1        | 5.1.0       |
+
+For example, the version constraint of python package `Pillow` should be `^5.1.0`.
+
 ## Development Guide
 
 ### Installation of dev requirements
