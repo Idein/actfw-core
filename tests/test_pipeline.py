@@ -81,13 +81,5 @@ def test_pipeline():
     signal.pthread_kill(threading.get_ident(), signal.SIGINT)
     th.join()
 
-    def expected_log(xs):
-        expected = 2
-        for actual in xs:
-            if expected != actual:
-                return False
-            expected += 2
-        return True
-
     assert len(printer.logs) > 0
-    assert expected_log(printer.logs)
+    assert all((i + 1) * 2  == x for i, x in enumerate(printer.logs))
