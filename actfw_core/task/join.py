@@ -41,7 +41,7 @@ class Join(Task):
                 if len(self.in_queues) == len(results):
                     yield results
                 else:
-                    assert(not self._is_running())
+                    assert not self._is_running()
             except GeneratorExit:
                 break
             except:
