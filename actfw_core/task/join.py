@@ -29,9 +29,19 @@ class Join(Task):
     def _inlet(self):
         while self._is_running():
             try:
-                yield tuple(in_queue.get(timeout=1) for in_queue in self.in_queues)
-            except Empty:
-                pass
+                results = []
+                for in_queue in self.in_queues:
+                    while self._is_running():
+                        try:
+                            i = in_queue.get(timeout=1)
+                            results.append(i)
+                            break
+                        except Empty:
+                            pass
+                if len(self.in_queues) == len(results):
+                    yield results
+                else:
+                    assert(not self._is_running())
             except GeneratorExit:
                 break
             except:

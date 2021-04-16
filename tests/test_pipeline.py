@@ -89,4 +89,5 @@ def test_pipeline():
             expected += 2
         return True
 
+    assert len(printer.logs) > 0
     assert expected_log(printer.logs)
