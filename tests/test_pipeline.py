@@ -34,9 +34,9 @@ class Adder(Pipe):
         return sum(xs)
 
 
-class Printer(Consumer):
+class Logger(Consumer):
     def __init__(self):
-        super(Printer, self).__init__()
+        super(Logger, self).__init__()
         self.xs = []
 
     @property
@@ -45,7 +45,6 @@ class Printer(Consumer):
 
     def proc(self, x):
         self.xs.append(x)
-        # print(x)
 
 
 def test_pipeline():
@@ -64,8 +63,8 @@ def test_pipeline():
     app.register_task(join)
     adder = Adder()
     app.register_task(adder)
-    printer = Printer()
-    app.register_task(printer)
+    logger = Logger()
+    app.register_task(logger)
 
     counter.connect(tee)
     tee.connect(inc0)
@@ -73,7 +72,7 @@ def test_pipeline():
     inc0.connect(join)
     inc1.connect(join)
     join.connect(adder)
-    adder.connect(printer)
+    adder.connect(logger)
 
     th = threading.Thread(target=lambda: app.run())
     th.start()
@@ -81,5 +80,5 @@ def test_pipeline():
     signal.pthread_kill(threading.get_ident(), signal.SIGINT)
     th.join()
 
-    assert len(printer.logs) > 0
-    assert all((i + 1) * 2  == x for i, x in enumerate(printer.logs))
+    assert len(logger.logs) > 0
+    assert all((i + 1) * 2 == x for i, x in enumerate(logger.logs))
