@@ -25,6 +25,11 @@ nose2 = "^0.10.0"
 pysen = {version = "^0.9.1", extras = ["lint"]}
 sphinx-theme = "^1.0"
 
+[tool.poetry.urls]
+"Repository" = "https://github.com/Idein/actfw-core"
+"Documentation" = "https://idein.github.io/actfw-core/latest/"
+"Changelog" = "https://github.com/Idein/actfw-core/blob/master/CHANGELOG.md"
+
 [tool.pysen.lint]
 enable_black = true
 enable_flake8 = false # FIXME: too many warns/errors.
