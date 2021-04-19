@@ -3,6 +3,7 @@ import traceback
 from queue import Empty, Full, Queue
 from threading import Thread
 
+from ..util.pad import _PadBase, _PadBlocking, _PadIn, _PadOut
 from .task import Task
 
 
@@ -83,6 +84,9 @@ class Pipe(Task):
         Args:
             follow (:class:`~actfw_core.task.Task`): following task
         """
-        q = Queue(1)
-        follow._add_in_queue(q)
-        self._add_out_queue(q)
+        pad_out, pad_in = self._new_pad().into_pad_pair()
+        follow._add_in_queue(pad_out)
+        self._add_out_queue(pad_in)
+
+    def _new_pad(self) -> _PadBase[T_OUT]:
+        return _PadBlocking()
