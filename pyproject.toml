@@ -17,7 +17,21 @@ version = "1.5.2"
 [tool.poetry.dependencies]
 python = "^3.6"
 
-Pillow = "^8.1.2"
+# This library is intended to be used to implement [Actcast application](https://actcast.io/docs/ForVendor/ApplicationDevelopment/).
+# Dependencies should be compatible with those provided by apt in Actcast application's base image
+# to prevent installing different versions.  Notice that, IIUC, there is a possibility that
+# `actdk build` (and `pip install`) on Raspberry Pi 3 installs a binary distribution for ARMv7 in
+# spite of the application is intended to support Raspberry Pi Zero, which is ARMv6.  Using apt
+# (for non-pure python packages) mitigates the problem.
+#
+# The table of current versions provided by apt:
+#
+# |                      | Raspberry Pi | Jetson Nano |
+# | -------------------- | ------------ | ----------- |
+# | pithon3-pil (Pillow) | 5.4.1        | 5.1.0       |
+#
+# For example, the version constraint of python package `Pillow` should be `^5`.
+Pillow = "^5"
 
 [tool.poetry.dev-dependencies]
 Sphinx = "^3.5.3"
