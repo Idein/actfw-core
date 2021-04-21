@@ -2,11 +2,20 @@ import inspect
 import traceback
 from queue import Empty, Full, Queue
 from threading import Thread
+from typing import Generic, List, TypeVar
 
+from ..util.pad import _PadBase, _PadBlocking, _PadIn, _PadOut
 from .task import Task
 
+T_OUT = TypeVar("T_OUT")
+T_IN = TypeVar("T_IN")
 
-class Pipe(Task):
+
+class Pipe(Task, Generic[T_OUT, T_IN]):
+    running: bool
+    in_queues: List[_PadOut[T_IN]]
+    out_queues: List[_PadIn[T_OUT]]
+    out_queue_id: int
 
     """Straightforward Pipeline Task."""
 
@@ -83,6 +92,9 @@ class Pipe(Task):
         Args:
             follow (:class:`~actfw_core.task.Task`): following task
         """
-        q = Queue(1)
-        follow._add_in_queue(q)
-        self._add_out_queue(q)
+        pad_out, pad_in = self._new_pad().into_pad_pair()
+        follow._add_in_queue(pad_out)
+        self._add_out_queue(pad_in)
+
+    def _new_pad(self) -> _PadBase[T_OUT]:
+        return _PadBlocking()

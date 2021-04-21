@@ -5,6 +5,7 @@ from queue import Full
 from actfw_core.v4l2.video import V4L2_PIX_FMT, Video, VideoPort
 
 from .task import Producer
+from .util.pad import _PadDiscardingOld
 
 
 class Frame(object):
@@ -13,7 +14,6 @@ class Frame(object):
 
     def __init__(self, value):
         self.value = value
-        self.updatable = True
 
     def getvalue(self):
         """
@@ -23,14 +23,7 @@ class Frame(object):
             bytes: captured image data
 
         """
-        self.updatable = False
         return self.value
-
-    def _update(self, value):
-        if self.updatable:
-            self.value = value
-            return True
-        return False
 
 
 class V4LCameraCapture(Producer):
@@ -71,7 +64,6 @@ class V4LCameraCapture(Producer):
         """
         super(V4LCameraCapture, self).__init__()
         self.video = Video(device)
-        self.frames = []
 
         width, height = size
 
@@ -150,31 +142,8 @@ class V4LCameraCapture(Producer):
             while self._is_running():
                 try:
                     value = stream.capture(timeout=5)
-                    updated = 0
-                    for frame in reversed(self.frames):
-                        if frame._update(value):
-                            """
-                            This frame updating is the reason why `V4LCameraCapture` must override run method.
-
-                            The Raspberry Pi firmware internally buffers 4 frames of the CSI camera image,
-                            and if that buffer is full, the next frame is dropped. Example, If the inference
-                            pipeline throughput is 100ms, each frame in buffer captured the first 4+1 frames
-                            will be buffered at the capture frame rate set in the camera, but after the first
-                            frame is extracted and a new frame is buffered, no new frame will be buffered until
-                            next extraction after 100ms. This behavior causes that the delay between the frame
-                            data and the real-time will increase to 400-500ms. This delay is not a good look
-                            for a demo.
-
-                            To avoid this delay, skip the frames in the buffer to produce the latest frames
-                            as much as possible by `frame._update`.
-                            """
-                            updated += 1
-                        else:
-                            break
-                    self.frames = self.frames[len(self.frames) - updated :]
                     frame = Frame(value)
-                    if self._outlet(frame):
-                        self.frames.append(frame)
+                    self._outlet(frame)
                 except:
                     raise
         self.video.close()
@@ -191,3 +160,6 @@ class V4LCameraCapture(Producer):
             except:
                 traceback.print_exc()
         return False
+
+    def _new_pad(self):  # -> _PadBase[T_OUT]
+        return _PadDiscardingOld()
