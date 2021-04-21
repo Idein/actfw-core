@@ -41,7 +41,7 @@ class _PadBase(ABC, Generic[T]):
 
 
 class _PadBlocking(_PadBase[T]):
-    _queue: Queue[T]
+    _queue: "Queue[T]"
 
     def __init__(self) -> None:
         self._queue = Queue(1)
@@ -66,7 +66,7 @@ class _PadBlocking(_PadBase[T]):
 
 
 class _PadDiscardingOld(Generic[T]):
-    _queue: _SimpleQueue[T]
+    _queue: "_SimpleQueue[T]"
 
     def __init__(self) -> None:
         self._queue = _SimpleQueue()
