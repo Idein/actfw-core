@@ -25,7 +25,7 @@ class Application:
                 pass
 
     def _handler(self, sig, frame):
-        self.running = False
+        self.stop()
 
     def get_settings(self, default_settings):
         """
@@ -78,3 +78,7 @@ class Application:
             task.stop()
         for task in self.tasks:
             task.join()
+
+    def stop(self):
+        """Stop application"""
+        self.running = False
