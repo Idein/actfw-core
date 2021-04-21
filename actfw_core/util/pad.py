@@ -26,7 +26,7 @@ class _PadBase(ABC, Generic[T]):
         self,
         block: bool = True,
         timeout: Optional[float] = None,
-    ) -> Optional[T]:
+    ) -> T:
         return self._queue.get(block=block, timeout=timeout)
 
     def into_pad_pair(self) -> "Tuple[_PadOut[T], _PadIn[T]]":
@@ -54,7 +54,7 @@ class _PadBlocking(_PadBase[T]):
         self,
         block: bool = True,
         timeout: Optional[float] = None,
-    ) -> Optional[T]:
+    ) -> T:
         return self._queue.get(block=block, timeout=timeout)
 
 
@@ -86,7 +86,7 @@ class _PadDiscardingOld(Generic[T]):
         self,
         block: bool = True,
         timeout: Optional[float] = None,
-    ) -> Optional[T]:
+    ) -> T:
         return self._queue.get(block=block, timeout=timeout)
 
 
@@ -118,5 +118,5 @@ class _PadOut(Generic[T]):
         self,
         block: bool = True,
         timeout: Optional[float] = None,
-    ) -> Optional[T]:
+    ) -> T:
         return self._pad.get(block=block, timeout=timeout)
