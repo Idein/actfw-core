@@ -119,4 +119,4 @@ class _PadOut(Generic[T]):
         block: bool = True,
         timeout: Optional[float] = None,
     ) -> Optional[T]:
-        self._pad.get(block=block, timeout=timeout)
+        return self._pad.get(block=block, timeout=timeout)
