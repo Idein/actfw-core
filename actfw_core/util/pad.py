@@ -58,7 +58,7 @@ class _PadBlocking(_PadBase[T]):
         return self._queue.get(block=block, timeout=timeout)
 
 
-class _PadDiscardingOld(Generic[T]):
+class _PadDiscardingOld(_PadBase[T]):
     _queue: "Queue[T]"
 
     def __init__(self) -> None:
