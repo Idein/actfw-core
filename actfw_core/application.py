@@ -10,10 +10,10 @@ class Application:
 
     """Actcast Application"""
 
-    def __init__(self):
+    def __init__(self, stop_by_signals=[signal.SIGINT, signal.SIGTERM]):
         self.running = True
-        signal.signal(signal.SIGINT, self._handler)
-        signal.signal(signal.SIGTERM, self._handler)
+        for sig in stop_by_signals:
+            signal.signal(sig, self._handler)
         self.tasks = []
         self.settings = None
         env = "ACT_SETTINGS_PATH"
@@ -61,11 +61,18 @@ class Application:
             raise TypeError("type(task) must be a subclass of actfw_core.task.Task.")
         self.tasks.append(task)
 
-    def run(self):
+    def start(self):
         """Start application"""
         for task in self.tasks:
             task.start()
 
+    @property
+    def is_running(self):
+        return self.running
+
+    def run(self):
+        """Run & Wait application"""
+        self.start()
         try:
             while self.running:
                 time.sleep(1)
@@ -73,7 +80,10 @@ class Application:
             pass
         except:
             raise
+        self.wait()
 
+    def wait(self):
+        """Wait application"""
         for task in self.tasks:
             task.stop()
         for task in self.tasks:
