@@ -10,7 +10,7 @@ class Counter(Producer):
         super().__init__()
         self.n = 0
 
-    def proc(self, _):
+    def proc(self):
         time.sleep(0.01)
         n = self.n
         self.n += 1
