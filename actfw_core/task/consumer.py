@@ -18,7 +18,7 @@ class Consumer(Pipe):
         """Run and start the activity"""
         for i in self._inlet():
             self.proc(i)
-            if not self._is_running:
+            if not self._is_running():
                 break
 
     def connect(self, follow):
