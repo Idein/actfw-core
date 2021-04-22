@@ -10,10 +10,10 @@ class Application:
 
     """Actcast Application"""
 
-    def __init__(self):
+    def __init__(self, stop_by_signals=[signal.SIGINT, signal.SIGTERM]):
         self.running = True
-        signal.signal(signal.SIGINT, self._handler)
-        signal.signal(signal.SIGTERM, self._handler)
+        for sig in stop_by_signals:
+            signal.signal(sig, self._handler)
         self.tasks = []
         self.settings = None
         env = "ACT_SETTINGS_PATH"
@@ -25,7 +25,7 @@ class Application:
                 pass
 
     def _handler(self, sig, frame):
-        self.running = False
+        self.stop()
 
     def get_settings(self, default_settings):
         """
@@ -78,3 +78,7 @@ class Application:
             task.stop()
         for task in self.tasks:
             task.join()
+
+    def stop(self):
+        """Stop application"""
+        self.running = False

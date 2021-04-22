@@ -1,4 +1,3 @@
-import signal
 import threading
 import time
 
@@ -77,7 +76,7 @@ def test_pipeline():
     th = threading.Thread(target=lambda: app.run())
     th.start()
     time.sleep(0.5)
-    signal.pthread_kill(threading.get_ident(), signal.SIGINT)
+    app.stop()
     th.join()
 
     assert len(logger.logs) > 0
