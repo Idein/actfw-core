@@ -61,10 +61,6 @@ class Application:
             raise TypeError("type(task) must be a subclass of actfw_core.task.Task.")
         self.tasks.append(task)
 
-    @property
-    def is_running(self):
-        return self.running
-
     def run(self):
         """Start application"""
         for task in self.tasks:
