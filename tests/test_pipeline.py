@@ -1,3 +1,4 @@
+import threading
 import time
 
 import actfw_core
@@ -72,10 +73,11 @@ def test_pipeline():
     join.connect(adder)
     adder.connect(logger)
 
-    app.start()
+    th = threading.Thread(target=lambda: app.run())
+    th.start()
     time.sleep(0.5)
     app.stop()
-    app.wait()
+    th.join()
 
     assert len(logger.logs) > 0
     assert all((i + 1) * 2 == x for i, x in enumerate(logger.logs))

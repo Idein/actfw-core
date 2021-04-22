@@ -61,18 +61,15 @@ class Application:
             raise TypeError("type(task) must be a subclass of actfw_core.task.Task.")
         self.tasks.append(task)
 
-    def start(self):
-        """Start application"""
-        for task in self.tasks:
-            task.start()
-
     @property
     def is_running(self):
         return self.running
 
     def run(self):
-        """Run & Wait application"""
-        self.start()
+        """Start application"""
+        for task in self.tasks:
+            task.start()
+
         try:
             while self.running:
                 time.sleep(1)
@@ -80,10 +77,7 @@ class Application:
             pass
         except:
             raise
-        self.wait()
 
-    def wait(self):
-        """Wait application"""
         for task in self.tasks:
             task.stop()
         for task in self.tasks:
