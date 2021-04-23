@@ -20,7 +20,7 @@ class Tee(Task):
 
     def __init__(self):
         """"""
-        super(Tee, self).__init__()
+        super().__init__()
         self.running = True
         self.in_queues = []
         self.out_queues = []

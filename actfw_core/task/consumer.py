@@ -6,7 +6,7 @@ class Consumer(Pipe):
     """Consumer Task."""
 
     def __init__(self):
-        super(Consumer, self).__init__()
+        super().__init__()
 
     def _add_out_queue(self, q):
         raise NotImplementedError("This is consumer")

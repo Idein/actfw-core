@@ -21,7 +21,7 @@ class Pipe(Task, Generic[T_OUT, T_IN]):
 
     def __init__(self):
         """"""
-        super(Pipe, self).__init__()
+        super().__init__()
         self.running = True
         self.in_queues = []
         self.out_queues = []
