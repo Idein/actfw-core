@@ -7,4 +7,4 @@ class Task(Thread):
 
     def __init__(self):
         """"""
-        super(Task, self).__init__()
+        super().__init__()

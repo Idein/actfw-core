@@ -7,7 +7,7 @@ from actfw_core.task import Consumer, Join, Pipe, Producer, Tee
 
 class Counter(Producer):
     def __init__(self):
-        super(Producer, self).__init__()
+        super().__init__()
         self.n = 0
 
     def proc(self, _):
@@ -19,7 +19,7 @@ class Counter(Producer):
 
 class Incrementer(Pipe):
     def __init__(self):
-        super(Incrementer, self).__init__()
+        super().__init__()
 
     def proc(self, x):
         return x + 1
@@ -27,7 +27,7 @@ class Incrementer(Pipe):
 
 class Adder(Pipe):
     def __init__(self):
-        super(Adder, self).__init__()
+        super().__init__()
 
     def proc(self, xs):
         return sum(xs)
@@ -35,7 +35,7 @@ class Adder(Pipe):
 
 class Logger(Consumer):
     def __init__(self):
-        super(Logger, self).__init__()
+        super().__init__()
         self.xs = []
 
     @property
