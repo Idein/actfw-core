@@ -5,10 +5,8 @@ import pytest
     "from_, import_",
     [
         ("actfw_core", "Application"),
-        ("actfw_core.task", "Producer"),
         ("actfw_core.capture", "V4LCameraCapture"),
-        ("actfw_core.task", "Pipe"),
-        ("actfw_core.task", "Consumer"),
+        ("actfw_core.task", "Consumer, Isolated, Join, Pipe, Producer, Task, Tee"),
     ],
 )
 def test_import_actfw_core(from_, import_):
