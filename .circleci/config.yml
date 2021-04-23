@@ -70,8 +70,8 @@ jobs:
       - checkout
       - poetry-install
       - run:
-          name: nose2
-          command: poetry run nose2 -v
+          name: Test
+          command: poetry run pytest -v
   test-with-up-to-date-dependencies:
     parameters:
       python-version:
@@ -86,8 +86,8 @@ jobs:
           command: rm poetry.lock
       - poetry-install
       - run:
-          name: nose2
-          command: poetry run nose2 -v
+          name: Test
+          command: poetry run pytest -v
 
   build-api-doc:
     docker:
