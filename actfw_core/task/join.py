@@ -1,7 +1,7 @@
 import traceback
 from queue import Empty, Full, Queue
 from threading import Thread
-from typing import Any, Generator, Generic, List, TypeVar
+from typing import Any, Generator, Generic, Tuple, TypeVar
 
 from ..util.pad import _PadBase, _PadBlocking, _PadIn, _PadOut
 from .consumer import _ConsumerMixin
@@ -9,7 +9,7 @@ from .producer import _ProducerMixin
 from .task import Task
 
 
-class Join(Task, _ProducerMixin[List[Any]], _ConsumerMixin[Any]):
+class Join(Task, _ProducerMixin[Tuple[Any, ...]], _ConsumerMixin[Any]):
     """Join Task."""
 
     def __init__(self) -> None:
@@ -18,7 +18,7 @@ class Join(Task, _ProducerMixin[List[Any]], _ConsumerMixin[Any]):
         _ProducerMixin.__init__(self)
         _ConsumerMixin.__init__(self)
 
-    def _inlet(self) -> Generator[List[Any], None, None]:
+    def _inlet(self) -> Generator[Tuple[Any, ...], None, None]:
         while self._is_running():
             try:
                 results = []
@@ -31,7 +31,7 @@ class Join(Task, _ProducerMixin[List[Any]], _ConsumerMixin[Any]):
                         except Empty:
                             pass
                 if len(self.in_queues) == len(results):
-                    yield results
+                    yield tuple(results)
                 else:
                     assert not self._is_running()
             except GeneratorExit:
