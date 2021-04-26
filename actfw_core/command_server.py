@@ -73,6 +73,8 @@ class CommandServer(Isolated):
                     else:
                         break
             try:
+                assert self.img is not None
+
                 conn, addr = s.accept()
                 [request_id, command_id, command_data_length] = map(int, _read_tokens(conn, 3))
                 command_data = _read_bytes(conn, command_data_length)
@@ -88,7 +90,7 @@ class CommandServer(Isolated):
                         ).encode("utf-8")
                     )
                 else:
-                    conn.sendall("{} 2 0\n".format(request_id))
+                    conn.sendall(f"{request_id} 2 0\n".encode())
                 conn.close()
             except socket.timeout:
                 pass

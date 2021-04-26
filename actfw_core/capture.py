@@ -1,20 +1,24 @@
 import enum
 from queue import Full
+from typing import Generic, TypeVar
 
-from actfw_core.v4l2.video import V4L2_PIX_FMT, Video, VideoPort
+from actfw_core.v4l2.video import V4L2_PIX_FMT, Video, VideoPort  # type: ignore
 
 from .task import Producer
 from .util.pad import _PadDiscardingOld
 
+T = TypeVar("T")
 
-class Frame(object):
+
+class Frame(Generic[T]):
+    value: T
 
     """Captured Frame"""
 
-    def __init__(self, value):
+    def __init__(self, value: T) -> None:
         self.value = value
 
-    def getvalue(self):
+    def getvalue(self) -> T:
         """
         Get frame data.
 
@@ -25,7 +29,7 @@ class Frame(object):
         return self.value
 
 
-class V4LCameraCapture(Producer):
+class V4LCameraCapture(Producer[Frame[bytes]]):
 
     FormatSelector = enum.Enum("FormatSelector", "DEFAULT PROPER MAXIMUM")
 

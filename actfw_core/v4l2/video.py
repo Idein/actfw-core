@@ -1,3 +1,5 @@
+# type: ignore
+
 import enum
 import errno
 import io
