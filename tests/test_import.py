@@ -1,12 +1,13 @@
-from nose2.tools import params
+import pytest
 
 
-@params(
-    {"from": "actfw_core", "import": "Application"},
-    {"from": "actfw_core.task", "import": "Producer"},
-    {"from": "actfw_core.capture", "import": "V4LCameraCapture"},
-    {"from": "actfw_core.task", "import": "Pipe"},
-    {"from": "actfw_core.task", "import": "Consumer"},
+@pytest.mark.parametrize(
+    "from_, import_",
+    [
+        ("actfw_core", "Application"),
+        ("actfw_core.capture", "V4LCameraCapture"),
+        ("actfw_core.task", "Consumer, Isolated, Join, Pipe, Producer, Task, Tee"),
+    ],
 )
-def test_import_actfw_core(param):
-    exec(f"""from {param['from']} import {param['import']}""")
+def test_import_actfw_core(from_, import_):
+    exec(f"""from {from_} import {import_}""")
