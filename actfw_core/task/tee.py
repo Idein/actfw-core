@@ -1,4 +1,3 @@
-import traceback
 from queue import Empty, Full, Queue
 from typing import Generic, List, TypeVar
 
@@ -26,8 +25,6 @@ class Tee(Generic[T_OUT, T_IN], Task, _ProducerMixin[T_OUT], _ConsumerMixin[T_IN
                     out_queue.put(o, timeout=1)
                 except Full:
                     pass
-                except:
-                    traceback.print_exc()
             return True
         return False
 

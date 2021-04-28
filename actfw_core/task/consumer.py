@@ -1,4 +1,3 @@
-import traceback
 from queue import Empty
 from typing import Generator, Generic, List, TypeVar
 
@@ -29,8 +28,6 @@ class _ConsumerMixin(Generic[T_IN], _TaskI):
                 pass
             except GeneratorExit:
                 break
-            except:
-                traceback.print_exc()
 
 
 class Consumer(Generic[T_IN], Task, _ConsumerMixin[T_IN]):
