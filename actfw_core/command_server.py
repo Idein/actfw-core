@@ -105,7 +105,3 @@ class CommandServer(Isolated):
         """
         with self.img_lock:
             self.img = image.copy()
-
-    def stop(self):
-        """Stop the activity"""
-        self.running = False
