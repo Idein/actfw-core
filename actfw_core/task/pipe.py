@@ -1,4 +1,3 @@
-import inspect
 from typing import Generic, TypeVar
 
 from ..util.pad import _PadBase, _PadBlocking, _PadIn, _PadOut

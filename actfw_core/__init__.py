@@ -1,13 +1,10 @@
 import json
-import os
 from pathlib import Path
 from typing import Any, Callable, Dict, List
 
-import actfw_core.capture
-import actfw_core.task
-
-from .application import Application
-from .command_server import CommandServer
+from . import capture, task  # noqa: F401
+from .application import Application  # noqa: F401
+from .command_server import CommandServer  # noqa: F401
 
 
 def notify(

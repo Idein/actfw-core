@@ -1,4 +1,4 @@
-from typing import Generic, List, TypeVar
+from typing import List, TypeVar
 
 from actfw_core.util.pad import _PadDiscardingOld
 

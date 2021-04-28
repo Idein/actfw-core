@@ -1,4 +1,5 @@
 # type: ignore
+# flake8: noqa
 
 import enum
 import errno
