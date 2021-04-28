@@ -2,15 +2,20 @@ import json
 import os
 import signal
 import time
+from types import FrameType
+from typing import Any, Dict, List, Optional
 
 from actfw_core.task import Task
 
 
 class Application:
+    running: bool
+    tasks: List[Task]
+    settings: Optional[Dict[str, Any]]
 
     """Actcast Application"""
 
-    def __init__(self, stop_by_signals=[signal.SIGINT, signal.SIGTERM]):
+    def __init__(self, stop_by_signals: List[signal.Signals] = [signal.SIGINT, signal.SIGTERM]) -> None:
         self.running = True
         for sig in stop_by_signals:
             signal.signal(sig, self._handler)
@@ -24,10 +29,10 @@ class Application:
             except FileNotFoundError:
                 pass
 
-    def _handler(self, sig, frame):
+    def _handler(self, sig: signal.Signals, frame: FrameType) -> None:
         self.stop()
 
-    def get_settings(self, default_settings):
+    def get_settings(self, default_settings: Dict[str, Any]) -> Dict[str, Any]:
         """
 
         Get given Act settings.
@@ -49,7 +54,7 @@ class Application:
             settings.update(self.settings)
         return settings
 
-    def register_task(self, task):
+    def register_task(self, task: Task) -> None:
         """
 
         Register the application task.
@@ -61,7 +66,7 @@ class Application:
             raise TypeError("type(task) must be a subclass of actfw_core.task.Task.")
         self.tasks.append(task)
 
-    def run(self):
+    def run(self) -> None:
         """Start application"""
         for task in self.tasks:
             task.start()
@@ -79,6 +84,6 @@ class Application:
         for task in self.tasks:
             task.join()
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop application"""
         self.running = False

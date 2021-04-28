@@ -7,11 +7,11 @@ from actfw_core.task import Consumer, Join, Pipe, Producer, Tee
 
 
 class Counter(Producer[int]):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.n = 0
 
-    def proc(self):
+    def proc(self) -> int:
         time.sleep(0.01)
         n = self.n
         self.n += 1
@@ -19,35 +19,37 @@ class Counter(Producer[int]):
 
 
 class Incrementer(Pipe[int, int]):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
-    def proc(self, x):
+    def proc(self, x: int) -> int:
         return x + 1
 
 
 class Adder(Pipe[int, Tuple[int, ...]]):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
-    def proc(self, xs):
+    def proc(self, xs: Tuple[int, ...]) -> int:
         return sum(xs)
 
 
 class Logger(Consumer[int]):
-    def __init__(self):
+    xs: List[int]
+
+    def __init__(self) -> None:
         super().__init__()
         self.xs = []
 
     @property
-    def logs(self):
+    def logs(self) -> List[int]:
         return self.xs
 
-    def proc(self, x):
+    def proc(self, x: int) -> None:
         self.xs.append(x)
 
 
-def test_pipeline():
+def test_pipeline() -> None:
 
     app = actfw_core.Application()
 

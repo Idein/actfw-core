@@ -1,11 +1,11 @@
 import enum
 from queue import Full
-from typing import Generic, TypeVar
+from typing import Callable, Generic, List, Tuple, TypeVar
 
 from actfw_core.v4l2.video import V4L2_PIX_FMT, Video, VideoPort  # type: ignore
 
 from .task import Producer
-from .util.pad import _PadDiscardingOld
+from .util.pad import _PadBase, _PadDiscardingOld
 
 T = TypeVar("T")
 
@@ -29,7 +29,14 @@ class Frame(Generic[T]):
         return self.value
 
 
+CONFIGURATOR_RETURN = TypeVar("CONFIGURATOR_RETURN")
+
+
 class V4LCameraCapture(Producer[Frame[bytes]]):
+    video: Video
+    capture_width: int
+    capture_height: int
+    capture_format: V4L2_PIX_FMT
 
     FormatSelector = enum.Enum("FormatSelector", "DEFAULT PROPER MAXIMUM")
 
@@ -37,13 +44,13 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
 
     def __init__(
         self,
-        device="/dev/video0",
-        size=(640, 480),
-        framerate=30,
-        expected_format=V4L2_PIX_FMT.RGB24,
-        fallback_formats=[V4L2_PIX_FMT.YUYV, V4L2_PIX_FMT.MJPEG],
-        format_selector=FormatSelector.DEFAULT,
-    ):
+        device: str = "/dev/video0",
+        size: Tuple[int, int] = (640, 480),
+        framerate: int = 30,
+        expected_format: V4L2_PIX_FMT = V4L2_PIX_FMT.RGB24,
+        fallback_formats: List[V4L2_PIX_FMT] = [V4L2_PIX_FMT.YUYV, V4L2_PIX_FMT.MJPEG],
+        format_selector: FormatSelector = FormatSelector.DEFAULT,
+    ) -> None:
         """
 
         Args:
@@ -82,7 +89,7 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
 
         if format_selector in [V4LCameraCapture.FormatSelector.PROPER, V4LCameraCapture.FormatSelector.MAXIMUM]:
 
-            def cmp(config):
+            def cmp(config):  # type: ignore
                 return (
                     config.width * config.height,
                     config.height,
@@ -92,7 +99,7 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
 
         else:
 
-            def cmp(config):
+            def cmp(config):  # type: ignore
                 return 1
 
         config = None
@@ -111,13 +118,15 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
         else:
             fmt = self.video.set_format(config, width, height, expected_format=expected_format)
         self.capture_width, self.capture_height, self.capture_format = fmt
+        # TODO: v3.0.0. Comment out.
+        # assert type(self.capture_format) is V4L2_PIX_FMT
         self.video.set_framerate(config)
         # video.set_rotation(90)
         buffers = self.video.request_buffers(4)
         for buf in buffers:
             self.video.queue_buffer(buf)
 
-    def capture_size(self):
+    def capture_size(self) -> Tuple[int, int]:
         """
         Get configured capture resolution.
         A configured resolution may be more larger than expected one.
@@ -127,7 +136,7 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
         """
         return (self.capture_width, self.capture_height)
 
-    def configure(self, configurator):
+    def configure(self, configurator: Callable[[Video], CONFIGURATOR_RETURN]) -> CONFIGURATOR_RETURN:
         """
         Run user defined video configurator.
 
@@ -139,7 +148,7 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
         """
         return configurator(self.video)
 
-    def run(self):
+    def run(self) -> None:
         """Run producer activity"""
         with self.video.start_streaming() as stream:
             while self._is_running():
@@ -151,5 +160,5 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
                     raise
         self.video.close()
 
-    def _new_pad(self):  # -> _PadBase[T_OUT]
+    def _new_pad(self) -> _PadBase[bytes]:
         return _PadDiscardingOld()

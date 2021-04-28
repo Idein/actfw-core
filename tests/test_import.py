@@ -9,5 +9,5 @@ import pytest
         ("actfw_core.task", "Consumer, Isolated, Join, Pipe, Producer, Task, Tee"),
     ],
 )
-def test_import_actfw_core(from_, import_):
+def test_import_actfw_core(from_: str, import_: str) -> None:
     exec(f"""from {from_} import {import_}""")

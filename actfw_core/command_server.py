@@ -3,11 +3,14 @@ import io
 import os
 import socket
 from threading import Lock
+from typing import List, Optional
+
+from PIL.Image import Image as PIL_Image
 
 from .task import Isolated
 
 
-def _read_tokens(conn, n):
+def _read_tokens(conn: socket.socket, n: int) -> List[bytes]:
     result = []
     s = b""
     x = n
@@ -22,7 +25,7 @@ def _read_tokens(conn, n):
     return result
 
 
-def _read_bytes(conn, n):
+def _read_bytes(conn: socket.socket, n: int) -> bytes:
     result = b""
     while len(result) < n:
         result += conn.recv(1024)
@@ -30,6 +33,9 @@ def _read_bytes(conn, n):
 
 
 class CommandServer(Isolated):
+    sock_path: Optional[str]
+    img_lock: Lock
+    img: Optional[PIL_Image]
 
     """Actcast Command Server
 
@@ -40,7 +46,7 @@ class CommandServer(Isolated):
 
     """
 
-    def __init__(self, sock_path=None):
+    def __init__(self, sock_path: Optional[str] = None) -> None:
         super(CommandServer, self).__init__()
         self.sock_path = None
         env = "ACTCAST_COMMAND_SOCK"
@@ -52,7 +58,7 @@ class CommandServer(Isolated):
         self.img_lock = Lock()
         self.img = None
 
-    def run(self):
+    def run(self) -> None:
         """Run and start the activity"""
         if self.sock_path is None:
             return
@@ -96,7 +102,7 @@ class CommandServer(Isolated):
                 pass
         os.remove(self.sock_path)
 
-    def update_image(self, image):
+    def update_image(self, image: PIL_Image) -> None:
         """
 
         Update the cached 'Take Photo' command image.

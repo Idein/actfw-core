@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+from typing import Any, Callable, Dict, List
 
 import actfw_core.capture
 import actfw_core.task
@@ -9,7 +10,11 @@ from .application import Application
 from .command_server import CommandServer
 
 
-def notify(notification, *args, **kwargs):
+def notify(
+    notification: List[Dict[str, Any]],
+    *args: Any,
+    **kwargs: Any,
+) -> None:
     """
 
     Make a notification to Actcast.
@@ -33,14 +38,14 @@ def notify(notification, *args, **kwargs):
 _default_heartbeat_file = Path("/root/heartbeat")
 
 
-def _default_heartbeat(*args, **kwargs):
+def _default_heartbeat(*args: Any, **kwargs: Any) -> None:
     _default_heartbeat_file.touch()
 
 
 _heartbeat_function = _default_heartbeat
 
 
-def set_heartbeat_function(f):
+def set_heartbeat_function(f: Callable[..., None]) -> None:
     """
 
     Set heartbeat action.
@@ -62,7 +67,7 @@ def set_heartbeat_function(f):
     _heartbeat_function = f
 
 
-def heartbeat(*args, **kwargs):
+def heartbeat(*args: Any, **kwargs: Any) -> None:
     """
 
     Execute heartbeat action.
