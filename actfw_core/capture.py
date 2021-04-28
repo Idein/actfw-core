@@ -152,12 +152,9 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
         """Run producer activity"""
         with self.video.start_streaming() as stream:
             while self._is_running():
-                try:
-                    value = stream.capture(timeout=5)
-                    frame = Frame(value)
-                    self._outlet(frame)
-                except:
-                    raise
+                value = stream.capture(timeout=5)
+                frame = Frame(value)
+                self._outlet(frame)
         self.video.close()
 
     def _new_pad(self) -> _PadBase[bytes]:
