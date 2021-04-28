@@ -1,4 +1,3 @@
-import traceback
 from queue import Empty, Full
 from typing import Generic, List, TypeVar
 
@@ -43,8 +42,6 @@ class _ProducerMixin(Generic[T_OUT], _TaskI):
                 return True
             except Full:
                 pass
-            except:
-                traceback.print_exc()
         return False
 
 

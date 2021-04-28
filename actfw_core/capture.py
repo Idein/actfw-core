@@ -1,5 +1,4 @@
 import enum
-import traceback
 from queue import Full
 
 from actfw_core.v4l2.video import V4L2_PIX_FMT, Video, VideoPort
@@ -157,8 +156,6 @@ class V4LCameraCapture(Producer):
                 return True
             except Full:
                 return False
-            except:
-                traceback.print_exc()
         return False
 
     def _new_pad(self):  # -> _PadBase[T_OUT]

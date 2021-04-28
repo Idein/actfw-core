@@ -2,7 +2,6 @@ import base64
 import io
 import os
 import socket
-import traceback
 from threading import Lock
 
 from .task import Isolated
@@ -93,8 +92,6 @@ class CommandServer(Isolated):
                 conn.close()
             except socket.timeout:
                 pass
-            except Exception as e:
-                traceback.print_exc()
         os.remove(self.sock_path)
 
     def update_image(self, image):

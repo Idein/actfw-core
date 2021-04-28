@@ -1,4 +1,3 @@
-import traceback
 from queue import Empty, Full, Queue
 from threading import Thread
 from typing import Any, Generator, Generic, Tuple, TypeVar
@@ -36,8 +35,6 @@ class Join(Task, _ProducerMixin[Tuple[Any, ...]], _ConsumerMixin[Any]):
                     assert not self._is_running()
             except GeneratorExit:
                 break
-            except:
-                traceback.print_exc()
 
     def run(self) -> None:
         """Run and start the activity"""
