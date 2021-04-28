@@ -147,16 +147,5 @@ class V4LCameraCapture(Producer):
                     raise
         self.video.close()
 
-    def _outlet(self, o):
-        length = len(self.out_queues)
-        while self._is_running():
-            try:
-                self.out_queues[self.out_queue_id % length].put(o, block=False)
-                self.out_queue_id += 1
-                return True
-            except Full:
-                return False
-        return False
-
     def _new_pad(self):  # -> _PadBase[T_OUT]
         return _PadDiscardingOld()
