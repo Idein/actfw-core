@@ -1,5 +1,5 @@
 import enum
-from typing import Callable, Generic, List, Tuple, TypeVar
+from typing import Callable, Generic, List, Optional, Tuple, TypeVar
 
 from actfw_core.v4l2.video import V4L2_PIX_FMT, Video, VideoPort  # type: ignore
 
@@ -47,7 +47,7 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
         size: Tuple[int, int] = (640, 480),
         framerate: int = 30,
         expected_format: V4L2_PIX_FMT = V4L2_PIX_FMT.RGB24,
-        fallback_formats: List[V4L2_PIX_FMT] = [V4L2_PIX_FMT.YUYV, V4L2_PIX_FMT.MJPEG],
+        fallback_formats: Optional[List[V4L2_PIX_FMT]] = None,
         format_selector: FormatSelector = FormatSelector.DEFAULT,
     ) -> None:
         """
@@ -71,6 +71,9 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
             try to capture one of the fallback_formats and convert it to expected_format.
 
         """
+        if fallback_formats is None:
+            fallback_formats = [V4L2_PIX_FMT.YUYV, V4L2_PIX_FMT.MJPEG]
+
         super(V4LCameraCapture, self).__init__()
         self.video = Video(device)
 

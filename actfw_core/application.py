@@ -3,7 +3,7 @@ import os
 import signal
 import time
 from types import FrameType
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from actfw_core.task import Task
 
@@ -15,7 +15,7 @@ class Application:
 
     """Actcast Application"""
 
-    def __init__(self, stop_by_signals: List[signal.Signals] = [signal.SIGINT, signal.SIGTERM]) -> None:
+    def __init__(self, stop_by_signals: Iterable[signal.Signals] = (signal.SIGINT, signal.SIGTERM)) -> None:
         self.running = True
         for sig in stop_by_signals:
             signal.signal(sig, self._handler)
