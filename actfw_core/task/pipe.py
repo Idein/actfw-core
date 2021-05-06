@@ -1,6 +1,5 @@
 from typing import Generic, TypeVar
 
-from ..util.pad import _PadBase, _PadBlocking, _PadIn, _PadOut
 from .consumer import _ConsumerMixin
 from .producer import _ProducerMixin
 from .task import Task

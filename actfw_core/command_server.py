@@ -65,7 +65,7 @@ class CommandServer(Isolated):
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             os.unlink(self.sock_path)
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             pass  # ignore
         s.bind(self.sock_path)
         s.settimeout(1)
@@ -83,7 +83,6 @@ class CommandServer(Isolated):
 
                 conn, addr = s.accept()
                 [request_id, command_id, command_data_length] = map(int, _read_tokens(conn, 3))
-                command_data = _read_bytes(conn, command_data_length)
                 if command_id == 0:  # Take Photo
                     header = "data:image/png;base64,"
                     with self.img_lock:

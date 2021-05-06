@@ -1,5 +1,4 @@
 import enum
-from queue import Full
 from typing import Callable, Generic, List, Tuple, TypeVar
 
 from actfw_core.v4l2.video import V4L2_PIX_FMT, Video, VideoPort  # type: ignore
@@ -59,7 +58,7 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
             framerate (int): expected capture framerate
             expected_format (:class:`~actfw_core.v4l2.video.V4L2_PIX_FMT`): expected capture format
             fallback_formats (list of :class:`~actfw_core.v4l2.video.V4L2_PIX_FMT`): fallback capture format
-            format_selector (:class:`~actfw_core.capture.V4LCameraCapture.FormatSelector): how to select a format from listed formats supported by a camera.
+            format_selector (:class:`~actfw_core.capture.V4LCameraCapture.FormatSelector): how to select a format from listed formats supported by a camera. # noqa: B006 B950
                 DEFAULT selects the first format that meets the conditions.
                 PROPER selects the smallest format that meets the conditions.
                 MAXIMUM selects the largest resolution format as a camera can.

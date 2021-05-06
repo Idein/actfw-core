@@ -1,5 +1,5 @@
-from queue import Empty, Full, Queue
-from typing import Generic, List, TypeVar
+from queue import Full
+from typing import Generic, TypeVar
 
 from .consumer import _ConsumerMixin
 from .producer import _ProducerMixin
