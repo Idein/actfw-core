@@ -76,8 +76,6 @@ class Application:
                 time.sleep(1)
         except KeyboardInterrupt:
             pass
-        except:
-            raise
 
         for task in self.tasks:
             task.stop()
