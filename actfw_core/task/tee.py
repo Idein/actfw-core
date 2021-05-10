@@ -1,15 +1,14 @@
-from queue import Empty, Full, Queue
-from typing import Generic, List, TypeVar
+from queue import Full
+from typing import Generic, TypeVar
 
 from .consumer import _ConsumerMixin
 from .producer import _ProducerMixin
 from .task import Task
 
-T_OUT = TypeVar("T_OUT")
-T_IN = TypeVar("T_IN")
+T = TypeVar("T")
 
 
-class Tee(Generic[T_OUT, T_IN], Task, _ProducerMixin[T_OUT], _ConsumerMixin[T_IN]):
+class Tee(Generic[T], Task, _ProducerMixin[T], _ConsumerMixin[T]):
     """Tee Task."""
 
     def __init__(self) -> None:
@@ -18,7 +17,7 @@ class Tee(Generic[T_OUT, T_IN], Task, _ProducerMixin[T_OUT], _ConsumerMixin[T_IN
         _ProducerMixin.__init__(self)
         _ConsumerMixin.__init__(self)
 
-    def _outlet(self, o: T_OUT) -> None:
+    def _outlet(self, o: T) -> bool:
         while self._is_running():
             for out_queue in self.out_queues:
                 try:

@@ -13,16 +13,16 @@ class Task(Thread, _TaskI):
 
     """Actcast Application Task"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """"""
         Thread.__init__(self)
 
         self.running = True
 
-    def _is_running(self):
+    def _is_running(self) -> bool:
         return self.running
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the activity"""
         self.running = False
 

@@ -1,4 +1,4 @@
-from queue import Empty, Full
+from queue import Full
 from typing import Generic, List, TypeVar
 
 from ..util.pad import _PadBase, _PadBlocking, _PadIn

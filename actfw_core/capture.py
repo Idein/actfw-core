@@ -1,20 +1,23 @@
 import enum
-from queue import Full
+from typing import Callable, Generic, Iterable, Tuple, TypeVar
 
-from actfw_core.v4l2.video import V4L2_PIX_FMT, Video, VideoPort
+from actfw_core.v4l2.video import V4L2_PIX_FMT, Video, VideoPort  # type: ignore
 
 from .task import Producer
-from .util.pad import _PadDiscardingOld
+from .util.pad import _PadBase, _PadDiscardingOld
+
+T = TypeVar("T")
 
 
-class Frame(object):
+class Frame(Generic[T]):
+    value: T
 
     """Captured Frame"""
 
-    def __init__(self, value):
+    def __init__(self, value: T) -> None:
         self.value = value
 
-    def getvalue(self):
+    def getvalue(self) -> T:
         """
         Get frame data.
 
@@ -25,7 +28,14 @@ class Frame(object):
         return self.value
 
 
-class V4LCameraCapture(Producer):
+CONFIGURATOR_RETURN = TypeVar("CONFIGURATOR_RETURN")
+
+
+class V4LCameraCapture(Producer[Frame[bytes]]):
+    video: Video
+    capture_width: int
+    capture_height: int
+    capture_format: V4L2_PIX_FMT
 
     FormatSelector = enum.Enum("FormatSelector", "DEFAULT PROPER MAXIMUM")
 
@@ -33,13 +43,13 @@ class V4LCameraCapture(Producer):
 
     def __init__(
         self,
-        device="/dev/video0",
-        size=(640, 480),
-        framerate=30,
-        expected_format=V4L2_PIX_FMT.RGB24,
-        fallback_formats=[V4L2_PIX_FMT.YUYV, V4L2_PIX_FMT.MJPEG],
-        format_selector=FormatSelector.DEFAULT,
-    ):
+        device: str = "/dev/video0",
+        size: Tuple[int, int] = (640, 480),
+        framerate: int = 30,
+        expected_format: V4L2_PIX_FMT = V4L2_PIX_FMT.RGB24,
+        fallback_formats: Iterable[V4L2_PIX_FMT] = (V4L2_PIX_FMT.YUYV, V4L2_PIX_FMT.MJPEG),
+        format_selector: FormatSelector = FormatSelector.DEFAULT,
+    ) -> None:
         """
 
         Args:
@@ -48,7 +58,7 @@ class V4LCameraCapture(Producer):
             framerate (int): expected capture framerate
             expected_format (:class:`~actfw_core.v4l2.video.V4L2_PIX_FMT`): expected capture format
             fallback_formats (list of :class:`~actfw_core.v4l2.video.V4L2_PIX_FMT`): fallback capture format
-            format_selector (:class:`~actfw_core.capture.V4LCameraCapture.FormatSelector): how to select a format from listed formats supported by a camera.
+            format_selector (:class:`~actfw_core.capture.V4LCameraCapture.FormatSelector): how to select a format from listed formats supported by a camera. # noqa: B006 B950
                 DEFAULT selects the first format that meets the conditions.
                 PROPER selects the smallest format that meets the conditions.
                 MAXIMUM selects the largest resolution format as a camera can.
@@ -78,7 +88,7 @@ class V4LCameraCapture(Producer):
 
         if format_selector in [V4LCameraCapture.FormatSelector.PROPER, V4LCameraCapture.FormatSelector.MAXIMUM]:
 
-            def cmp(config):
+            def cmp(config):  # type: ignore
                 return (
                     config.width * config.height,
                     config.height,
@@ -88,11 +98,11 @@ class V4LCameraCapture(Producer):
 
         else:
 
-            def cmp(config):
+            def cmp(config):  # type: ignore
                 return 1
 
         config = None
-        fmts = [expected_format] + fallback_formats
+        fmts = [expected_format] + [f for f in fallback_formats]
         for fmt in fmts:
             expected_framerate = 1 if format_selector == V4LCameraCapture.FormatSelector.MAXIMUM else framerate
             candidates = self.video.lookup_config(width, height, expected_framerate, fmt, expected_format)
@@ -107,13 +117,15 @@ class V4LCameraCapture(Producer):
         else:
             fmt = self.video.set_format(config, width, height, expected_format=expected_format)
         self.capture_width, self.capture_height, self.capture_format = fmt
+        # TODO: v3.0.0. Comment out.
+        # assert type(self.capture_format) is V4L2_PIX_FMT
         self.video.set_framerate(config)
         # video.set_rotation(90)
         buffers = self.video.request_buffers(4)
         for buf in buffers:
             self.video.queue_buffer(buf)
 
-    def capture_size(self):
+    def capture_size(self) -> Tuple[int, int]:
         """
         Get configured capture resolution.
         A configured resolution may be more larger than expected one.
@@ -123,7 +135,7 @@ class V4LCameraCapture(Producer):
         """
         return (self.capture_width, self.capture_height)
 
-    def configure(self, configurator):
+    def configure(self, configurator: Callable[[Video], CONFIGURATOR_RETURN]) -> CONFIGURATOR_RETURN:
         """
         Run user defined video configurator.
 
@@ -135,28 +147,14 @@ class V4LCameraCapture(Producer):
         """
         return configurator(self.video)
 
-    def run(self):
+    def run(self) -> None:
         """Run producer activity"""
         with self.video.start_streaming() as stream:
             while self._is_running():
-                try:
-                    value = stream.capture(timeout=5)
-                    frame = Frame(value)
-                    self._outlet(frame)
-                except:
-                    raise
+                value = stream.capture(timeout=5)
+                frame = Frame(value)
+                self._outlet(frame)
         self.video.close()
 
-    def _outlet(self, o):
-        length = len(self.out_queues)
-        while self._is_running():
-            try:
-                self.out_queues[self.out_queue_id % length].put(o, block=False)
-                self.out_queue_id += 1
-                return True
-            except Full:
-                return False
-        return False
-
-    def _new_pad(self):  # -> _PadBase[T_OUT]
+    def _new_pad(self) -> _PadBase[bytes]:
         return _PadDiscardingOld()

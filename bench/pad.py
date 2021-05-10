@@ -7,7 +7,6 @@ if True:
 
 import time
 from queue import Queue
-from typing import Callable, Optional
 
 from actfw_core.util.pad import _PadDiscardingOld
 

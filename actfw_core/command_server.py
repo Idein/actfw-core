@@ -3,11 +3,14 @@ import io
 import os
 import socket
 from threading import Lock
+from typing import List, Optional
+
+from PIL.Image import Image as PIL_Image
 
 from .task import Isolated
 
 
-def _read_tokens(conn, n):
+def _read_tokens(conn: socket.socket, n: int) -> List[bytes]:
     result = []
     s = b""
     x = n
@@ -22,7 +25,7 @@ def _read_tokens(conn, n):
     return result
 
 
-def _read_bytes(conn, n):
+def _read_bytes(conn: socket.socket, n: int) -> bytes:
     result = b""
     while len(result) < n:
         result += conn.recv(1024)
@@ -30,6 +33,9 @@ def _read_bytes(conn, n):
 
 
 class CommandServer(Isolated):
+    sock_path: Optional[str]
+    img_lock: Lock
+    img: Optional[PIL_Image]
 
     """Actcast Command Server
 
@@ -40,7 +46,7 @@ class CommandServer(Isolated):
 
     """
 
-    def __init__(self, sock_path=None):
+    def __init__(self, sock_path: Optional[str] = None) -> None:
         super(CommandServer, self).__init__()
         self.sock_path = None
         env = "ACTCAST_COMMAND_SOCK"
@@ -52,14 +58,14 @@ class CommandServer(Isolated):
         self.img_lock = Lock()
         self.img = None
 
-    def run(self):
+    def run(self) -> None:
         """Run and start the activity"""
         if self.sock_path is None:
             return
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             os.unlink(self.sock_path)
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             pass  # ignore
         s.bind(self.sock_path)
         s.settimeout(1)
@@ -73,9 +79,10 @@ class CommandServer(Isolated):
                     else:
                         break
             try:
+                assert self.img is not None
+
                 conn, addr = s.accept()
                 [request_id, command_id, command_data_length] = map(int, _read_tokens(conn, 3))
-                command_data = _read_bytes(conn, command_data_length)
                 if command_id == 0:  # Take Photo
                     header = "data:image/png;base64,"
                     with self.img_lock:
@@ -88,13 +95,13 @@ class CommandServer(Isolated):
                         ).encode("utf-8")
                     )
                 else:
-                    conn.sendall("{} 2 0\n".format(request_id))
+                    conn.sendall(f"{request_id} 2 0\n".encode())
                 conn.close()
             except socket.timeout:
                 pass
         os.remove(self.sock_path)
 
-    def update_image(self, image):
+    def update_image(self, image: PIL_Image) -> None:
         """
 
         Update the cached 'Take Photo' command image.
@@ -105,7 +112,3 @@ class CommandServer(Isolated):
         """
         with self.img_lock:
             self.img = image.copy()
-
-    def stop(self):
-        """Stop the activity"""
-        self.running = False

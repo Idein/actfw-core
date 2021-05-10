@@ -1,5 +1,3 @@
-import queue
-import sys
 from abc import ABC, abstractmethod
 from queue import Empty, Queue
 from typing import Generic, Optional, Tuple, TypeVar

@@ -1,58 +1,61 @@
 import threading
 import time
+from typing import List, Tuple
 
 import actfw_core
 from actfw_core.task import Consumer, Join, Pipe, Producer, Tee
 
 
-class Counter(Producer):
-    def __init__(self):
+class Counter(Producer[int]):
+    def __init__(self) -> None:
         super().__init__()
         self.n = 0
 
-    def proc(self):
+    def proc(self) -> int:
         time.sleep(0.01)
         n = self.n
         self.n += 1
         return n
 
 
-class Incrementer(Pipe):
-    def __init__(self):
+class Incrementer(Pipe[int, int]):
+    def __init__(self) -> None:
         super().__init__()
 
-    def proc(self, x):
+    def proc(self, x: int) -> int:
         return x + 1
 
 
-class Adder(Pipe):
-    def __init__(self):
+class Adder(Pipe[int, Tuple[int, ...]]):
+    def __init__(self) -> None:
         super().__init__()
 
-    def proc(self, xs):
+    def proc(self, xs: Tuple[int, ...]) -> int:
         return sum(xs)
 
 
-class Logger(Consumer):
-    def __init__(self):
+class Logger(Consumer[int]):
+    xs: List[int]
+
+    def __init__(self) -> None:
         super().__init__()
         self.xs = []
 
     @property
-    def logs(self):
+    def logs(self) -> List[int]:
         return self.xs
 
-    def proc(self, x):
+    def proc(self, x: int) -> None:
         self.xs.append(x)
 
 
-def test_pipeline():
+def test_pipeline() -> None:
 
     app = actfw_core.Application()
 
     counter = Counter()
     app.register_task(counter)
-    tee = Tee()
+    tee = Tee[int]()
     app.register_task(tee)
     inc0 = Incrementer()
     app.register_task(inc0)

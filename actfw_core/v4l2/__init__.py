@@ -1,1 +1,1 @@
-from . import types, video
+from . import types, video  # noqa: F401
