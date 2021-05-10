@@ -10,3 +10,4 @@
   - `Consumer` and `Producer` were chirldren of `Pipe`, but they are not now.  They are children of `Task`.
   - Use mixins and interfaces for implementation of children of `Task`.
 - Added methods `Task.stop()` and `Task.run()`.  (The later was a method of `Pipe`.)
+- Added type annotations.
