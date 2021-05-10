@@ -1,5 +1,5 @@
 import enum
-from typing import Callable, Generic, List, Optional, Tuple, TypeVar
+from typing import Callable, Generic, Iterable, Tuple, TypeVar
 
 from actfw_core.v4l2.video import V4L2_PIX_FMT, Video, VideoPort  # type: ignore
 
@@ -47,7 +47,7 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
         size: Tuple[int, int] = (640, 480),
         framerate: int = 30,
         expected_format: V4L2_PIX_FMT = V4L2_PIX_FMT.RGB24,
-        fallback_formats: Optional[List[V4L2_PIX_FMT]] = None,
+        fallback_formats: Iterable[V4L2_PIX_FMT] = (V4L2_PIX_FMT.YUYV, V4L2_PIX_FMT.MJPEG),
         format_selector: FormatSelector = FormatSelector.DEFAULT,
     ) -> None:
         """
@@ -71,9 +71,6 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
             try to capture one of the fallback_formats and convert it to expected_format.
 
         """
-        if fallback_formats is None:
-            fallback_formats = [V4L2_PIX_FMT.YUYV, V4L2_PIX_FMT.MJPEG]
-
         super(V4LCameraCapture, self).__init__()
         self.video = Video(device)
 
@@ -105,7 +102,7 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
                 return 1
 
         config = None
-        fmts = [expected_format] + fallback_formats
+        fmts = [expected_format] + [f for f in fallback_formats]
         for fmt in fmts:
             expected_framerate = 1 if format_selector == V4LCameraCapture.FormatSelector.MAXIMUM else framerate
             candidates = self.video.lookup_config(width, height, expected_framerate, fmt, expected_format)
