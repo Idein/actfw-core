@@ -11,3 +11,4 @@
   - Use mixins and interfaces for implementation of children of `Task`.
 - Added methods `Task.stop()` and `Task.run()`.  (The later was a method of `Pipe`.)
 - Added type annotations.
+- (Breaking change; for actfw-* developers) Modified the behavior of `Producer._outlet()`; made it non-blocking and return false if the `_PadOut` is full.

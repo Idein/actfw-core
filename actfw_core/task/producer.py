@@ -35,14 +35,15 @@ class _ProducerMixin(Generic[T_OUT], _TaskI):
 
     def _outlet(self, o: T_OUT) -> bool:
         length = len(self.out_queues)
-        while self._is_running():
+        if self._is_running():
             try:
                 self.out_queues[self.out_queue_id].put(o, timeout=1)
                 self.out_queue_id = (self.out_queue_id + 1) % length
                 return True
             except Full:
-                pass
-        return False
+                return False
+        else:
+            return False
 
 
 class Producer(Generic[T_OUT], Task, _ProducerMixin[T_OUT]):
