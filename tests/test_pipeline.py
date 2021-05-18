@@ -34,6 +34,16 @@ class Adder(Pipe[int, Tuple[int, ...]]):
         return sum(xs)
 
 
+class ThrouputBottleneck(Pipe[int, int]):
+    def __init__(self, duration_secs: float) -> None:
+        super().__init__()
+        self.duration_secs = duration_secs
+
+    def proc(self, x: int) -> int:
+        time.sleep(self.duration_secs)
+        return x
+
+
 class Logger(Consumer[int]):
     xs: List[int]
 
@@ -84,3 +94,29 @@ def test_pipeline() -> None:
 
     assert len(logger.logs) > 0
     assert all((i + 1) * 2 == x for i, x in enumerate(logger.logs))
+
+
+# https://github.com/Idein/actfw-core/pull/31#pullrequestreview-656173369
+def test_pipeline_slow_but_no_loss() -> None:
+
+    app = actfw_core.Application()
+
+    counter = Counter()
+    app.register_task(counter)
+    # The value 2 secs comes from the fact that Producer/Pipe classes call `_PadOut.put(timeout=1)`.
+    bottleneck = ThrouputBottleneck(2)
+    app.register_task(bottleneck)
+    logger = Logger()
+    app.register_task(logger)
+
+    counter.connect(bottleneck)
+    bottleneck.connect(logger)
+
+    th = threading.Thread(target=lambda: app.run())
+    th.start()
+    time.sleep(10)
+    app.stop()
+    th.join()
+
+    assert len(logger.logs) > 0
+    assert all(i == x for i, x in enumerate(logger.logs))
