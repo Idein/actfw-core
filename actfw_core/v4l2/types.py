@@ -344,6 +344,13 @@ class _m_for_buffer(Union):
     ]
 
 
+class _fd_or_reserved(Union):
+    _fields_ = [
+        ("request_fd", c_int32),
+        ("reserved", c_uint32),
+    ]
+
+
 class buffer(Structure):
     _fields_ = [
         ("index", c_uint32),
@@ -358,6 +365,5 @@ class buffer(Structure):
         ("m", _m_for_buffer),
         ("length", c_uint32),
         ("reserved2", c_uint32),
-        ("reserved", c_uint32),  # In fact, `reserved` is the union of s32 and u32
-                                 # https://github.com/torvalds/linux/blob/master/include/uapi/linux/videodev2.h#L1061-L1064
+        ("reserved", _fd_or_reserved),
     ]
