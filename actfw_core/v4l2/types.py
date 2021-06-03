@@ -198,7 +198,7 @@ class sdr_format(Structure):
     _fields_ = [
         ("pixelformat", c_uint32),
         ("buffersize", c_uint32),
-        ("reserved", c_ubyte * 24),
+        ("reserved", c_uint8 * 24),
     ]
 
 
