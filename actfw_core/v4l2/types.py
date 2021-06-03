@@ -357,6 +357,7 @@ class buffer(Structure):
         ("memory", c_uint32),
         ("m", _m_for_buffer),
         ("length", c_uint32),
-        ("reserved2", c_uint),
-        ("reserved", c_uint),
+        ("reserved2", c_uint32),
+        ("reserved", c_uint32),  # In fact, `reserved` is the union of s32 and u32
+                                 # https://github.com/torvalds/linux/blob/master/include/uapi/linux/videodev2.h#L1061-L1064
     ]
