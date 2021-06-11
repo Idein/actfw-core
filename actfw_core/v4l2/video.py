@@ -22,6 +22,18 @@ class _libv4l2(object):
         if path is not None:
             self.lib = CDLL(path, use_errno=True)
 
+            # ioctl
+            self.lib.v4l2_ioctl.argtypes = [c_int, c_ulong, c_void_p]
+            self.lib.v4l2_ioctl.rettype = c_int
+
+            # mmap
+            self.lib.v4l2_mmap.argtypes = [c_void_p, c_size_t, c_int, c_int, c_int, c_int64]
+            self.lib.v4l2_mmap.rettype = c_void_p
+
+            # munmap
+            self.lib.v4l2_munmap.argtypes = [c_void_p, c_size_t]
+            self.lib.v4l2_munmap.rettype = c_int
+
     def ioctl(self, *args, **kwargs):
         if self.lib is None:
             raise FileNotFoundError("Not found: 'libv4l2.so'")
@@ -44,6 +56,19 @@ class _libv4lconvert(object):
         path = find_library("v4lconvert")
         if path is not None:
             self.lib = CDLL(path, use_errno=True)
+
+            # create
+            self.lib.v4lconvert_create.argtypes = [c_int]
+            self.lib.v4lconvert_create.rettype = c_void_p  # struct v4lconvert_data *
+
+            # convert
+            self.lib.v4lconvert_convert.argtypes = [c_void_p, POINTER(format), POINTER(format),
+                                                    POINTER(c_ubyte), c_int, POINTER(c_ubyte), c_int]
+            self.lib.v4lconvert_convert.rettype = c_void_p  # struct v4lconvert_data *
+
+            # try_format
+            self.lib.v4lconvert_try_format.argtypes = [c_void_p, POINTER(format), POINTER(format)]
+            self.lib.v4lconvert_try_format.rettype = c_int
 
     def create(self, *args, **kwargs):
         if self.lib is None:
@@ -887,7 +912,7 @@ class VideoBuffer(object):
 
         self.video = video
         self.buf = buf
-        self.mapped_buf = cast(result, POINTER(ARRAY(c_uint8, self.buf.length)))
+        self.mapped_buf = cast(result, POINTER(c_uint8))
 
     def unmap_buffer(self):
         if self.mapped_buf is None:
