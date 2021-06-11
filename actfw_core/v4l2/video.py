@@ -896,7 +896,7 @@ class VideoStream(object):
     def capture(self, timeout=1, in_expected_format=True):
 
         buf = self.video.dequeue_buffer(timeout=timeout)
-        dst = (c_uint8 * self.video.expected_fmt.fmt.pix.sizeimage)()
+        dst = bytes(self.video.expected_fmt.fmt.pix.sizeimage)
         if in_expected_format:
             _v4lconvert.convert(
                 self.video.converter,
