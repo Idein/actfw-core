@@ -24,7 +24,7 @@ class _libv4l2(object):
 
             # ioctl
             self.lib.v4l2_ioctl.argtypes = [c_int, c_ulong, c_void_p]
-            self.lib.v4l2_ioctl.rettype = c_int
+            self.lib.v4l2_ioctl.restype = c_int
 
             # mmap
             self.lib.v4l2_mmap.argtypes = [
@@ -35,11 +35,11 @@ class _libv4l2(object):
                 c_int,
                 c_int64,
             ]
-            self.lib.v4l2_mmap.rettype = c_void_p
+            self.lib.v4l2_mmap.restype = c_void_p
 
             # munmap
             self.lib.v4l2_munmap.argtypes = [c_void_p, c_size_t]
-            self.lib.v4l2_munmap.rettype = c_int
+            self.lib.v4l2_munmap.restype = c_int
 
     def ioctl(self, *args, **kwargs):
         if self.lib is None:
@@ -66,7 +66,7 @@ class _libv4lconvert(object):
 
             # create
             self.lib.v4lconvert_create.argtypes = [c_int]
-            self.lib.v4lconvert_create.rettype = c_void_p  # struct v4lconvert_data *
+            self.lib.v4lconvert_create.restype = c_void_p  # struct v4lconvert_data *
 
             # convert
             self.lib.v4lconvert_convert.argtypes = [
@@ -78,11 +78,11 @@ class _libv4lconvert(object):
                 POINTER(c_ubyte),
                 c_int,
             ]
-            self.lib.v4lconvert_convert.rettype = c_void_p  # struct v4lconvert_data *
+            self.lib.v4lconvert_convert.restype = c_void_p  # struct v4lconvert_data *
 
             # try_format
             self.lib.v4lconvert_try_format.argtypes = [c_void_p, POINTER(format), POINTER(format)]
-            self.lib.v4lconvert_try_format.rettype = c_int
+            self.lib.v4lconvert_try_format.restype = c_int
 
     def create(self, *args, **kwargs):
         if self.lib is None:
