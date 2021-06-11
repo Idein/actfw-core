@@ -373,6 +373,7 @@ class Video(object):
             flags |= os.O_NONBLOCK
         self.device_fd = os.open(self.device, flags)
         self.converter = _v4lconvert.create(self.device_fd)
+        self.buffers: Optional[List[VideoBuffer]] = None  # set when enqueu
 
     def close(self):
         os.close(self.device_fd)
@@ -771,15 +772,13 @@ class Video(object):
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_REQBUFS): {}".format(errno.errorcode[get_errno()]))
 
-        return [VideoBuffer._from_query(self, i) for i in range(n)]
+        self.buffers = [VideoBuffer(self, i) for i in range(n)]
 
-    def queue_buffer(self, video_buf):
-
-        result = self._ioctl(_VIDIOC.QBUF, byref(video_buf.buf))
-        if -1 == result:
-            raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
-
-        return True
+    def queue_buffer(self):
+        for video_buf in self.buffers:
+            result = self._ioctl(_VIDIOC.QBUF, byref(video_buf.buf))
+            if -1 == result:
+                raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
 
     def start_streaming(self):
 
@@ -818,7 +817,7 @@ class Video(object):
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_DQBUF): {}".format(errno.errorcode[get_errno()]))
 
-        return VideoBuffer(self, buf)
+        return self.buffers[buf.index]
 
     def requeue_buffer(self, video_buf):
 
@@ -829,43 +828,41 @@ class Video(object):
 
 class VideoStream(object):
     def __init__(self, video):
-        self.video = video
+        self.video: Video = video
 
     def __enter__(self):
         return self
 
     def __exit__(self, ex_type, ex_value, trace):
+        for buf in self.video.buffers:
+            buf.unmap_buffer()
         self.video.stop_streaming()
 
     def capture(self, timeout=1, in_expected_format=True):
 
         buf = self.video.dequeue_buffer(timeout=timeout)
-        mapped_buf = buf.get_mapped_buffer()
-
-        dst = bytes(self.video.expected_fmt.fmt.pix.sizeimage)
+        dst = (c_uint8 * self.video.expected_fmt.fmt.pix.sizeimage)()
         if in_expected_format:
             _v4lconvert.convert(
                 self.video.converter,
                 byref(self.video.fmt),
                 byref(self.video.expected_fmt),
-                mapped_buf,
+                buf.mapped_buf,
                 self.video.fmt.fmt.pix.sizeimage,
-                cast(dst, POINTER(c_uint8)),
+                dst,
                 self.video.expected_fmt.fmt.pix.sizeimage,
             )
         else:
             stream = io.BytesIO(dst)
-            stream.write(mapped_buf.contents)
+            stream.write(buf.mapped_buf.contents)
 
-        buf.unmap_buffer()
         self.video.requeue_buffer(buf)
 
         return dst
 
 
 class VideoBuffer(object):
-    @classmethod
-    def _from_query(cls, video, index):
+    def __init__(self, video, index):
 
         buf = buffer()
         buf.type = V4L2_BUF_TYPE.VIDEO_CAPTURE
@@ -877,28 +874,20 @@ class VideoBuffer(object):
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_QYERYBUF): {}".format(errno.errorcode[get_errno()]))
 
-        return cls(video, buf)
-
-    def __init__(self, video, buf):
-        self.video = video
-        self.buf = buf
-        self.mapped_buf = None
-
-    def get_mapped_buffer(self):
-        if self.mapped_buf is not None:
-            return self.mapped_buf
         result = _v4l2.mmap(
             None,
-            self.buf.length,
+            buf.length,
             mmap.PROT_READ | mmap.PROT_WRITE,
             mmap.MAP_SHARED,
-            self.video.device_fd,
-            c_longlong(self.buf.m.offset),
+            video.device_fd,
+            buf.m.offset,
         )
         if result == -1:
             raise RuntimeError("mmap failed: {}".format(errno.errorcode[get_errno()]))
+
+        self.video = video
+        self.buf = buf
         self.mapped_buf = cast(result, POINTER(ARRAY(c_uint8, self.buf.length)))
-        return self.mapped_buf
 
     def unmap_buffer(self):
         if self.mapped_buf is None:
