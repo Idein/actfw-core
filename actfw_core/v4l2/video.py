@@ -27,7 +27,14 @@ class _libv4l2(object):
             self.lib.v4l2_ioctl.rettype = c_int
 
             # mmap
-            self.lib.v4l2_mmap.argtypes = [c_void_p, c_size_t, c_int, c_int, c_int, c_int64]
+            self.lib.v4l2_mmap.argtypes = [
+                c_void_p,
+                c_size_t,
+                c_int,
+                c_int,
+                c_int,
+                c_int64,
+            ]
             self.lib.v4l2_mmap.rettype = c_void_p
 
             # munmap
@@ -62,8 +69,15 @@ class _libv4lconvert(object):
             self.lib.v4lconvert_create.rettype = c_void_p  # struct v4lconvert_data *
 
             # convert
-            self.lib.v4lconvert_convert.argtypes = [c_void_p, POINTER(format), POINTER(format),
-                                                    POINTER(c_ubyte), c_int, POINTER(c_ubyte), c_int]
+            self.lib.v4lconvert_convert.argtypes = [
+                c_void_p,
+                POINTER(format),
+                POINTER(format),
+                POINTER(c_ubyte),
+                c_int,
+                POINTER(c_ubyte),
+                c_int,
+            ]
             self.lib.v4lconvert_convert.rettype = c_void_p  # struct v4lconvert_data *
 
             # try_format
@@ -560,7 +574,15 @@ class Video(object):
                     if expected_format == pixel_format:
                         results.append(candidate)
                     else:
-                        if self.try_convert(candidate, candidate.width, candidate.height, expected_format) is not None:
+                        if (
+                            self.try_convert(
+                                candidate,
+                                candidate.width,
+                                candidate.height,
+                                expected_format,
+                            )
+                            is not None
+                        ):
                             results.append(candidate)
 
                     old_candidate = candidate
@@ -592,7 +614,11 @@ class Video(object):
             raise RuntimeError("incompatible format")
 
         before = (expected_width, expected_height, expected_format)
-        after = (expected_fmt.fmt.pix.width, expected_fmt.fmt.pix.height, expected_fmt.fmt.pix.pixelformat)
+        after = (
+            expected_fmt.fmt.pix.width,
+            expected_fmt.fmt.pix.height,
+            expected_fmt.fmt.pix.pixelformat,
+        )
 
         if before == after:
             return (fmt, expected_fmt)
@@ -619,7 +645,11 @@ class Video(object):
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_S_FMT)")
 
-        return (self.expected_fmt.fmt.pix.width, self.expected_fmt.fmt.pix.height, self.expected_fmt.fmt.pix.pixelformat)
+        return (
+            self.expected_fmt.fmt.pix.width,
+            self.expected_fmt.fmt.pix.height,
+            self.expected_fmt.fmt.pix.pixelformat,
+        )
 
     def set_framerate(self, conf):
 
