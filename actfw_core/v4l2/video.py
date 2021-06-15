@@ -904,7 +904,7 @@ class VideoStream(object):
                 byref(self.video.expected_fmt),
                 buf.mapped_buf,
                 self.video.fmt.fmt.pix.sizeimage,
-                dst,
+                cast(dst, POINTER(c_ubyte)),
                 self.video.expected_fmt.fmt.pix.sizeimage,
             )
         else:
