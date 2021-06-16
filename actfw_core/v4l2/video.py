@@ -831,6 +831,10 @@ class VideoStream(object):
     def __init__(self, video):
         self.video = video
 
+        # memory region for output of _v4lconvert.convert.
+        # This is to avoid ctypes.cast due to https://bugs.python.org/issue12836
+        self._convert_dst = (c_uint8 * self.video.expected_fmt.fmt.pix.sizeimage)()
+
     def __enter__(self):
         return self
 
@@ -850,9 +854,11 @@ class VideoStream(object):
                 byref(self.video.expected_fmt),
                 mapped_buf,
                 self.video.fmt.fmt.pix.sizeimage,
-                cast(dst, POINTER(c_uint8)),
+                self._convert_dst,
                 self.video.expected_fmt.fmt.pix.sizeimage,
             )
+            io.BytesIO(dst)
+            stream.write(self._convert_dst)
         else:
             stream = io.BytesIO(dst)
             stream.write(mapped_buf.contents)
