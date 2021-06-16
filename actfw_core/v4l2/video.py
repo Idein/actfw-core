@@ -846,7 +846,6 @@ class VideoStream(object):
         buf = self.video.dequeue_buffer(timeout=timeout)
         mapped_buf = buf.get_mapped_buffer()
 
-        dst = bytes(self.video.expected_fmt.fmt.pix.sizeimage)
         if in_expected_format:
             _v4lconvert.convert(
                 self.video.converter,
@@ -857,9 +856,9 @@ class VideoStream(object):
                 self._convert_dst,
                 self.video.expected_fmt.fmt.pix.sizeimage,
             )
-            io.BytesIO(dst)
-            stream.write(self._convert_dst)
+            dst = bytes(self._convert_dst)
         else:
+            dst = bytes(self.video.expected_fmt.fmt.pix.sizeimage)
             stream = io.BytesIO(dst)
             stream.write(mapped_buf.contents)
 
