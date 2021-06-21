@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List
 from . import capture, task  # noqa: F401
 from .application import Application  # noqa: F401
 from .command_server import CommandServer  # noqa: F401
+from .service_client import ServiceClient  # noqa: F401
 
 
 def notify(
