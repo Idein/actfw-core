@@ -29,6 +29,7 @@ class ServiceClient:
         sock.sendall(cmd)
         [request_id, command_id, response_length] = map(int, _read_tokens(sock, 3))
         response = _read_bytes(sock, response_length)
+        sock.shutdown(socket.SHUT_RDWR)
         sock.close()
         return response.decode("ascii")
 
