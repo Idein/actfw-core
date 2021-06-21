@@ -2,28 +2,7 @@ import base64
 import os
 import socket
 from typing import List
-
-
-def _read_tokens(conn: socket.socket, n: int) -> List[bytes]:
-    result = []
-    s = b""
-    x = n
-    while x > 0:
-        c = conn.recv(1)
-        if c == b" ":
-            x -= 1
-            result.append(s)
-            s = b""
-        else:
-            s += c
-    return result
-
-
-def _read_bytes(conn: socket.socket, n: int) -> bytes:
-    result = b""
-    while len(result) < n:
-        result += conn.recv(1024)
-    return result
+from .command_server import _read_bytes, _read_tokens
 
 
 class ServiceClient:
