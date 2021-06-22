@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0 (2021-XX-XX)
+
+- Support a new actcast agent feature by `actfw_core.ServiceClient`.
+
 ## 2.0.0 (2021-05-18)
 
 - Stop exporting `actfw_core.__version__`.
