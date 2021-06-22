@@ -47,7 +47,7 @@ class CommandServer(Isolated):
     """
 
     def __init__(self, sock_path: Optional[str] = None) -> None:
-        super(CommandServer, self).__init__()
+        super().__init__()
         self.sock_path = None
         env = "ACTCAST_COMMAND_SOCK"
         if env in os.environ:
