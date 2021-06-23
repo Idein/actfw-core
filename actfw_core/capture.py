@@ -71,7 +71,7 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
             try to capture one of the fallback_formats and convert it to expected_format.
 
         """
-        super(V4LCameraCapture, self).__init__()
+        super().__init__()
         self.video = Video(device)
 
         width, height = size
