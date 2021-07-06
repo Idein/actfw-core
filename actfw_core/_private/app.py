@@ -23,42 +23,6 @@ __all__ = [
 ]
 
 
-# class ApplicationLifecycleManager:
-#     _state_manager: _StateManager
-
-#     def __init__(self) -> None:
-#         self._state_manager = _StateManager()
-
-#     def application_init(self) -> ApplicationLifecycleManagerInit:
-#         return ApplicationLifecycleManagerInit(self._state_manager)
-
-#     def with_application(self, app: Application) -> ApplicationLifecycleManagerWithApplication:
-#         return ApplicationLifecycleManagerWithApplication(self._state_manager, app)
-
-
-# class ApplicationLifecycleManagerInit(AbstractContextManager):
-#     _state_manager: _StateManager
-
-#     def __init__(self, state_manager: _StateManager) -> None:
-#         self._state_manager = state_manager
-
-#     def __enter__(self) -> "Lifecycle":
-#         return self
-
-#     def __exit__(
-#         self,
-#         exec_type: Optional[Type[BaseException]],
-#         exec_inst: Optional[BaseException],
-#         exec_tb: Optional[TracebackType],
-#     ) -> bool:
-#         if exec_type is None:
-#             self._state_manager.change_state(AppStates.Terminated())
-#             self._state_manager.terminated_block_forever()
-#         else:
-#             self._state_manager.change_state(AppStates.Restarting())
-#             self._state_manager.restarting_exit()
-
-
 class App:
     _state_manager: _StateManager
     _inner: Union[InnerInit, InnerBuilding]
