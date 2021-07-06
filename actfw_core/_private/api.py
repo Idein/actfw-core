@@ -1,8 +1,8 @@
 from typing import Optional
 
-from .schema.agent_api import Command, CommandRequest, CommandResponse, ServiceRequest, ServiceResponse, CommandKind
-from .agent_api import CommandMediator, ServiceSock, CommandSock
+from .agent_api import CommandMediator, CommandSock, ServiceSock
 from .envvar import EnvVar
+from .schema.agent_api import Command, CommandKind, CommandRequest, CommandResponse, ServiceRequest, ServiceResponse
 
 
 class ApiContext:

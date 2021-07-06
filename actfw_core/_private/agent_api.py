@@ -1,14 +1,13 @@
-from typing import Dict, Optional
-import socket
 import os
+import socket
 from pathlib import Path
 from threading import Lock
-
-from .schema.agent_api import RequestId, CommandKind
+from typing import Dict, Optional
 
 from rustonic.prelude import Unreachable
 from rustonic.std.sync import Mutex
-from .schema.agent_api import Command, CommandRequest, CommandResponse, ServiceRequest, ServiceResponse
+
+from .schema.agent_api import Command, CommandKind, CommandRequest, CommandResponse, RequestId, ServiceRequest, ServiceResponse
 
 
 class CommandSock:
@@ -73,11 +72,11 @@ class ServiceSock:
         return response
 
 
-from threading import Thread
-from queue import SimpleQueue
 import queue
+from queue import SimpleQueue
+from threading import Thread
 
-        
+
 class CommandMediator:
     _sock: CommandSock
     _recv_thread: Thread

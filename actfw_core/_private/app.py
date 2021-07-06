@@ -1,12 +1,11 @@
-from typing import List, Optional, Type
 from contextlib import AbstractContextManager
 from types import TracebackType
-
-from .state import _StateManager
-from .task import Task
+from typing import List, Optional, Type
 
 from rustonic.prelude import Unreachable
 
+from .state import _StateManager
+from .task import Task
 
 __all__ = [
     "ApplicationBuilder",
@@ -185,12 +184,11 @@ class AppBuilder:
         self._finalized = True
 
 
+from queue import SimpleQueue
 
-
+from rustonic.crossbeam.sync import WaitGroup
 
 from .liveness_updator import LivenessUpdator
-from rustonic.crossbeam.sync import WaitGroup
-from queue import SimpleQueue
 
 
 class _InnerRunning:
@@ -228,12 +226,6 @@ class _InnerRunning:
                 break
 
 
-
-
-
-
-
-
 # class ApplicationBuilder:
 #     _state_manager: _StateManager
 #     _tasks: List[Task]
@@ -267,7 +259,6 @@ class _InnerRunning:
 
 
 # class _TaskContext:
-    
+
 
 #     def __init__(self, app: Application) -> None:
-        

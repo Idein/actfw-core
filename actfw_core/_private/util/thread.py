@@ -1,5 +1,5 @@
-from threading import Thread
 from queue import SimpleQueue
+from threading import Thread
 from typing import Callable
 
 

@@ -56,26 +56,27 @@ class _Restarting(_State):
         super().__init__()
 
 
-_ADMISSIBLE_TRANSITIONS: set[Tuple[type(_State), type(_State)]] = set([
-    # Ordinal transition
-    (_Init, _Building),
-    (_Building, _Startup),
-    (_Startup, _Running),
-    (_Running, _TemporallyUnavailable),
-    (_TemporallyUnavailable, _Running),
-    # Error transition
-    (_Init, _Terminated),
-    (_Init, _Restarting),
-    (_Building, _Terminated),
-    (_Building, _Restarting),
-    (_Startup, _Terminated),
-    (_Startup, _Restarting),
-    (_Running, _Terminated),
-    (_Running, _Restarting),
-    (_TemporallyUnavailable, _Terminated),
-    (_TemporallyUnavailable, _Restarting),
-])
-
+_ADMISSIBLE_TRANSITIONS: set[Tuple[type(_State), type(_State)]] = set(
+    [
+        # Ordinal transition
+        (_Init, _Building),
+        (_Building, _Startup),
+        (_Startup, _Running),
+        (_Running, _TemporallyUnavailable),
+        (_TemporallyUnavailable, _Running),
+        # Error transition
+        (_Init, _Terminated),
+        (_Init, _Restarting),
+        (_Building, _Terminated),
+        (_Building, _Restarting),
+        (_Startup, _Terminated),
+        (_Startup, _Restarting),
+        (_Running, _Terminated),
+        (_Running, _Restarting),
+        (_TemporallyUnavailable, _Terminated),
+        (_TemporallyUnavailable, _Restarting),
+    ]
+)
 
 
 class States:

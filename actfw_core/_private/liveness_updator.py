@@ -1,10 +1,9 @@
 import time
 from pathlib import Path
-from typing import Optional
 from queue import SimpleQueue
+from typing import Optional
 
 from .util.thread import LoopThread
-
 
 DEFAULT_UPDATE_DURATION_SECS = 3
 LIVENESS_PROVE_PATH = Path("/tmp/actcast-app-liveness-prove")

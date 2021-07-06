@@ -16,7 +16,9 @@ def main():
 
         with app.builder() as b:
             # Capture task
-            capture = V4LCameraCapture("/dev/video0", MODEL_INPUT_SIZE, 15, format_selector=V4LCameraCapture.FormatSelector.PROPER)
+            capture = V4LCameraCapture(
+                "/dev/video0", MODEL_INPUT_SIZE, 15, format_selector=V4LCameraCapture.FormatSelector.PROPER
+            )
             capture = b.spawn_task(capture)
 
             # Classifier task
@@ -35,6 +37,3 @@ def main():
             b.build()
 
         app.run()
-
-
-

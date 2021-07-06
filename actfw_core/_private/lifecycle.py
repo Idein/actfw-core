@@ -2,8 +2,8 @@ from contextlib import AbstractContextManager
 from types import TracebackType
 from typing import Optional, Type
 
-from .state import _StateManager, States
 from .application import ApplicationBuilder
+from .state import States, _StateManager
 
 
 class Lifecycle(AbstractContextManager):

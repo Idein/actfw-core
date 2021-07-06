@@ -1,8 +1,8 @@
 import enum
-from actfw_core.compat.dataclasses import dataclass
+import socket
 from typing import List
 
-import socket
+from actfw_core.compat.dataclasses import dataclass
 from rustonic.std.result import *
 
 
