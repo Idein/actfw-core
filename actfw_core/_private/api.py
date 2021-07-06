@@ -2,7 +2,7 @@ from typing import Optional
 
 from .agent_api import CommandMediator, CommandSock, ServiceSock
 from .envvar import EnvVar
-from .schema.agent_api import Command, CommandKind, CommandRequest, CommandResponse, ServiceRequest, ServiceResponse
+from .schema.agent_api import CommandKind, CommandRequest, CommandResponse, ServiceRequest, ServiceResponse
 
 
 class ApiContext:

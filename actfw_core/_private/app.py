@@ -1,15 +1,25 @@
 from contextlib import AbstractContextManager
+from queue import SimpleQueue
 from types import TracebackType
-from typing import List, Optional, Type
+from typing import List, Optional, Type, Union
 
+from rustonic.crossbeam.sync import WaitGroup
 from rustonic.prelude import Unreachable
 
+from .app_component.liveness_updator import LivenessUpdater
+from .app_state import AppStates
+from .envvar import EnvVar
 from .state import _StateManager
 from .task import Task
+from .task_state import TaskStates
+from .util.waitgroup_waiter import WaitGroupWaiter
 
 __all__ = [
-    "ApplicationBuilder",
     "App",
+    "AppBuilder",
+    "AppInitGuard",
+    "AppGuard",
+    "AppBuilderGuard",
 ]
 
 
@@ -42,10 +52,10 @@ __all__ = [
 #         exec_tb: Optional[TracebackType],
 #     ) -> bool:
 #         if exec_type is None:
-#             self._state_manager.change_state(States.Terminated())
+#             self._state_manager.change_state(AppStates.Terminated())
 #             self._state_manager.terminated_block_forever()
 #         else:
-#             self._state_manager.change_state(States.Restarting())
+#             self._state_manager.change_state(AppStates.Restarting())
 #             self._state_manager.restarting_exit()
 
 
@@ -71,13 +81,13 @@ class App:
             return AppGuard(app)
 
     def builder(self) -> "AppBuilderGuard":
-        self._state_manager.change_state(States.Build())
+        self._state_manager.change_state(AppStates.Build())
         builder = AppBuilder(self)
         self._inner = _AppInnerBuild(builder)
         return AppBuilderGuard(builder)
 
-    def _finish_build(self, _builder: AppBuilder) -> None:
-        self._state_manager.change_state(States.BuildDone())
+    def _finish_build(self, _builder: "AppBuilder") -> None:
+        self._state_manager.change_state(AppStates.BuildDone())
 
     def run(self) -> None:
         """
@@ -86,10 +96,10 @@ class App:
         - Run the application and block forever if there is no fatal error.
         - Raise exception if a fatal error occured.
         """
-        self._state_manager.change_state(States.RunningStartup())
+        self._state_manager.change_state(AppStates.RunningStartup())
         builder = self._inner._builder  # Consume `self._inner`.
         api = AppApi(self)
-        self._inner = _InnerRunning(api, buider._tasks)
+        self._inner = _InnerRunning(api, builder._tasks)
         self._inner.run()
 
 
@@ -109,10 +119,10 @@ class AppInitGuard(AbstractContextManager["AppInitGuard"]):
         exec_tb: Optional[TracebackType],
     ) -> bool:
         if exec_type is None:
-            self._state_manager.change_state(States.Terminated())
+            self._state_manager.change_state(AppStates.Terminated())
             self._state_manager.terminated_block_forever()
         else:
-            self._state_manager.change_state(States.Restarting())
+            self._state_manager.change_state(AppStates.Restarting())
             self._state_manager.restarting_exit()
 
     def into_state_manager(self) -> _StateManager:
@@ -135,10 +145,10 @@ class AppGuard(AbstractContextManager["App"]):
         exec_tb: Optional[TracebackType],
     ) -> bool:
         if exec_type is None:
-            self._app._state_manager.change_state(States.Terminated())
+            self._app._state_manager.change_state(AppStates.Terminated())
             self._app._state_manager.terminated_block_forever()
         else:
-            self._app._state_manager.change_state(States.Restarting())
+            self._app._state_manager.change_state(AppStates.Restarting())
             self._app._state_manager.restarting_exit()
 
         raise Unreachable()
@@ -182,13 +192,6 @@ class AppBuilder:
 
     def build(self) -> None:
         self._finalized = True
-
-
-from queue import SimpleQueue
-
-from rustonic.crossbeam.sync import WaitGroup
-
-from .liveness_updator import LivenessUpdator
 
 
 class _InnerRunning:

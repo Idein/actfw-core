@@ -3,7 +3,7 @@ import socket
 from typing import List
 
 from actfw_core.compat.dataclasses import dataclass
-from rustonic.std.result import *
+from rustonic.std.result import Err, Ok, Result
 
 
 def _read_tokens(conn: socket.socket, n: int) -> List[bytes]:

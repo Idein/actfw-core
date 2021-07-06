@@ -1,3 +1,6 @@
+# type: ignore
+# flake8: noqa
+
 from actfw_core._private.app import App
 from rustonic.prelude import Unreachable
 

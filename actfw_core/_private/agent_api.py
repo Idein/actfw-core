@@ -1,13 +1,14 @@
-import os
+import queue
 import socket
 from pathlib import Path
-from threading import Lock
+from queue import SimpleQueue
+from threading import Lock, Thread
 from typing import Dict, Optional
 
 from rustonic.prelude import Unreachable
 from rustonic.std.sync import Mutex
 
-from .schema.agent_api import Command, CommandKind, CommandRequest, CommandResponse, RequestId, ServiceRequest, ServiceResponse
+from .schema.agent_api import CommandKind, CommandRequest, CommandResponse, RequestId, ServiceRequest, ServiceResponse
 
 
 class CommandSock:
@@ -45,7 +46,7 @@ class CommandSock:
         # I guess `self._send_lock` can be omited.
         with self._send_lock:
             with self._conns.lock() as conns:
-                if not response.id_ in conns:
+                if response.id_ not in conns:
                     raise Unreachable(f"misuse of `CommandSock.send(), response id invalid: respanse = {response}`")
 
                 conn = conns[response.id_]
@@ -70,11 +71,6 @@ class ServiceSock:
         conn.shutdown(socket.SHUT_RDWR)
         conn.close()
         return response
-
-
-import queue
-from queue import SimpleQueue
-from threading import Thread
 
 
 class CommandMediator:
