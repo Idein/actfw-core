@@ -32,6 +32,7 @@ python = "^3.6"
 #
 # For example, the version constraint of python package `Pillow` should be `^5`.
 Pillow = "^5"
+pyOpenSSL = { version = "^20.0.1", optional = true }
 
 [tool.poetry.dev-dependencies]
 Sphinx = "^3.5.3"
@@ -39,6 +40,10 @@ pyproject-indirect-import-detector = "^0.1.1"
 pysen = {version = "^0.9.1", extras = ["lint"]}
 pytest = "^6.2.3"
 sphinx-theme = "^1.0"
+
+[tool.poetry.extras]
+agent_app_protocol_service_server = ["pyOpenSSL"]
+test = ["pyOpenSSL"]
 
 [tool.poetry.urls]
 "Repository" = "https://github.com/Idein/actfw-core"
