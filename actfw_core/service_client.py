@@ -1,11 +1,14 @@
 import base64
 import os
 import socket
+from pathlib import Path
+from typing import Optional
 
 from .command_server import _read_bytes, _read_tokens
 
 
 class ServiceClient:
+    _socket_path: Path
     _request_id: int
 
     """Actcast Service Client
@@ -17,15 +20,18 @@ class ServiceClient:
 
     """
 
-    def __init__(self) -> None:
+    def __init__(self, socket_path: Optional[Path] = None) -> None:
+        if socket_path is None:
+            socket_path = Path(os.environ["ACTCAST_SERVICE_SOCK"])
+
+        self._socket_path = socket_path
         self._request_id = 0
 
     def _sendrecv(self, command_id: int, payload: str) -> str:
         cmd = f"{self._request_id} {command_id} {len(payload)} {payload}".encode("ascii")
         self._request_id += 1
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        socket_path = os.environ["ACTCAST_SERVICE_SOCK"]
-        sock.connect(socket_path)
+        sock.connect(str(self._socket_path))
         sock.sendall(cmd)
         [request_id, command_id, response_length] = map(int, _read_tokens(sock, 3))
         response = _read_bytes(sock, response_length)
