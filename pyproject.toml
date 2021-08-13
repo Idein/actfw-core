@@ -36,6 +36,7 @@ pyOpenSSL = { version = "^20.0.1", optional = true }
 
 [tool.poetry.dev-dependencies]
 Sphinx = "^3.5.3"
+cryptography = "^3.4.7"
 pyproject-indirect-import-detector = "^0.1.1"
 pysen = {version = "^0.9.1", extras = ["lint"]}
 pytest = "^6.2.3"

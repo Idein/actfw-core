@@ -83,7 +83,7 @@ name = "cffi"
 version = "1.14.6"
 description = "Foreign Function Interface for Python calling C code."
 category = "main"
-optional = true
+optional = false
 python-versions = "*"
 
 [package.dependencies]
@@ -136,7 +136,7 @@ name = "cryptography"
 version = "3.4.7"
 description = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -401,7 +401,7 @@ name = "pycparser"
 version = "2.20"
 description = "C parser in Python"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
@@ -771,7 +771,7 @@ test = ["pyOpenSSL"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6"
-content-hash = "83c80873cd03b96243ab8cdbcb44cde0ffacf36003f79c61c04b0f53d1b422b2"
+content-hash = "d1f9a19ed6bac0b016d75f763edddebe5c517aaad68948943f01a404203e0aed"
 
 [metadata.files]
 alabaster = [
