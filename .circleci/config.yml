@@ -25,7 +25,7 @@ commands:
             source $BASH_ENV
 
             poetry config virtualenvs.in-project true
-            poetry install
+            poetry install --extras test
       - save_cache:
           key: *cache-key-poetry
           paths:
