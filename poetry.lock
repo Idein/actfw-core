@@ -168,7 +168,7 @@ dev = ["pytest (>=5)", "pytest-cov", "coveralls", "black", "mypy", "pylint"]
 name = "dataclasses"
 version = "0.8"
 description = "A backport of the dataclasses module for Python 3.6"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6, <3.7"
 
@@ -446,7 +446,7 @@ python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
 name = "pyproject-indirect-import-detector"
-version = "0.1.1"
+version = "0.1.2"
 description = "CI tool to detect indirect import"
 category = "dev"
 optional = false
@@ -771,7 +771,7 @@ test = ["pyOpenSSL"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6"
-content-hash = "d1f9a19ed6bac0b016d75f763edddebe5c517aaad68948943f01a404203e0aed"
+content-hash = "c3be8e3a3022ae1739b238d6c6b4c7e5f26234c405cd2025ecf93c81cb3d609e"
 
 [metadata.files]
 alabaster = [
@@ -1084,8 +1084,8 @@ pyparsing = [
     {file = "pyparsing-2.4.7.tar.gz", hash = "sha256:c203ec8783bf771a155b207279b9bccb8dea02d8f0c9e5f8ead507bc3246ecc1"},
 ]
 pyproject-indirect-import-detector = [
-    {file = "pyproject-indirect-import-detector-0.1.1.tar.gz", hash = "sha256:245c9264240786f556ff7652d5c519bbffc423c1c39059b780e5b55d512bf9be"},
-    {file = "pyproject_indirect_import_detector-0.1.1-py3-none-any.whl", hash = "sha256:d177299f0154d44e79106f715a0b3f8e716cbb9d4f93ba808570833fa5ba911c"},
+    {file = "pyproject-indirect-import-detector-0.1.2.tar.gz", hash = "sha256:27d5c893cd737ff420871fae67e5a84bdf7d46de5108bad8c42c0e4e96deda2b"},
+    {file = "pyproject_indirect_import_detector-0.1.2-py3-none-any.whl", hash = "sha256:26d4d5038a050801c825d0801c4eab3bdd2a73fec6ded1c75a6f21c760926d47"},
 ]
 pysen = [
     {file = "pysen-0.9.1-py3-none-any.whl", hash = "sha256:706088b904a74b83a341cc7b19f213737412575bc74e851a57e7b6db80e437c9"},
