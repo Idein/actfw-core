@@ -41,9 +41,9 @@ class ServiceClient:
 
         response, err = ServiceResponse.parse(sock)
         if err:
-            return None, RuntimeError("`ServiceResponse.parse()` failed")
+            return None, RuntimeError("couldn't parse a response from actcast agent: `ServiceResponse.parse()` failed")
         if response.status != Status.OK:
-            return None, RuntimeError(f"Service request failed: request = {request}, response = {response}")
+            return None, RuntimeError(f"service request failed: request = {request}, response = {response}")
 
         sock.shutdown(socket.SHUT_RDWR)
         sock.close()
