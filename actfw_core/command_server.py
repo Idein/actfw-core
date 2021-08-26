@@ -81,7 +81,7 @@ class CommandServer(Isolated):
             try:
                 assert self.img is not None
 
-                conn, addr = s.accept()
+                conn, _ = s.accept()
                 [request_id, command_id, command_data_length] = map(int, _read_tokens(conn, 3))
                 if command_id == 0:  # Take Photo
                     header = "data:image/png;base64,"
