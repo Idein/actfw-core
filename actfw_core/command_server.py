@@ -1,35 +1,15 @@
 import base64
+import copy
 import io
 import os
 import socket
 from threading import Lock
-from typing import List, Optional
+from typing import Optional
 
 from PIL.Image import Image as PIL_Image
 
+from .schema.agent_app_protocol import CommandKind, CommandRequest, CommandResponse, Status
 from .task import Isolated
-
-
-def _read_tokens(conn: socket.socket, n: int) -> List[bytes]:
-    result = []
-    s = b""
-    x = n
-    while x > 0:
-        c = conn.recv(1)
-        if c == b" ":
-            x -= 1
-            result.append(s)
-            s = b""
-        else:
-            s += c
-    return result
-
-
-def _read_bytes(conn: socket.socket, n: int) -> bytes:
-    result = b""
-    while len(result) < n:
-        result += conn.recv(1024)
-    return result
 
 
 class CommandServer(Isolated):
@@ -82,20 +62,30 @@ class CommandServer(Isolated):
                 assert self.img is not None
 
                 conn, _ = s.accept()
-                [request_id, command_id, command_data_length] = map(int, _read_tokens(conn, 3))
-                if command_id == 0:  # Take Photo
+                request, err = CommandRequest.parse(conn)
+                if err:
+                    response = CommandResponse(
+                        copy.copy(request.id_),
+                        Status.GENERAL_ERROR,
+                        b"",
+                    )
+                    conn.sendall(response.to_bytes())
+                    continue
+
+                if request.kind == CommandKind.TAKE_PHOTO:
                     header = "data:image/png;base64,"
                     with self.img_lock:
                         pngimg = io.BytesIO()
                         self.img.save(pngimg, format="PNG")
                         b64img = base64.b64encode(pngimg.getbuffer())
-                    conn.sendall(
-                        "{} {} {} {}{}\n".format(
-                            request_id, 0, len(header) + len(b64img), header, b64img.decode("utf-8")
-                        ).encode("utf-8")
-                    )
+                    response = CommandResponse(copy.copy(request.id_), Status.GENERAL_ERROR, header + b64img.decode("utf-8"))
                 else:
-                    conn.sendall(f"{request_id} 2 0\n".encode())
+                    response = CommandResponse(
+                        copy.copy(request.id_),
+                        Status.GENERAL_ERROR,
+                        b"",
+                    )
+                conn.sendall(response.to_bytes())
                 conn.close()
             except socket.timeout:
                 pass
