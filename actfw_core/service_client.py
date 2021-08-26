@@ -5,6 +5,7 @@ import socket
 from pathlib import Path
 from typing import Optional, cast
 
+from ._private.util.result import ResultTuple
 from .schema.agent_app_protocol import RequestId, ServiceKind, ServiceRequest, ServiceResponse, Status
 
 
@@ -32,7 +33,7 @@ class ServiceClient:
         self._request_id = self._request_id.next_()
         return copy.copy(self._request_id)
 
-    def _sendrecv(self, request: ServiceRequest) -> ServiceResponse:
+    def _sendrecv(self, request: ServiceRequest) -> ResultTuple[ServiceResponse, RuntimeError]:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.connect(str(self._socket_path))
 
@@ -40,14 +41,14 @@ class ServiceClient:
 
         response, err = ServiceResponse.parse(sock)
         if err:
-            raise RuntimeError("`ServiceResponse.parse()` failed")
+            return None, RuntimeError("`ServiceResponse.parse()` failed")
         if response.status != Status.OK:
-            raise RuntimeError(f"Service request failed: request = {request}, response = {response}")
+            return None, RuntimeError(f"Service request failed: request = {request}, response = {response}")
 
         sock.shutdown(socket.SHUT_RDWR)
         sock.close()
 
-        return response
+        return response, None
 
     def rs256(self, payload: bytes) -> str:
         """
@@ -69,8 +70,11 @@ class ServiceClient:
             ServiceKind.RS_256,
             payload,
         )
+        response, err = self._sendrecv(request)
+        if err:
+            raise err
         # IIUC, bytes.decode() returns `Any`: https://github.com/python/typeshed/blob/92aecad/stdlib/%40python2/_codecs.pyi#L22
-        return cast(str, self._sendrecv(request).data.decode())
+        return cast(str, response.data.decode())
 
 
 if __name__ == "__main__":
