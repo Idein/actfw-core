@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.1.0 (2021-XX-XX)
+## 2.1.0 (2021-08-30)
 
 - Support a new actcast agent feature by `actfw_core.ServiceClient`.
 
