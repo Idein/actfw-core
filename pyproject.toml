@@ -32,10 +32,13 @@ python = "^3.6"
 #
 # For example, the version constraint of python package `Pillow` should be `^5`.
 Pillow = "^5"
+dataclasses = {version = "^0.8", python = "< 3.7"}
 
 [tool.poetry.dev-dependencies]
 Sphinx = "^3.5.3"
-pyproject-indirect-import-detector = "^0.1.1"
+cryptography = "^3.4.7"
+pyOpenSSL = "^20.0.1"
+pyproject-indirect-import-detector = "^0.1.2"
 pysen = {version = "^0.9.1", extras = ["lint"]}
 pytest = "^6.2.3"
 sphinx-theme = "^1.0"
@@ -56,6 +59,13 @@ py_version = "py38"
 
 [[tool.pysen.lint.mypy_targets]]
 paths = ["."]
+
+[tool.pyproject-indirect-import-detector]
+exclude_projects = ["dataclasses"]
+exclude_modules = [
+    "dataclasses",
+    "OpenSSL", # Conditional export
+]
 
 [build-system]
 build-backend = "poetry.core.masonry.api"

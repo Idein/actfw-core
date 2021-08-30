@@ -1,12 +1,17 @@
 import base64
+import copy
 import os
 import socket
+from pathlib import Path
+from typing import Optional, cast
 
-from .command_server import _read_bytes, _read_tokens
+from ._private.util.result import ResultTuple
+from .schema.agent_app_protocol import RequestId, ServiceKind, ServiceRequest, ServiceResponse, Status
 
 
 class ServiceClient:
-    _request_id: int
+    _socket_path: Path
+    _request_id: RequestId
 
     """Actcast Service Client
 
@@ -17,21 +22,33 @@ class ServiceClient:
 
     """
 
-    def __init__(self) -> None:
-        self._request_id = 0
+    def __init__(self, socket_path: Optional[Path] = None) -> None:
+        if socket_path is None:
+            socket_path = Path(os.environ["ACTCAST_SERVICE_SOCK"])
 
-    def _sendrecv(self, command_id: int, payload: str) -> str:
-        cmd = f"{self._request_id} {command_id} {len(payload)} {payload}".encode("ascii")
-        self._request_id += 1
+        self._socket_path = socket_path
+        self._request_id = RequestId(0)
+
+    def _get_request_id(self) -> RequestId:
+        self._request_id = self._request_id.next_()
+        return copy.copy(self._request_id)
+
+    def _sendrecv(self, request: ServiceRequest) -> ResultTuple[ServiceResponse, RuntimeError]:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        socket_path = os.environ["ACTCAST_SERVICE_SOCK"]
-        sock.connect(socket_path)
-        sock.sendall(cmd)
-        [request_id, command_id, response_length] = map(int, _read_tokens(sock, 3))
-        response = _read_bytes(sock, response_length)
+        sock.connect(str(self._socket_path))
+
+        sock.sendall(request.to_bytes())
+
+        response, err = ServiceResponse.parse(sock)
+        if err:
+            return None, RuntimeError("couldn't parse a response from actcast agent: `ServiceResponse.parse()` failed")
+        if response.status != Status.OK:
+            return None, RuntimeError(f"service request failed: request = {request}, response = {response}")
+
         sock.shutdown(socket.SHUT_RDWR)
         sock.close()
-        return response.decode("ascii")
+
+        return response, None
 
     def rs256(self, payload: bytes) -> str:
         """
@@ -43,9 +60,21 @@ class ServiceClient:
 
         Returns:
             str: signature (base64url encoded)
+
+        Exceptions:
+            RuntimeError
         """
-        b64encoded = base64.urlsafe_b64encode(payload).rstrip(b"=").decode("ascii")
-        return self._sendrecv(0, b64encoded)
+        payload = base64.urlsafe_b64encode(payload).rstrip(b"=")
+        request = ServiceRequest(
+            self._get_request_id(),
+            ServiceKind.RS_256,
+            payload,
+        )
+        response, err = self._sendrecv(request)
+        if err:
+            raise err
+        # IIUC, bytes.decode() returns `Any`: https://github.com/python/typeshed/blob/92aecad/stdlib/%40python2/_codecs.pyi#L22
+        return cast(str, response.data.decode())
 
 
 if __name__ == "__main__":
