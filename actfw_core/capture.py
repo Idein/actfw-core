@@ -121,9 +121,8 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
         # assert type(self.capture_format) is V4L2_PIX_FMT
         self.video.set_framerate(config)
         # video.set_rotation(90)
-        buffers = self.video.request_buffers(4)
-        for buf in buffers:
-            self.video.queue_buffer(buf)
+        self.video.request_buffers(4)
+        self.video.queue_buffer()
 
     def capture_size(self) -> Tuple[int, int]:
         """

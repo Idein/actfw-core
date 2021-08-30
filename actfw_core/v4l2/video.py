@@ -22,6 +22,25 @@ class _libv4l2(object):
         if path is not None:
             self.lib = CDLL(path, use_errno=True)
 
+            # ioctl
+            self.lib.v4l2_ioctl.argtypes = [c_int, c_ulong, c_void_p]
+            self.lib.v4l2_ioctl.restype = c_int
+
+            # mmap
+            self.lib.v4l2_mmap.argtypes = [
+                c_void_p,
+                c_size_t,
+                c_int,
+                c_int,
+                c_int,
+                c_int64,
+            ]
+            self.lib.v4l2_mmap.restype = c_void_p
+
+            # munmap
+            self.lib.v4l2_munmap.argtypes = [c_void_p, c_size_t]
+            self.lib.v4l2_munmap.restype = c_int
+
     def ioctl(self, *args, **kwargs):
         if self.lib is None:
             raise FileNotFoundError("Not found: 'libv4l2.so'")
@@ -44,6 +63,26 @@ class _libv4lconvert(object):
         path = find_library("v4lconvert")
         if path is not None:
             self.lib = CDLL(path, use_errno=True)
+
+            # create
+            self.lib.v4lconvert_create.argtypes = [c_int]
+            self.lib.v4lconvert_create.restype = c_void_p  # struct v4lconvert_data *
+
+            # convert
+            self.lib.v4lconvert_convert.argtypes = [
+                c_void_p,
+                POINTER(format),
+                POINTER(format),
+                POINTER(c_ubyte),
+                c_int,
+                POINTER(c_ubyte),
+                c_int,
+            ]
+            self.lib.v4lconvert_convert.restype = c_void_p  # struct v4lconvert_data *
+
+            # try_format
+            self.lib.v4lconvert_try_format.argtypes = [c_void_p, POINTER(format), POINTER(format)]
+            self.lib.v4lconvert_try_format.restype = c_int
 
     def create(self, *args, **kwargs):
         if self.lib is None:
@@ -373,6 +412,7 @@ class Video(object):
             flags |= os.O_NONBLOCK
         self.device_fd = os.open(self.device, flags)
         self.converter = _v4lconvert.create(self.device_fd)
+        self.buffers: Optional[List[VideoBuffer]] = None  # set when enqueu
 
     def close(self):
         os.close(self.device_fd)
@@ -534,7 +574,15 @@ class Video(object):
                     if expected_format == pixel_format:
                         results.append(candidate)
                     else:
-                        if self.try_convert(candidate, candidate.width, candidate.height, expected_format) is not None:
+                        if (
+                            self.try_convert(
+                                candidate,
+                                candidate.width,
+                                candidate.height,
+                                expected_format,
+                            )
+                            is not None
+                        ):
                             results.append(candidate)
 
                     old_candidate = candidate
@@ -566,7 +614,11 @@ class Video(object):
             raise RuntimeError("incompatible format")
 
         before = (expected_width, expected_height, expected_format)
-        after = (expected_fmt.fmt.pix.width, expected_fmt.fmt.pix.height, expected_fmt.fmt.pix.pixelformat)
+        after = (
+            expected_fmt.fmt.pix.width,
+            expected_fmt.fmt.pix.height,
+            expected_fmt.fmt.pix.pixelformat,
+        )
 
         if before == after:
             return (fmt, expected_fmt)
@@ -593,7 +645,11 @@ class Video(object):
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_S_FMT)")
 
-        return (self.expected_fmt.fmt.pix.width, self.expected_fmt.fmt.pix.height, self.expected_fmt.fmt.pix.pixelformat)
+        return (
+            self.expected_fmt.fmt.pix.width,
+            self.expected_fmt.fmt.pix.height,
+            self.expected_fmt.fmt.pix.pixelformat,
+        )
 
     def set_framerate(self, conf):
 
@@ -771,15 +827,13 @@ class Video(object):
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_REQBUFS): {}".format(errno.errorcode[get_errno()]))
 
-        return [VideoBuffer._from_query(self, i) for i in range(n)]
+        self.buffers = [VideoBuffer(self, i) for i in range(n)]
 
-    def queue_buffer(self, video_buf):
-
-        result = self._ioctl(_VIDIOC.QBUF, byref(video_buf.buf))
-        if -1 == result:
-            raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
-
-        return True
+    def queue_buffer(self):
+        for video_buf in self.buffers:
+            result = self._ioctl(_VIDIOC.QBUF, byref(video_buf.buf))
+            if -1 == result:
+                raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
 
     def start_streaming(self):
 
@@ -818,7 +872,7 @@ class Video(object):
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_DQBUF): {}".format(errno.errorcode[get_errno()]))
 
-        return VideoBuffer(self, buf)
+        return self.buffers[buf.index]
 
     def requeue_buffer(self, video_buf):
 
@@ -829,43 +883,41 @@ class Video(object):
 
 class VideoStream(object):
     def __init__(self, video):
-        self.video = video
+        self.video: Video = video
 
     def __enter__(self):
         return self
 
     def __exit__(self, ex_type, ex_value, trace):
+        for buf in self.video.buffers:
+            buf.unmap_buffer()
         self.video.stop_streaming()
 
     def capture(self, timeout=1, in_expected_format=True):
 
         buf = self.video.dequeue_buffer(timeout=timeout)
-        mapped_buf = buf.get_mapped_buffer()
-
         dst = bytes(self.video.expected_fmt.fmt.pix.sizeimage)
         if in_expected_format:
             _v4lconvert.convert(
                 self.video.converter,
                 byref(self.video.fmt),
                 byref(self.video.expected_fmt),
-                mapped_buf,
+                buf.mapped_buf,
                 self.video.fmt.fmt.pix.sizeimage,
-                cast(dst, POINTER(c_uint8)),
+                cast(dst, POINTER(c_ubyte)),
                 self.video.expected_fmt.fmt.pix.sizeimage,
             )
         else:
             stream = io.BytesIO(dst)
-            stream.write(mapped_buf.contents)
+            stream.write(buf.mapped_buf.contents)
 
-        buf.unmap_buffer()
         self.video.requeue_buffer(buf)
 
         return dst
 
 
 class VideoBuffer(object):
-    @classmethod
-    def _from_query(cls, video, index):
+    def __init__(self, video, index):
 
         buf = buffer()
         buf.type = V4L2_BUF_TYPE.VIDEO_CAPTURE
@@ -877,28 +929,20 @@ class VideoBuffer(object):
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_QYERYBUF): {}".format(errno.errorcode[get_errno()]))
 
-        return cls(video, buf)
-
-    def __init__(self, video, buf):
-        self.video = video
-        self.buf = buf
-        self.mapped_buf = None
-
-    def get_mapped_buffer(self):
-        if self.mapped_buf is not None:
-            return self.mapped_buf
         result = _v4l2.mmap(
             None,
-            self.buf.length,
+            buf.length,
             mmap.PROT_READ | mmap.PROT_WRITE,
             mmap.MAP_SHARED,
-            self.video.device_fd,
-            c_longlong(self.buf.m.offset),
+            video.device_fd,
+            buf.m.offset,
         )
         if result == -1:
             raise RuntimeError("mmap failed: {}".format(errno.errorcode[get_errno()]))
-        self.mapped_buf = cast(result, POINTER(ARRAY(c_uint8, self.buf.length)))
-        return self.mapped_buf
+
+        self.video = video
+        self.buf = buf
+        self.mapped_buf = cast(result, POINTER(c_uint8))
 
     def unmap_buffer(self):
         if self.mapped_buf is None:
