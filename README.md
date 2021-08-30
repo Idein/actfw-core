@@ -74,7 +74,7 @@ app.run()
 
 ```console
 pip3 install poetry
-poetry install --extras test
+poetry install
 ```
 
 ### Running tests
