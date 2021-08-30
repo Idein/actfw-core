@@ -62,7 +62,10 @@ paths = ["."]
 
 [tool.pyproject-indirect-import-detector]
 exclude_projects = ["dataclasses"]
-exclude_modules = ["dataclasses"]
+exclude_modules = [
+    "dataclasses",
+    "OpenSSL", # Conditional export
+]
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
