@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.1 (2021-09-01)
+
+- Improve efficeincy of `V4LCameraCapture`.
+  - Reduce the number of calls of `v4l2_mmap` and `v4l2_munmap`.
+- `V4LCameraCapture` now correctly works in 64-bit linux environments.
+
 ## 2.1.0 (2021-08-30)
 
 - Support a new actcast agent feature by `actfw_core.ServiceClient`.
