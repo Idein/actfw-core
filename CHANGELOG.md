@@ -2,6 +2,9 @@
 
 ## 2.1.1 (2021-09-01)
 
+- Improve efficeincy of `V4LCameraCapture`.
+  - Reduce the number of calls of `v4l2_mmap` and `v4l2_munmap`.
+- `V4LCameraCapture` now correctly works in 64-bit linux environments.
 - Fixed a bug: In 2.1.0, `actfw_core.CommandServer` failed to response to Take Photo command.
 
 ## 2.1.0 (2021-08-30)
