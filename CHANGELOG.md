@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1 (2021-09-01)
+
+- Fixed a bug: In 2.1.0, `actfw_core.CommandServer` failed to response to Take Photo command.
+
 ## 2.1.0 (2021-08-30)
 
 - Support a new actcast agent feature by `actfw_core.ServiceClient`.

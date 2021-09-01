@@ -73,12 +73,13 @@ class CommandServer(Isolated):
                     continue
 
                 if request.kind == CommandKind.TAKE_PHOTO:
-                    header = "data:image/png;base64,"
+                    header = b"data:image/png;base64,"
                     with self.img_lock:
                         pngimg = io.BytesIO()
                         self.img.save(pngimg, format="PNG")
                         b64img = base64.b64encode(pngimg.getbuffer())
-                    response = CommandResponse(copy.copy(request.id_), Status.GENERAL_ERROR, header + b64img.decode("utf-8"))
+                    data = header + b64img
+                    response = CommandResponse(copy.copy(request.id_), Status.OK, data)
                 else:
                     response = CommandResponse(
                         copy.copy(request.id_),
@@ -86,6 +87,7 @@ class CommandServer(Isolated):
                         b"",
                     )
                 conn.sendall(response.to_bytes())
+                conn.shutdown(socket.SHUT_RDWR)
                 conn.close()
             except socket.timeout:
                 pass
