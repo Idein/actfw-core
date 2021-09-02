@@ -19,17 +19,20 @@ def main():
 
         with app.builder() as b:
             # Capture task
-            capture = V4LCameraCapture(
+            capture_ = V4LCameraCapture(
                 "/dev/video0", MODEL_INPUT_SIZE, 15, format_selector=V4LCameraCapture.FormatSelector.PROPER
             )
-            capture = b.spawn_task(capture)
+            capture = b.spawn_task(capture_)
 
             # Classifier task
             model = Model()
             classifier = b.spawn_task(Classifier(model, MODEL_INPUT_SIZE))
 
             presenter = b.spawn_task(Presenter(setting))
-            take_photo = b.spawn_task(TakePhotoHandler())
+
+            take_photo_ = TakePhotoHandler(b.support_agent_app_command_take_photo())
+            take_photo = b.spawn_task(take_photo_)
+            
             display = b.spawn_task(Display())
 
             b.connect(capture, classifier)
@@ -40,3 +43,30 @@ def main():
             b.build()
 
         app.run()
+
+
+
+# class SimpleElementBase(ProtocolElement):
+#     def __init__(self) -> None:
+#         self._helper = SimpleElementBaseHelper()
+
+#     def new_pad_in(self) -> PadIn[T_OUT]:
+        
+
+from typing import Gereric, TypeVar
+
+
+T_IN = TypeVar("T_IN")
+T_OUT = TypeVar("T_OUT")
+
+
+class TakePhotoHandler(ProtocolPipe[T_IN, T_OUT]):
+    _handler: AgentAppCommandHandlerTakePhoto
+
+    def __init__(self, handler: AgentAppCommandHandlerTakePhoto) -> None:
+        super().__init__()
+
+        self._handler = handler
+
+    def proc(self, api: ElementApi, x: T_IN) -> T_OUT:
+                

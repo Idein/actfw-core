@@ -6,9 +6,15 @@ from urllib.parse import ParseResult as urllib_ParseResult
 from urllib.parse import urlparse
 from uuid import UUID
 
+from .misc import AgentAppProtocolVersion
+
+
 __all__ = [
     "EnvVar",
 ]
+
+
+REQUIRED_MINIMUM_PROTOCOL_VERSION = AgentAppProtocolVersion.parse("1.0.0")
 
 
 # TODO: check by running application.
@@ -20,18 +26,20 @@ class EnvVar:
     For more details of each environment variable, see https://example.com/ .
     """
 
+    # Protocol version of agent-app communication.
+    protocol_version: AgentAppProtocolVersion
     # Act ID of the actcast application.  (u64)
-    actcast_act_id: int
+    act_id: int
     # Device ID of the device running the actcast application.
-    actcast_device_id: str
+    device_id: str
     # ID that identifies the launch of the actcast application, like PID.  (UUIDv4)
-    actcast_instance_id: UUID
+    instance_id: UUID
     # Path of socket file to receive command from actcast agent.
-    actcast_command_sock: Path
+    command_sock: Path
     # Path of socket file to send command to actcast agent.
-    actcast_service_sock: Path
+    service_sock: Path
     # URL of SOCKS5 proxy server.
-    actcast_socks_server: Optional[urllib_ParseResult]
+    socks_server: Optional[urllib_ParseResult]
 
     @classmethod
     def load(cls) -> "EnvVar":
@@ -41,6 +49,15 @@ class EnvVar:
         Exceptions:
             Raise :class:`~RuntimeError` if the environment variable not set.
         """
+
+        name = "ACTCAST_PROTOCOL_VERSION"
+        x = os.environ.get(name)
+        if x is None:
+            raise RuntimeError(f"environment variable not set: {name}")
+        protocol_version = AgentAppProtocolVersion.parse(x)
+
+        if protocol_version < REQUIRED_MINIMUM_PROTOCOL_VERSION:
+            raise RuntimeError(f"agent too old, `actfw-core` of this version requires `ACTCAST_PROTOCOL_VERSION >= \"{REQUIRED_MINIMUM_PROTOCOL_VERSION.to_str()}\"`")
 
         name = "ACTCAST_ACT_ID"
         x = os.environ.get(name)

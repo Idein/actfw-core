@@ -26,11 +26,13 @@ class LivenessUpdater:
     def startup(self) -> None:
         self._thread.startup()
 
-    def teardown(self) -> None:
-        self._thread.teardown()
-
-    def join(self) -> None:
-        self._thread.join()
+    # This component will be not teardowned.
+    #
+    # def teardown(self) -> None:
+    #     self._thread.teardown()
+    #
+    # def join(self) -> None:
+    #     self._thread.join()
 
     def _loop_body(self) -> None:
         LIVENESS_PROVE_PATH.touch()

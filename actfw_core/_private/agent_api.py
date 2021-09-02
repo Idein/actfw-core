@@ -4,11 +4,13 @@ from pathlib import Path
 from queue import SimpleQueue
 from threading import Lock, Thread
 from typing import Dict, Optional
+from dataclasses import dataclass
 
 from rustonic.prelude import Unreachable
 from rustonic.std.sync import Mutex
 
 from .schema.agent_api import CommandKind, CommandRequest, CommandResponse, RequestId, ServiceRequest, ServiceResponse
+from .envvar import EnvVar
 
 
 class CommandSock:
@@ -123,7 +125,38 @@ class CommandRequestQueue:
             return None
 
 
-# @dataclasses(frozen=True, eq=False)
-# class AgentAppApiMediator:
-#     command_mediator: CommandMediator
-#     service_sock: ServiceSock
+@dataclass(frozen=True, eq=False)
+class AgentAppInterface:
+    command_mediator: CommandMediator
+    service_sock: ServiceSock
+
+    @classmethod
+    def startup(cls, envvar: EnvVar) -> "AgentAppInterface":
+        command_sock = CommandSock(envvar.command_sock)
+        command_mediator = CommandMediator(command_sock)
+        command_mediator.startup()
+        service_sock = ServiceSock(envvar.service_sock)
+        return cls(command_mediator, service_sock)
+
+
+def ProtocolAgentAppCommandHandler(Protocol):
+    def _push_request(self, request: CommandRequest) -> None:
+        pass
+
+
+class AgentAppCommandHandlerTakePhoto(ProtocolAgentAppCommandHandler):
+    _queue: SimpleQueue[CommandRequest]
+
+    def __init__(self) -> None:
+        self._queue = SimpleQueue()
+
+    # ProtocolAgentAppCommandHandler
+    def _push_request(self, request: CommandRequest) -> None:
+        assert request.cmd == CommandKind.TAKE_PHOTO
+        self._queue.push(request)
+
+    def try_recv(self) -> Optional[CommandRequest]:
+        return self._queue.get_nowait()
+
+    def send(self, response: CommandResponse) -> None:
+        self._sock.send(response)
