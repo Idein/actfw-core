@@ -30,8 +30,6 @@ commands:
           key: *cache-key-poetry
           paths:
             - ".venv"
-            - "/usr/local/bin"
-            - "/usr/local/lib/python*/site-packages"
 
   prepare-github-writable-user:
     steps:
