@@ -20,8 +20,8 @@ commands:
       - run:
           name: install poetry && poetry install
           command: |
-            curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
-            echo 'export PATH=$HOME/.poetry/bin:$PATH' >> $BASH_ENV
+            curl -sSL https://install.python-poetry.org | python -
+            echo 'export PATH=$HOME/.local/bin:$PATH' >> $BASH_ENV
             source $BASH_ENV
 
             poetry config virtualenvs.in-project true
@@ -30,8 +30,6 @@ commands:
           key: *cache-key-poetry
           paths:
             - ".venv"
-            - "/usr/local/bin"
-            - "/usr/local/lib/python*/site-packages"
 
   prepare-github-writable-user:
     steps:
