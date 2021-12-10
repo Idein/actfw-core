@@ -39,7 +39,7 @@ Sphinx = "^4.3.0"
 cryptography = "^3.4.7"
 pyOpenSSL = "^20.0.1"
 pyproject-indirect-import-detector = "^0.1.2"
-pysen = {version = "^0.9.1", extras = ["lint"]}
+pysen = {version = "^0.10.1", extras = ["lint"]}
 pytest = "^6.2.3"
 sphinx-theme = "^1.0"
 
