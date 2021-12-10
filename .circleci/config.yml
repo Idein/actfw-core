@@ -14,8 +14,8 @@ commands:
   poetry-install:
     steps:
       # See: https://circleci.com/docs/2.0/language-python/#cache-dependencies
-      # - restore_cache:
-      #     key: &cache-key-poetry cache-poetry-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "poetry.lock" }}
+      - restore_cache:
+          key: &cache-key-poetry cache-poetry-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "poetry.lock" }}
       - install-python-dev-tools
       - run:
           name: install poetry && poetry install
@@ -26,10 +26,10 @@ commands:
 
             poetry config virtualenvs.in-project true
             poetry install
-      # - save_cache:
-      #     key: *cache-key-poetry
-      #     paths:
-      #       - ".venv"
+      - save_cache:
+          key: *cache-key-poetry
+          paths:
+            - ".venv"
 
   prepare-github-writable-user:
     steps:
