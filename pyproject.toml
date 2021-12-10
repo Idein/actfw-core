@@ -48,6 +48,9 @@ sphinx-theme = "^1.0"
 "Documentation" = "https://idein.github.io/actfw-core/latest/"
 "Changelog" = "https://github.com/Idein/actfw-core/blob/master/CHANGELOG.md"
 
+[tool.pysen]
+version = "0.10"
+
 [tool.pysen.lint]
 enable_black = true
 enable_flake8 = true
