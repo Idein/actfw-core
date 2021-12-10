@@ -15,7 +15,7 @@ repository = "https://github.com/Idein/actfw-core"
 version = "2.1.1"
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "^3.6.2"
 
 # This library is intended to be used to implement [Actcast application](https://actcast.io/docs/ForVendor/ApplicationDevelopment/).
 # Dependencies should be compatible with those provided by apt in Actcast application's base image
@@ -39,9 +39,13 @@ Sphinx = "^4.3.0"
 cryptography = "^3.4.7"
 pyOpenSSL = "^20.0.1"
 pyproject-indirect-import-detector = "^0.1.2"
-pysen = {version = "^0.10.1", extras = ["lint"]}
+pysen = {version = "^0.10.1"}
 pytest = "^6.2.3"
 sphinx-theme = "^1.0"
+black = "21.10b0"
+flake8 = "4.0.1"
+isort = "5.1.4"
+mypy = "0.910"
 
 [tool.poetry.urls]
 "Repository" = "https://github.com/Idein/actfw-core"
