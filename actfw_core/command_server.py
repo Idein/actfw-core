@@ -51,16 +51,7 @@ class CommandServer(Isolated):
         s.settimeout(1)
         s.listen(1)
         while self.running:
-            # Wait photo
-            while self.running:
-                with self.img_lock:
-                    if self.img is None:
-                        continue
-                    else:
-                        break
             try:
-                assert self.img is not None
-
                 conn, _ = s.accept()
                 request, err = CommandRequest.parse(conn)
                 if err:
@@ -73,13 +64,27 @@ class CommandServer(Isolated):
                     continue
 
                 if request.kind == CommandKind.TAKE_PHOTO:
-                    header = b"data:image/png;base64,"
-                    with self.img_lock:
-                        pngimg = io.BytesIO()
-                        self.img.save(pngimg, format="PNG")
-                        b64img = base64.b64encode(pngimg.getbuffer())
-                    data = header + b64img
-                    response = CommandResponse(copy.copy(request.id_), Status.OK, data)
+                    # Wait the first `self.img` registered.
+                    while self.running:
+                        # TODO: Explicit timeout
+                        if HOGE:
+                            response = CommandResponse(
+                                copy.copy(request.id_),
+                                Status.GENERAL_ERROR,
+                                b"",
+                            )
+                            break
+                        with self.img_lock:
+                            if self.img is None:
+                                continue
+                            else:
+                                header = b"data:image/png;base64,"
+                                pngimg = io.BytesIO()
+                                self.img.save(pngimg, format="PNG")
+                                b64img = base64.b64encode(pngimg.getbuffer())
+                                data = header + b64img
+                                response = CommandResponse(copy.copy(request.id_), Status.OK, data)
+                                break
                 else:
                     response = CommandResponse(
                         copy.copy(request.id_),
