@@ -32,8 +32,8 @@ python = "^3.6.2"
 #
 # For example, the version constraint of python package `Pillow` should be `^5`.
 Pillow = [
-    {version = "^5", python = "<= 3.7"},
-    {version = "^8", python = "> 3.7"},
+    {version = "^5", python = "< 3.8"},
+    {version = "^8", python = ">= 3.8"},
 ]
 dataclasses = {version = "^0.8", python = "< 3.7"}
 
