@@ -1,5 +1,5 @@
 # Changelog
-## 2.2.0 (2022-XX-XX)
+## 2.2.0a0 (2022-03-14)
 
 - upgrade pillow version for python>=3.8 environment
 
