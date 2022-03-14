@@ -26,12 +26,15 @@ python = "^3.6.2"
 #
 # The table of current versions provided by apt:
 #
-# |                      | Raspberry Pi | Jetson Nano |
-# | -------------------- | ------------ | ----------- |
-# | pithon3-pil (Pillow) | 5.4.1        | 5.1.0       |
+# |                      | Raspberry Pi (buster) | Raspberry Pi (bullseye) | Jetson Nano |
+# | -------------------- | --------------------- | ----------------------- | ----------- |
+# | pithon3-pil (Pillow) | 5.4.1                 | 8.1.2                   | 5.1.0       |
 #
-# For example, the version constraint of python package `Pillow` should be `^5`.
-Pillow = "^5"
+# For example, the version constraint of python package `Pillow` should be `^5` for raspberry pi buster enviroment.
+Pillow = [
+    {version = "^5", python = "< 3.8"},
+    {version = "^8", python = ">= 3.8"},
+]
 dataclasses = {version = "^0.8", python = "< 3.7"}
 
 [tool.poetry.dev-dependencies]
