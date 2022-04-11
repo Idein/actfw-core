@@ -90,5 +90,9 @@ Follow the following branch/tag rules.
 
 1. Make changes for next version in `master` branch (via pull-requests).
 2. Make a PR that updates version in `pyproject.toml` and merge it to `master` branch.
-3. Create Git tag from `master` branch's HEAD named `release-<New version>`. E.g. `release-1.4.0`.
+3. Create GitHub release from `master` branch's HEAD.
+    1. [Draft a new release](https://github.com/Idein/actfw-core/releases/new).
+    2. Create new tag named `release-<New version>` (e.g. `release-1.4.0`) from `Choose a tag` pull down menu.
+    3. Write title and description.
+    4. Publish release.
 4. Then CI will build/upload package to PyPI & API doc to GitHub Pages.
