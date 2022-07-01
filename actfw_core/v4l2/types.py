@@ -296,6 +296,15 @@ class requestbuffers(Structure):
         ("reserved", c_uint32 * 2),
     ]
 
+class exportbuffer(Structure):
+    _fields_ = [
+        ("type", c_uint32),
+        ("index", c_uint32),
+        ("plane", c_uint32),
+        ("flags", c_uint32),
+        ("fd", c_int32),        
+        ("reserved", c_uint32 * 11),        
+    ]    
 
 class timeval(Structure):
     # TODO: check
@@ -366,4 +375,65 @@ class buffer(Structure):
         ("length", c_uint32),
         ("reserved2", c_uint32),
         ("reserved", _fd_or_reserved),
+    ]
+
+
+class mbus_framefmt(Structure):
+    _fields_ = [
+        ("width", c_uint32),
+        ("height", c_uint32),
+        ("code", c_uint32),
+        ("field", c_uint32),
+        ("colorspace", c_uint32),
+        ("ycbcr_enc", c_uint16),
+        ("quantization", c_uint16),
+        ("xfer_func", c_uint16),
+        ("reserved", c_uint16 * 11)
+    ]
+
+
+class subdev_format(Structure):
+    _fields_ = [
+        ("which", c_uint32),
+        ("pad", c_uint32),        
+        ("format", mbus_framefmt),
+        ("reserved", c_uint32 * 8)
+    ]
+
+class _value_for_ext_control(Union):
+    _fields_ = [
+        ("value", c_int32),
+        ("value64", c_int64),
+        ("string", c_char_p),
+        ("p_u8", POINTER(c_uint8)),
+        ("p_u16", POINTER(c_uint16)),
+        ("p_u32", POINTER(c_uint32)),
+        ("ptr", c_void_p)
+    ]
+
+class v4l2_ext_control(Structure):
+    _pack_ = 1
+    _anonymous_ = ("_value",)    
+    _fields_ = [
+        ("id", c_uint32),
+        ("size", c_uint32),
+        ("reserved2", c_uint32 * 1),
+        ("_value", _value_for_ext_control)
+    ]
+
+class _class_or_which_for_ext_controls(Union):
+    _fields_ = [
+        ("ctrl_class", c_uint32),
+        ("which", c_uint32),
+    ]    
+
+class v4l2_ext_controls(Structure):
+    _anonymous_ = ("_class_or_which",)    
+    _fields_ = [
+        ("_class_or_which", _class_or_which_for_ext_controls),
+        ("count", c_uint32),
+        ("error_idx", c_uint32),        
+        ("request_fd", c_int32),        
+        ("reserved", c_uint32),
+        ("controls", POINTER(v4l2_ext_control))
     ]

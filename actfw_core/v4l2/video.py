@@ -14,6 +14,7 @@ from ctypes.util import find_library
 from actfw_core.v4l2.control import *
 from actfw_core.v4l2.types import *
 
+from typing import List
 
 class _libv4l2(object):
     def __init__(self):
@@ -148,9 +149,11 @@ class _VIDIOC(enum.IntEnum):
     QUERYCAP = _IOR("V", 0, capability)
     ENUM_FMT = _IOWR("V", 2, fmtdesc)
     S_FMT = _IOWR("V", 5, format)
+    SUBDEV_S_FMT = _IOWR("V", 5, subdev_format)
     REQBUFS = _IOWR("V", 8, requestbuffers)
     QUERYBUF = _IOWR("V", 9, buffer)
     QBUF = _IOWR("V", 15, buffer)
+    EXPBUF = _IOWR("V", 16, exportbuffer)
     DQBUF = _IOWR("V", 17, buffer)
     STREAMON = _IOW("V", 18, c_int)
     STREAMOFF = _IOW("V", 19, c_int)
@@ -158,6 +161,8 @@ class _VIDIOC(enum.IntEnum):
     G_CTRL = _IOWR("V", 27, control)
     S_CTRL = _IOWR("V", 28, control)
     QUERYCTRL = _IOWR("V", 36, queryctrl)
+    G_EXT_CTRLS = _IOWR("V", 71, v4l2_ext_controls)
+    S_EXT_CTRLS = _IOWR("V", 72, v4l2_ext_controls)
     ENUM_FRAMESIZES = _IOWR("V", 74, frmsizeenum)
     ENUM_FRAMEINTERVALS = _IOWR("V", 75, frmivalenum)
 
@@ -389,6 +394,240 @@ class V4L2_MEMORY(enum.IntEnum):
     USERPTR = 2
     OVERLAY = 3
     DMABUF = 4
+
+
+class V4L2_SUBDEV_FORMAT_WHENCE(enum.IntEnum):
+    TRY = 0
+    ACTIVE = 1
+
+
+class MEDIA_BUS_FMT(enum.IntEnum):    
+    SBGGR8_1X8 = 0x3001
+    SBGGR10_1X10 = 0x3007
+
+
+
+class RawVideo(object):
+    def __init__(self, device, blocking=False, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE):
+        self.device = device
+        self.v4l2_buf_type = v4l2_buf_type
+        flags = os.O_RDWR
+        if not blocking:
+            flags |= os.O_NONBLOCK
+        self.device_fd = os.open(self.device, flags)
+        self.buffers: Optional[List[VideoBuffer]] = None  # set when enqueu
+
+    def close(self):
+        os.close(self.device_fd)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, ex_type, ex_value, trace):
+        self.close()
+
+    
+    def _ioctl(self, request, arg):
+        while True:
+            result = _v4l2.ioctl(self.device_fd, request, arg)
+            e = get_errno()
+            if not (((-1 == result) and ((e == errno.EINTR)))):
+                break
+        return result
+
+
+    def set_format(self, expected_width, expected_height, expected_format: V4L2_PIX_FMT):
+
+        fmt = format()
+        fmt.type = self.v4l2_buf_type
+        fmt.fmt.pix.width = expected_width
+        fmt.fmt.pix.height = expected_height
+        fmt.fmt.pix.pixelformat = expected_format
+        fmt.fmt.pix.field = V4L2_FIELD.NONE # TODO: これで良いのか
+        result = self._ioctl(_VIDIOC.S_FMT, byref(fmt))
+        if -1 == result:
+            raise RuntimeError("ioctl(VIDIOC_S_FMT){}".format(errno.errorcode[get_errno()]))
+
+        self.fmt = fmt
+        return (
+            fmt.fmt.pix.width,
+            fmt.fmt.pix.height,
+            fmt.fmt.pix.pixelformat,
+        )
+
+
+    def set_subdev_format(self, expected_width, expected_height, expected_format: MEDIA_BUS_FMT):
+        fmt = subdev_format()
+        fmt.pad = 0 # hard code
+        fmt.which = V4L2_SUBDEV_FORMAT_WHENCE.ACTIVE
+        fmt.format.width = expected_width
+        fmt.format.height = expected_height
+        fmt.format.code = expected_format
+
+        print(_VIDIOC.SUBDEV_S_FMT.value, sizeof(subdev_format), sizeof(mbus_framefmt))
+        result = self._ioctl(_VIDIOC.SUBDEV_S_FMT, byref(fmt))
+        if -1 == result:
+            raise RuntimeError("ioctl(SUBDEV_S_FMT){}".format(errno.errorcode[get_errno()]))
+        
+        self.subdev_fmt = fmt
+        return (fmt.format.width, fmt.format.height, fmt.format.code)
+    
+
+    def get_ext_controls(self, ids: List[V4L2_CID]) -> List[v4l2_ext_control]:
+        ctrls = v4l2_ext_controls()
+        ctr_arr = (v4l2_ext_control * len(ids))()
+        print(len(ctr_arr))
+        for (i, ctrl_id) in  enumerate(ids):
+            ctr_arr[i].id = ctrl_id
+
+        ctrls.which = 0
+        ctrls.controls = ctr_arr
+        ctrls.count = len(ctr_arr)
+        result = self._ioctl(_VIDIOC.G_EXT_CTRLS, byref(ctrls))
+
+        if -1 == result:
+            raise RuntimeError("ioctl(G_EXT_CTRLS){}".format(errno.errorcode[get_errno()]))        
+
+        return ctr_arr
+
+    def set_ext_controls(self, ctr_list: List[v4l2_ext_controls]):
+        ctrls = v4l2_ext_controls()
+        ctr_arr = (v4l2_ext_control * len(ctr_list))()
+        for (i, ctrl) in enumerate(ctr_list):
+            ctr_arr[i] = ctrl
+        
+        ctrls.which = 0
+        ctrls.controls = ctr_arr
+        ctrls.count = len(ctr_arr)
+        result = self._ioctl(_VIDIOC.S_EXT_CTRLS, byref(ctrls))
+
+        if -1 == result:
+            raise RuntimeError("ioctl(S_EXT_CTRLS){}".format(errno.errorcode[get_errno()]))        
+
+        return ctr_arr        
+
+
+
+    def set_framerate(self, conf):
+
+        parm = streamparm()
+        parm.type = self.v4l2_buf_type
+        parm.parm.capture.timeperframe = conf.interval
+        parm.parm.capture.capturemode = V4L2_MODE_HIGHQUALITY
+
+        result = self._ioctl(_VIDIOC.S_PARM, byref(parm))
+        if -1 == result:
+            raise RuntimeError("ioctl(VIDIOC_S_PARM)")
+
+        return True
+
+
+    def request_buffers(self, n, v4l2_memory:V4L2_MEMORY=V4L2_MEMORY.MMAP, dma_fds=[]):
+
+        req = requestbuffers()
+        req.count = n
+        req.type = self.v4l2_buf_type
+        req.memory = v4l2_memory
+
+        result = self._ioctl(_VIDIOC.REQBUFS, byref(req))
+        if -1 == result:
+            raise RuntimeError("ioctl(VIDIOC_REQBUFS): {}".format(errno.errorcode[get_errno()]))
+
+        if req.count < n:
+            raise RuntimeError("ioctl(VIDIOC_REQBUFS): insufficient buffer count")
+
+        if v4l2_memory == V4L2_MEMORY.MMAP:
+            self.buffers = [VideoBuffer(self, i, V4L2_MEMORY.MMAP, v4l2_buf_type=self.v4l2_buf_type) for i in range(n)]
+        elif v4l2_memory == V4L2_MEMORY.DMABUF:
+            if n != len(dma_fds):
+                raise RuntimeError("requested buffer count mismatch with number of given dma file descriptor")
+            
+            self.buffers = [VideoBuffer(self, i, V4L2_MEMORY.DMABUF, fd, v4l2_buf_type=self.v4l2_buf_type) for (i, fd) in enumerate(dma_fds)]
+
+    def export_buffers(self):
+        export_fds = []
+        # all buffer in self.buffers is MMAP_BUFFER
+        for video_buf in self.buffers:
+            expbuf = exportbuffer()
+            expbuf.type = self.v4l2_buf_type
+            expbuf.index = video_buf.buf.index
+            result = self._ioctl(_VIDIOC.EXPBUF, byref(expbuf))
+            if -1 == result:
+                raise RuntimeError("ioctl(VIDIOC_EXPBUF): {}".format(errno.errorcode[get_errno()]))
+
+            export_fds.append(expbuf.fd)
+        
+        return export_fds
+
+    def queue_all_buffers(self):
+        for video_buf in self.buffers:
+            result = self._ioctl(_VIDIOC.QBUF, byref(video_buf.buf))
+            if -1 == result:
+                raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
+
+    def queue_buffer(self, index):
+        video_buf = self.buffers[index]
+        result = self._ioctl(_VIDIOC.QBUF, byref(video_buf.buf))
+        if -1 == result:
+                raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
+
+    def start_streaming(self):
+
+        cap = c_int(self.v4l2_buf_type)
+        result = self._ioctl(_VIDIOC.STREAMON, byref(cap))
+        if -1 == result:
+            raise RuntimeError("ioctl(VIDIOC_STREAMON): {}".format(errno.errorcode[get_errno()]))
+
+
+    def stop_streaming(self):
+
+        cap = c_int(self.v4l2_buf_type)
+        result = self._ioctl(_VIDIOC.STREAMOFF, byref(cap))
+        if -1 == result:
+            raise RuntimeError("ioctl(VIDIOC_STREAMON): {}".format(errno.errorcode[get_errno()]))
+
+        return True
+
+
+    def dequeue_buffer_nonblocking(self, v4l2_memory: V4L2_MEMORY=V4L2_MEMORY.MMAP):
+        buf = buffer()
+        buf.type = self.v4l2_buf_type
+        buf.memory = v4l2_memory
+        result = self._ioctl(_VIDIOC.DQBUF, byref(buf))
+        if result != 0 and get_errno() == errno.EAGAIN:
+            return None
+        elif -1 == result:
+            raise RuntimeError("ioctl(VIDIOC_DQBUF): {}".format(errno.errorcode[get_errno()]))
+
+        return self.buffers[buf.index]        
+        
+    # blocking
+    def dequeue_buffer(self, timeout=1, v4l2_memory: V4L2_MEMORY=V4L2_MEMORY.MMAP):
+        class FDWrapper:
+            def __init__(self, fd):
+                self.fd = fd
+
+            def fileno(self):
+                return self.fd
+
+        rlist, _, _ = select.select([FDWrapper(self.device_fd)], [], [], timeout)
+        if len(rlist) == 0:
+            raise RuntimeError("Capture timeout")
+
+        buf = buffer()
+        buf.type = self.v4l2_buf_type
+        buf.memory = v4l2_memory
+        result = self._ioctl(_VIDIOC.DQBUF, byref(buf))
+        if -1 == result:
+            raise RuntimeError("ioctl(VIDIOC_DQBUF): {}".format(errno.errorcode[get_errno()]))
+
+        return self.buffers[buf.index]
+
+    def requeue_buffer(self, video_buf):
+
+        result = self._ioctl(_VIDIOC.QBUF, byref(video_buf.buf))
+        if -1 == result:
+            raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
 
 
 VideoPort = enum.Enum("VideoPort", "CSI USB")
@@ -917,32 +1156,38 @@ class VideoStream(object):
 
 
 class VideoBuffer(object):
-    def __init__(self, video, index):
+    def __init__(self, video, index, v4l2_memory: V4L2_MEMORY=V4L2_MEMORY.MMAP, dma_fd=None, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE):
 
         buf = buffer()
-        buf.type = V4L2_BUF_TYPE.VIDEO_CAPTURE
-        buf.memory = V4L2_MEMORY.MMAP
+        buf.type = v4l2_buf_type
+        buf.memory = v4l2_memory
         buf.index = index
 
         set_errno(0)
         result = video._ioctl(_VIDIOC.QUERYBUF, byref(buf))
         if -1 == result:
-            raise RuntimeError("ioctl(VIDIOC_QYERYBUF): {}".format(errno.errorcode[get_errno()]))
+            raise RuntimeError("ioctl(VIDIOC_QUERYBUF): {}".format(errno.errorcode[get_errno()]))
 
-        result = _v4l2.mmap(
-            None,
-            buf.length,
-            mmap.PROT_READ | mmap.PROT_WRITE,
-            mmap.MAP_SHARED,
-            video.device_fd,
-            buf.m.offset,
-        )
-        if result == -1:
-            raise RuntimeError("mmap failed: {}".format(errno.errorcode[get_errno()]))
+        if v4l2_memory == V4L2_MEMORY.MMAP:
+            result = _v4l2.mmap(
+                None,
+                buf.length,
+                mmap.PROT_READ | mmap.PROT_WRITE,
+                mmap.MAP_SHARED,
+                video.device_fd,
+                buf.m.offset,
+            )
+            if result == -1:
+                raise RuntimeError("mmap failed: {}".format(errno.errorcode[get_errno()]))
 
-        self.video = video
-        self.buf = buf
-        self.mapped_buf = cast(result, POINTER(c_uint8))
+            self.video = video
+            self.buf = buf
+            self.mapped_buf = cast(result, POINTER(c_uint8))
+        elif v4l2_memory == V4L2_MEMORY.DMABUF:
+            self.video = video
+            self.buf = buf
+            self.buf.m.fd = dma_fd
+            self.dma_fd = dma_fd
 
     def unmap_buffer(self):
         if self.mapped_buf is None:
@@ -951,6 +1196,44 @@ class VideoBuffer(object):
         if result == -1:
             raise RuntimeError("munmap failed: {}".format(errno.errorcode[get_errno()]))
         self.mapped_buf = None
+
+class V4LConverter(object):
+    def __init__(self, device_fd) -> None:
+        self.converter = _v4lconvert.create(device_fd)
+
+
+    def convert(self, buffer: VideoBuffer, src_fmt, dst_fmt) -> bytes:
+        if buffer.buf.memory == V4L2_MEMORY.DMABUF:
+            raise RuntimeError("V4LConverter.convert: expected memory type MMAP")
+
+        dst = bytes(dst_fmt.fmt.pix.sizeimage)
+        _v4lconvert.convert(
+                self.converter,
+                byref(src_fmt),
+                byref(dst_fmt),
+                buffer.mapped_buf,
+                src_fmt.fmt.pix.sizeimage,
+                cast(dst, POINTER(c_ubyte)),
+                dst_fmt.fmt.pix.sizeimage,
+            )
+            
+        return dst
+
+    def try_convert(self, src_fmt, expected_width, expected_height, expected_format) -> format:
+        dst_fmt = format()
+        dst_fmt.type = V4L2_BUF_TYPE.VIDEO_CAPTURE
+        dst_fmt.fmt.pix.width = expected_width
+        dst_fmt.fmt.pix.height = expected_height
+        dst_fmt.fmt.pix.pixelformat = expected_format
+        dst_fmt.fmt.pix.field = V4L2_FIELD.INTERLACED
+        
+        
+        result = _v4lconvert.try_format(self.converter, byref(src_fmt), byref(dst_fmt))
+        if -1 == result:
+            raise RuntimeError("incompatible format")        
+        
+        return dst_fmt
+
 
 
 # if __name__ == '__main__':
