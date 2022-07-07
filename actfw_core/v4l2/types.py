@@ -437,3 +437,49 @@ class v4l2_ext_controls(Structure):
         ("reserved", c_uint32),
         ("controls", POINTER(v4l2_ext_control))
     ]
+
+# ISP statistics structures.
+# TODO: raspi固有なのでactfw-raspberypiで定義する
+DEFAULT_AWB_REGIONS_X = 16
+DEFAULT_AWB_REGIONS_Y = 12
+
+NUM_HISTOGRAMS = 2
+NUM_HISTOGRAM_BINS = 128
+AWB_REGIONS = DEFAULT_AWB_REGIONS_X * DEFAULT_AWB_REGIONS_Y
+FLOATING_REGIONS = 16
+AGC_REGIONS = 16
+FOCUS_REGIONS = 12
+
+
+class bcm2835_isp_stats_hist(Structure):
+    _fields_ = [
+        ("r_hist", c_uint32 * NUM_HISTOGRAM_BINS),
+        ("g_hist", c_uint32 * NUM_HISTOGRAM_BINS),
+        ("b_hist", c_uint32 * NUM_HISTOGRAM_BINS),
+    ]
+
+class bcm2835_isp_stats_region(Structure):
+    _fields_ = [
+        ("counted", c_uint32),
+        ("noncounted", c_uint32),
+        ("r_sum", c_uint64),
+        ("g_sum", c_uint64),
+        ("b_sum", c_uint64),
+    ]
+
+class bcm2835_isp_stats_focus(Structure):
+    _fields_ = [
+        ("contrast_val", c_uint64 * 2 * 2),
+        ("contrast_val_num", c_uint32 * 2 * 2),
+    ]
+
+class bcm2835_isp_stats(Structure):
+    _fields_ = [
+        ("version", c_uint32),
+        ("size", c_uint32),
+        ("hist", bcm2835_isp_stats_hist * NUM_HISTOGRAMS),
+        ("awb_stats", bcm2835_isp_stats_region * AWB_REGIONS),
+        ("floating_stats", bcm2835_isp_stats_region * FLOATING_REGIONS),
+        ("agc_stats", bcm2835_isp_stats_region * AGC_REGIONS),
+        ("focus_stats", bcm2835_isp_stats_focus * FOCUS_REGIONS)
+    ]

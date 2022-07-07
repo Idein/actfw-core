@@ -43,19 +43,23 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         unicam_subdev: str = "/dev/v4l-subdev0",
         isp_in: str = "/dev/video13", 
         isp_out_high: str = "/dev/video14",
+        isp_out_metadata: str = "/dev/video16",
         size: Tuple[int, int] = (640, 480),
         framerate: int = 30,
         expected_format: V4L2_PIX_FMT = V4L2_PIX_FMT.YUV420,        
+        auto_whitebalance: bool = True
         ):
         super().__init__()
         self.dma_buffer_num = 4
         self.isp_out_buffer_num = 4
+        self.isp_out_metadata_buffer_num = 2
         self.shared_dma_fds = []
         self.unicam = RawVideo(unicam)
         self.unicam_subdev = RawVideo(unicam_subdev)
         self.isp_in = RawVideo(isp_in, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_OUTPUT)
         self.isp_out_high = RawVideo(isp_out_high)
-
+        self.isp_out_metadata = RawVideo(isp_out_metadata, v4l2_buf_type=V4L2_BUF_TYPE.META_CAPTURE)
+        self.do_awb = auto_whitebalance
         
         (self.expected_width, self.expected_height) = size
         self.expected_pix_format = expected_format
@@ -70,6 +74,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
     def setup_pipeline(self):
         # setup subdev
         # TODO: capability見て最適なsize選択
+        assert(self.unicam_subdev.set_vertical_flip(True))
+        assert(self.unicam_subdev.set_horizontal_flip(True))
+        print(f"exposure subdev: {self.unicam_subdev.set_exposure_time(1712)}")
+        print(f"exposure unicam: {self.unicam.set_exposure_time(1712)}")
         self.unicam_subdev.set_subdev_format(self.expected_width, (self.expected_height), MEDIA_BUS_FMT.SBGGR10_1X10)
         self.unicam_width = self.unicam_subdev.subdev_fmt.format.width
         self.unicam_height = self.unicam_subdev.subdev_fmt.format.height
@@ -111,6 +119,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.unicam.request_buffers(self.dma_buffer_num, V4L2_MEMORY.DMABUF, self.dma_fds)
         self.isp_in.request_buffers(self.dma_buffer_num, V4L2_MEMORY.DMABUF, self.dma_fds)
         self.isp_out_high.request_buffers(self.isp_out_buffer_num, V4L2_MEMORY.MMAP)
+        self.isp_out_metadata.request_buffers(self.isp_out_metadata_buffer_num, V4L2_MEMORY.MMAP)
     
 
     def unicam2isp(self):
@@ -126,7 +135,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.unicam.queue_buffer(buffer.buf.index)        
 
     def produceImageFromIsp(self):
-        buffer = self.isp_out_high.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.DMABUF)
+        buffer = self.isp_out_high.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.MMAP)
         if buffer is None:
             return
         
@@ -135,18 +144,51 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self._outlet(frame)
         self.isp_out_high.queue_buffer(buffer.buf.index)        
 
+    def adustSettingFromMetadata(self):
+        buffer = self.isp_out_metadata.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.MMAP)
+        if buffer is None:
+            return
+        if self.do_awb:
+            stats: bcm2835_isp_stats = cast(buffer.mapped_buf, POINTER(bcm2835_isp_stats)).contents
+        
+            sum_r = 0
+            sum_b = 0
+            sum_g = 0
+            # TODO: pythonだと遅いかも？ stats.awb_statsは192要素だから大丈夫？
+            for region in stats.awb_stats:
+                sum_r += region.r_sum
+                sum_b += region.b_sum
+                sum_g += region.g_sum
+
+            gain_r = sum_g / (sum_r + 1)
+            gain_b = sum_g / (sum_b + 1)
+
+            print(f" gain_r {gain_r}, gain_b {gain_b}")
+            red_balance_ctrl = v4l2_ext_control()
+            red_balance_ctrl.id = V4L2_CID.RED_BALANCE
+            red_balance_ctrl.value64 = int(gain_r * 1000)
+            blue_balance_ctrl = v4l2_ext_control()
+            blue_balance_ctrl.id = V4L2_CID.BLUE_BALANCE
+            blue_balance_ctrl.value64 = int(gain_b * 1000)
+            ctrls = self.isp_in.set_ext_controls([red_balance_ctrl, blue_balance_ctrl])
+
+        self.isp_out_metadata.queue_buffer(buffer.buf.index)
+
+
 
     def run(self):
         self.unicam.queue_all_buffers()
         self.isp_out_high.queue_all_buffers()
+        self.isp_out_metadata.queue_all_buffers()
 
         self.unicam.start_streaming()
         self.isp_in.start_streaming()        
         self.isp_out_high.start_streaming()        
+        self.isp_out_metadata.start_streaming()
         
         while self._is_running():
             timeout = 1
-            rlist, wlist, _ = select.select([FDWrapper(self.unicam.device_fd), FDWrapper(self.isp_out_high.device_fd)], [FDWrapper(self.isp_in.device_fd)], [], timeout)
+            rlist, wlist, _ = select.select([FDWrapper(self.unicam.device_fd), FDWrapper(self.isp_out_high.device_fd),FDWrapper(self.isp_out_metadata.device_fd) ], [FDWrapper(self.isp_in.device_fd)], [], timeout)
             
             if len(rlist) == 0 and len(wlist) == 0:
                 raise RuntimeError("Capture timeout")
@@ -156,6 +198,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                     self.unicam2isp()
                 elif r.fileno() == self.isp_out_high.device_fd:
                     self.produceImageFromIsp()
+                elif r.fileno() == self.isp_out_metadata.device_fd:
+                    self.adustSettingFromMetadata()
             for w in wlist:
                 if w.fileno() == self.isp_in.device_fd:
                     self.isp2unicam()

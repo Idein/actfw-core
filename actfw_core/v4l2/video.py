@@ -357,6 +357,8 @@ class V4L2_BUF_TYPE(enum.IntEnum):
     VIDEO_OUTPUT_MPLANE = 10
     SDR_CAPTURE = 11
     SDR_OUTPUT = 12
+    META_CAPTURE = 13
+    META_OUTPUT = 14
     PRIVATE = 0x80
 
 
@@ -521,7 +523,130 @@ class RawVideo(object):
 
         return True
 
+    def set_horizontal_flip(self, flip):
+        """
+        Flip video (horizontal) if it supported.
 
+        Args:
+            flip (boolean): enable flip
+
+        Returns:
+            boolean: result
+        """
+
+        qctrl = queryctrl()
+        qctrl.id = V4L2_CID.HFLIP
+        result = self._ioctl(_VIDIOC.QUERYCTRL, byref(qctrl))
+        if -1 == result:
+            return False
+        if qctrl.flags & V4L2_CTRL_FLAG_DISABLED:
+            return False
+
+        ctrl = control()
+        ctrl.id = V4L2_CID.HFLIP
+        ctrl.value = flip
+
+        result = self._ioctl(_VIDIOC.S_CTRL, byref(ctrl))
+        if -1 == result:
+            return False
+        expected = ctrl.value
+        result = self._ioctl(_VIDIOC.G_CTRL, byref(ctrl))
+        if -1 == result:
+            return False
+        if expected != ctrl.value:
+            return False
+
+        return True
+
+    def set_vertical_flip(self, flip):
+        """
+        Flip video (vertical) if it supported.
+
+        Args:
+            flip (boolean): enable flip
+
+        Returns:
+            boolean: result
+        """
+
+        qctrl = queryctrl()
+        qctrl.id = V4L2_CID.VFLIP
+        result = self._ioctl(_VIDIOC.QUERYCTRL, byref(qctrl))
+        if -1 == result:
+            return False
+        if qctrl.flags & V4L2_CTRL_FLAG_DISABLED:
+            return False
+
+        ctrl = control()
+        ctrl.id = V4L2_CID.VFLIP
+        ctrl.value = flip
+
+        result = self._ioctl(_VIDIOC.S_CTRL, byref(ctrl))
+        if -1 == result:
+            return False
+        expected = ctrl.value
+        result = self._ioctl(_VIDIOC.G_CTRL, byref(ctrl))
+        if -1 == result:
+            return False
+        if expected != ctrl.value:
+            return False
+
+        return True
+
+    # unicamには効かな
+    def set_exposure_time(self, ms=None):
+        """
+        Set exposure time.
+
+        Args:
+            ms (int or None): exposure time [msec] (None means auto)
+
+        Returns:
+            boolean: result
+        """
+
+        if ms is None:
+            ctrl = control()
+            ctrl.id = V4L2_CID.EXPOSURE_AUTO
+            ctrl.value = V4L2_EXPOSURE.AUTO
+            result = self._ioctl(_VIDIOC.S_CTRL, byref(ctrl))
+            if -1 == result:
+                return False
+            expected = ctrl.value
+            result = self._ioctl(_VIDIOC.G_CTRL, byref(ctrl))
+            if -1 == result:
+                return False
+            if expected != ctrl.value:
+                return False
+        else:
+            ctrl = control()
+            ctrl.id = V4L2_CID.EXPOSURE_AUTO
+            ctrl.value = V4L2_EXPOSURE.MANUAL
+            result = self._ioctl(_VIDIOC.S_CTRL, byref(ctrl))
+            if -1 == result:
+                return False
+            expected = ctrl.value
+            result = self._ioctl(_VIDIOC.G_CTRL, byref(ctrl))
+            if -1 == result:
+                return False
+            if expected != ctrl.value:
+                return False
+
+            ctrl.id = V4L2_CID.EXPOSURE_ABSOLUTE
+            ctrl.value = int(10 * ms)  # [100us]
+            result = self._ioctl(_VIDIOC.S_CTRL, byref(ctrl))
+            if -1 == result:
+                return False
+            expected = ctrl.value
+            result = self._ioctl(_VIDIOC.G_CTRL, byref(ctrl))
+            if -1 == result:
+                return False
+            if expected != ctrl.value:
+                return False
+
+        return True
+
+        
     def request_buffers(self, n, v4l2_memory:V4L2_MEMORY=V4L2_MEMORY.MMAP, dma_fds=[]):
 
         req = requestbuffers()
@@ -565,7 +690,7 @@ class RawVideo(object):
             if -1 == result:
                 raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
 
-    def queue_buffer(self, index):
+    def queue_buffer(self, index)   :
         video_buf = self.buffers[index]
         result = self._ioctl(_VIDIOC.QBUF, byref(video_buf.buf))
         if -1 == result:
