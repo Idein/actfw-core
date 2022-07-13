@@ -10,11 +10,11 @@ import os
 import select
 from ctypes import *
 from ctypes.util import find_library
+from typing import List
 
 from actfw_core.v4l2.control import *
 from actfw_core.v4l2.types import *
 
-from typing import List
 
 class _libv4l2(object):
     def __init__(self):
@@ -343,8 +343,10 @@ class V4L2_PIX_FMT(enum.IntEnum):
     Y12I = _fourcc("Y", "1", "2", "I")
     Z16 = _fourcc("Z", "1", "6", " ")
 
+
 class V4L2_META_FMT(enum.IntEnum):
     BCM2835_ISP_STATS = _fourcc("B", "S", "T", "A")
+
 
 class V4L2_BUF_TYPE(enum.IntEnum):
     VIDEO_CAPTURE = 1
@@ -405,10 +407,9 @@ class V4L2_SUBDEV_FORMAT_WHENCE(enum.IntEnum):
     ACTIVE = 1
 
 
-class MEDIA_BUS_FMT(enum.IntEnum):    
+class MEDIA_BUS_FMT(enum.IntEnum):
     SBGGR8_1X8 = 0x3001
     SBGGR10_1X10 = 0x3007
-
 
 
 class RawVideo(object):
@@ -430,7 +431,6 @@ class RawVideo(object):
     def __exit__(self, ex_type, ex_value, trace):
         self.close()
 
-    
     def _ioctl(self, request, arg):
         while True:
             result = _v4l2.ioctl(self.device_fd, request, arg)
@@ -439,7 +439,6 @@ class RawVideo(object):
                 break
         return result
 
-
     def set_pix_format(self, expected_width, expected_height, expected_format: V4L2_PIX_FMT):
 
         fmt = format()
@@ -447,7 +446,7 @@ class RawVideo(object):
         fmt.fmt.pix.width = expected_width
         fmt.fmt.pix.height = expected_height
         fmt.fmt.pix.pixelformat = expected_format
-        fmt.fmt.pix.field = V4L2_FIELD.INTERLACED # TODO: check if this is appropriate
+        fmt.fmt.pix.field = V4L2_FIELD.INTERLACED  # TODO: check if this is appropriate
         result = self._ioctl(_VIDIOC.S_FMT, byref(fmt))
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_S_FMT){}".format(errno.errorcode[get_errno()]))
@@ -470,10 +469,9 @@ class RawVideo(object):
 
         self.fmt = fmt
 
-
     def set_subdev_format(self, expected_width, expected_height, expected_format: MEDIA_BUS_FMT):
         fmt = subdev_format()
-        fmt.pad = 0 # hard code
+        fmt.pad = 0  # hard code
         fmt.which = V4L2_SUBDEV_FORMAT_WHENCE.ACTIVE
         fmt.format.width = expected_width
         fmt.format.height = expected_height
@@ -483,16 +481,15 @@ class RawVideo(object):
         result = self._ioctl(_VIDIOC.SUBDEV_S_FMT, byref(fmt))
         if -1 == result:
             raise RuntimeError("ioctl(SUBDEV_S_FMT){}".format(errno.errorcode[get_errno()]))
-        
+
         self.subdev_fmt = fmt
         return (fmt.format.width, fmt.format.height, fmt.format.code)
 
-    
     def get_ext_controls(self, ids: List[V4L2_CID]) -> List[v4l2_ext_control]:
         ctrls = v4l2_ext_controls()
         ctr_arr = (v4l2_ext_control * len(ids))()
         print(len(ctr_arr))
-        for (i, ctrl_id) in  enumerate(ids):
+        for (i, ctrl_id) in enumerate(ids):
             ctr_arr[i].id = ctrl_id
 
         ctrls.which = 0
@@ -501,7 +498,7 @@ class RawVideo(object):
         result = self._ioctl(_VIDIOC.G_EXT_CTRLS, byref(ctrls))
 
         if -1 == result:
-            raise RuntimeError("ioctl(G_EXT_CTRLS){}".format(errno.errorcode[get_errno()]))        
+            raise RuntimeError("ioctl(G_EXT_CTRLS){}".format(errno.errorcode[get_errno()]))
 
         return ctr_arr
 
@@ -510,18 +507,16 @@ class RawVideo(object):
         ctr_arr = (v4l2_ext_control * len(ctr_list))()
         for (i, ctrl) in enumerate(ctr_list):
             ctr_arr[i] = ctrl
-        
+
         ctrls.which = 0
         ctrls.controls = ctr_arr
         ctrls.count = len(ctr_arr)
         result = self._ioctl(_VIDIOC.S_EXT_CTRLS, byref(ctrls))
 
         if -1 == result:
-            raise RuntimeError("ioctl(S_EXT_CTRLS){}".format(errno.errorcode[get_errno()]))        
+            raise RuntimeError("ioctl(S_EXT_CTRLS){}".format(errno.errorcode[get_errno()]))
 
-        return ctr_arr        
-
-
+        return ctr_arr
 
     def set_framerate(self, conf):
 
@@ -659,8 +654,7 @@ class RawVideo(object):
 
         return True
 
-        
-    def request_buffers(self, n, v4l2_memory:V4L2_MEMORY=V4L2_MEMORY.MMAP, dma_fds=[]):
+    def request_buffers(self, n, v4l2_memory: V4L2_MEMORY = V4L2_MEMORY.MMAP, dma_fds=[]):
 
         req = requestbuffers()
         req.count = n
@@ -679,8 +673,10 @@ class RawVideo(object):
         elif v4l2_memory == V4L2_MEMORY.DMABUF:
             if n != len(dma_fds):
                 raise RuntimeError("requested buffer count mismatch with number of given dma file descriptor")
-            
-            self.buffers = [VideoBuffer(self, i, V4L2_MEMORY.DMABUF, fd, v4l2_buf_type=self.v4l2_buf_type) for (i, fd) in enumerate(dma_fds)]
+
+            self.buffers = [
+                VideoBuffer(self, i, V4L2_MEMORY.DMABUF, fd, v4l2_buf_type=self.v4l2_buf_type) for (i, fd) in enumerate(dma_fds)
+            ]
 
     def export_buffers(self):
         export_fds = []
@@ -694,7 +690,7 @@ class RawVideo(object):
                 raise RuntimeError("ioctl(VIDIOC_EXPBUF): {}".format(errno.errorcode[get_errno()]))
 
             export_fds.append(expbuf.fd)
-        
+
         return export_fds
 
     def queue_all_buffers(self):
@@ -703,11 +699,11 @@ class RawVideo(object):
             if -1 == result:
                 raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
 
-    def queue_buffer(self, index)   :
+    def queue_buffer(self, index):
         video_buf = self.buffers[index]
         result = self._ioctl(_VIDIOC.QBUF, byref(video_buf.buf))
         if -1 == result:
-                raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
+            raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
 
     def start_streaming(self):
 
@@ -715,7 +711,6 @@ class RawVideo(object):
         result = self._ioctl(_VIDIOC.STREAMON, byref(cap))
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_STREAMON): {}".format(errno.errorcode[get_errno()]))
-
 
     def stop_streaming(self):
 
@@ -726,8 +721,7 @@ class RawVideo(object):
 
         return True
 
-
-    def dequeue_buffer_nonblocking(self, v4l2_memory: V4L2_MEMORY=V4L2_MEMORY.MMAP):
+    def dequeue_buffer_nonblocking(self, v4l2_memory: V4L2_MEMORY = V4L2_MEMORY.MMAP):
         buf = buffer()
         buf.type = self.v4l2_buf_type
         buf.memory = v4l2_memory
@@ -737,10 +731,10 @@ class RawVideo(object):
         elif -1 == result:
             raise RuntimeError("ioctl(VIDIOC_DQBUF): {}".format(errno.errorcode[get_errno()]))
 
-        return self.buffers[buf.index]        
-        
+        return self.buffers[buf.index]
+
     # blocking
-    def dequeue_buffer(self, timeout=1, v4l2_memory: V4L2_MEMORY=V4L2_MEMORY.MMAP):
+    def dequeue_buffer(self, timeout=1, v4l2_memory: V4L2_MEMORY = V4L2_MEMORY.MMAP):
         class FDWrapper:
             def __init__(self, fd):
                 self.fd = fd
@@ -1294,7 +1288,9 @@ class VideoStream(object):
 
 
 class VideoBuffer(object):
-    def __init__(self, video, index, v4l2_memory: V4L2_MEMORY=V4L2_MEMORY.MMAP, dma_fd=None, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE):
+    def __init__(
+        self, video, index, v4l2_memory: V4L2_MEMORY = V4L2_MEMORY.MMAP, dma_fd=None, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE
+    ):
 
         buf = buffer()
         buf.type = v4l2_buf_type
@@ -1335,10 +1331,10 @@ class VideoBuffer(object):
             raise RuntimeError("munmap failed: {}".format(errno.errorcode[get_errno()]))
         self.mapped_buf = None
 
+
 class V4LConverter(object):
     def __init__(self, device_fd) -> None:
         self.converter = _v4lconvert.create(device_fd)
-
 
     def convert(self, buffer: VideoBuffer, src_fmt, dst_fmt) -> bytes:
         if buffer.buf.memory == V4L2_MEMORY.DMABUF:
@@ -1346,15 +1342,15 @@ class V4LConverter(object):
 
         dst = bytes(dst_fmt.fmt.pix.sizeimage)
         _v4lconvert.convert(
-                self.converter,
-                byref(src_fmt),
-                byref(dst_fmt),
-                buffer.mapped_buf,
-                src_fmt.fmt.pix.sizeimage,
-                cast(dst, POINTER(c_ubyte)),
-                dst_fmt.fmt.pix.sizeimage,
-            )
-            
+            self.converter,
+            byref(src_fmt),
+            byref(dst_fmt),
+            buffer.mapped_buf,
+            src_fmt.fmt.pix.sizeimage,
+            cast(dst, POINTER(c_ubyte)),
+            dst_fmt.fmt.pix.sizeimage,
+        )
+
         return dst
 
     def try_convert(self, src_fmt, expected_width, expected_height, expected_format) -> format:
@@ -1364,14 +1360,12 @@ class V4LConverter(object):
         dst_fmt.fmt.pix.height = expected_height
         dst_fmt.fmt.pix.pixelformat = expected_format
         dst_fmt.fmt.pix.field = V4L2_FIELD.INTERLACED
-        
-        
+
         result = _v4lconvert.try_format(self.converter, byref(src_fmt), byref(dst_fmt))
         if -1 == result:
-            raise RuntimeError("incompatible format")        
-        
-        return dst_fmt
+            raise RuntimeError("incompatible format")
 
+        return dst_fmt
 
 
 # if __name__ == '__main__':

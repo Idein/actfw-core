@@ -296,15 +296,17 @@ class requestbuffers(Structure):
         ("reserved", c_uint32 * 2),
     ]
 
+
 class exportbuffer(Structure):
     _fields_ = [
         ("type", c_uint32),
         ("index", c_uint32),
         ("plane", c_uint32),
         ("flags", c_uint32),
-        ("fd", c_int32),        
-        ("reserved", c_uint32 * 11),        
-    ]    
+        ("fd", c_int32),
+        ("reserved", c_uint32 * 11),
+    ]
+
 
 class timeval(Structure):
     # TODO: check
@@ -388,17 +390,13 @@ class mbus_framefmt(Structure):
         ("ycbcr_enc", c_uint16),
         ("quantization", c_uint16),
         ("xfer_func", c_uint16),
-        ("reserved", c_uint16 * 11)
+        ("reserved", c_uint16 * 11),
     ]
 
 
 class subdev_format(Structure):
-    _fields_ = [
-        ("which", c_uint32),
-        ("pad", c_uint32),        
-        ("format", mbus_framefmt),
-        ("reserved", c_uint32 * 8)
-    ]
+    _fields_ = [("which", c_uint32), ("pad", c_uint32), ("format", mbus_framefmt), ("reserved", c_uint32 * 8)]
+
 
 class _value_for_ext_control(Union):
     _fields_ = [
@@ -408,35 +406,34 @@ class _value_for_ext_control(Union):
         ("p_u8", POINTER(c_uint8)),
         ("p_u16", POINTER(c_uint16)),
         ("p_u32", POINTER(c_uint32)),
-        ("ptr", c_void_p)
+        ("ptr", c_void_p),
     ]
+
 
 class v4l2_ext_control(Structure):
     _pack_ = 1
-    _anonymous_ = ("_value",)    
-    _fields_ = [
-        ("id", c_uint32),
-        ("size", c_uint32),
-        ("reserved2", c_uint32 * 1),
-        ("_value", _value_for_ext_control)
-    ]
+    _anonymous_ = ("_value",)
+    _fields_ = [("id", c_uint32), ("size", c_uint32), ("reserved2", c_uint32 * 1), ("_value", _value_for_ext_control)]
+
 
 class _class_or_which_for_ext_controls(Union):
     _fields_ = [
         ("ctrl_class", c_uint32),
         ("which", c_uint32),
-    ]    
+    ]
+
 
 class v4l2_ext_controls(Structure):
-    _anonymous_ = ("_class_or_which",)    
+    _anonymous_ = ("_class_or_which",)
     _fields_ = [
         ("_class_or_which", _class_or_which_for_ext_controls),
         ("count", c_uint32),
-        ("error_idx", c_uint32),        
-        ("request_fd", c_int32),        
+        ("error_idx", c_uint32),
+        ("request_fd", c_int32),
         ("reserved", c_uint32),
-        ("controls", POINTER(v4l2_ext_control))
+        ("controls", POINTER(v4l2_ext_control)),
     ]
+
 
 # ISP statistics structures.
 # TODO: raspi固有なのでactfw-raspberypiで定義する
@@ -458,6 +455,7 @@ class bcm2835_isp_stats_hist(Structure):
         ("b_hist", c_uint32 * NUM_HISTOGRAM_BINS),
     ]
 
+
 class bcm2835_isp_stats_region(Structure):
     _fields_ = [
         ("counted", c_uint32),
@@ -467,11 +465,13 @@ class bcm2835_isp_stats_region(Structure):
         ("b_sum", c_uint64),
     ]
 
+
 class bcm2835_isp_stats_focus(Structure):
     _fields_ = [
         ("contrast_val", c_uint64 * 2 * 2),
         ("contrast_val_num", c_uint32 * 2 * 2),
     ]
+
 
 class bcm2835_isp_stats(Structure):
     _fields_ = [
@@ -481,5 +481,5 @@ class bcm2835_isp_stats(Structure):
         ("awb_stats", bcm2835_isp_stats_region * AWB_REGIONS),
         ("floating_stats", bcm2835_isp_stats_region * FLOATING_REGIONS),
         ("agc_stats", bcm2835_isp_stats_region * AGC_REGIONS),
-        ("focus_stats", bcm2835_isp_stats_focus * FOCUS_REGIONS)
+        ("focus_stats", bcm2835_isp_stats_focus * FOCUS_REGIONS),
     ]
