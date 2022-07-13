@@ -205,7 +205,7 @@ class sdr_format(Structure):
 class meta_format(Structure):
     _pack_ = 1
     _fields_ = [
-        ("pixelformat", c_uint32),
+        ("dataformat", c_uint32),
         ("buffersize", c_uint32),
     ]
 

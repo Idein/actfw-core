@@ -343,6 +343,8 @@ class V4L2_PIX_FMT(enum.IntEnum):
     Y12I = _fourcc("Y", "1", "2", "I")
     Z16 = _fourcc("Z", "1", "6", " ")
 
+class V4L2_META_FMT(enum.IntEnum):
+    BCM2835_ISP_STATS = _fourcc("B", "S", "T", "A")
 
 class V4L2_BUF_TYPE(enum.IntEnum):
     VIDEO_CAPTURE = 1
@@ -438,14 +440,14 @@ class RawVideo(object):
         return result
 
 
-    def set_format(self, expected_width, expected_height, expected_format: V4L2_PIX_FMT):
+    def set_pix_format(self, expected_width, expected_height, expected_format: V4L2_PIX_FMT):
 
         fmt = format()
         fmt.type = self.v4l2_buf_type
         fmt.fmt.pix.width = expected_width
         fmt.fmt.pix.height = expected_height
         fmt.fmt.pix.pixelformat = expected_format
-        fmt.fmt.pix.field = V4L2_FIELD.NONE # TODO: これで良いのか
+        fmt.fmt.pix.field = V4L2_FIELD.INTERLACED # TODO: check if this is appropriate
         result = self._ioctl(_VIDIOC.S_FMT, byref(fmt))
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_S_FMT){}".format(errno.errorcode[get_errno()]))
@@ -456,6 +458,17 @@ class RawVideo(object):
             fmt.fmt.pix.height,
             fmt.fmt.pix.pixelformat,
         )
+
+    def set_meta_format(self, dataformat: V4L2_META_FMT, buffersize):
+        fmt = format()
+        fmt.type = V4L2_BUF_TYPE.META_CAPTURE
+        fmt.fmt.meta.dataformat = dataformat
+        fmt.fmt.meta.buffersize = buffersize
+        result = self._ioctl(_VIDIOC.S_FMT, byref(fmt))
+        if -1 == result:
+            raise RuntimeError("ioctl(VIDIOC_S_FMT){}".format(errno.errorcode[get_errno()]))
+
+        self.fmt = fmt
 
 
     def set_subdev_format(self, expected_width, expected_height, expected_format: MEDIA_BUS_FMT):
@@ -473,8 +486,8 @@ class RawVideo(object):
         
         self.subdev_fmt = fmt
         return (fmt.format.width, fmt.format.height, fmt.format.code)
-    
 
+    
     def get_ext_controls(self, ids: List[V4L2_CID]) -> List[v4l2_ext_control]:
         ctrls = v4l2_ext_controls()
         ctr_arr = (v4l2_ext_control * len(ids))()
