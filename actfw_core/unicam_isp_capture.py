@@ -35,10 +35,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_out_buffer_num = 4
         self.isp_out_metadata_buffer_num = 2
         self.shared_dma_fds: List[int] = []
-        self.unicam = RawVideo(unicam)
-        self.unicam_subdev = RawVideo(unicam_subdev)
+        self.unicam = RawVideo(unicam, V4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE)
+        self.unicam_subdev = RawVideo(unicam_subdev, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE)
         self.isp_in = RawVideo(isp_in, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_OUTPUT)
-        self.isp_out_high = RawVideo(isp_out_high)
+        self.isp_out_high = RawVideo(isp_out_high, V4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE)
         self.isp_out_metadata = RawVideo(isp_out_metadata, v4l2_buf_type=V4L2_BUF_TYPE.META_CAPTURE)
         self.do_awb = auto_whitebalance
 
@@ -79,7 +79,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         # setup isp_out_high
 
-        # TODO: Ensure that the value of bytesperline is equal to width or appropriate handle padding.
+        # TODO: Ensure that the value of bytesperline is equal to width or handle padding appropriately.
         # One possible solution is to use only width of multiples of 32.
         (isp_out_width, isp_out_height, isp_out_format) = self.isp_out_high.set_pix_format(
             self.expected_width, self.expected_height, self.expected_pix_format
