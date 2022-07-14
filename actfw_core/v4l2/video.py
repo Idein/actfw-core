@@ -599,7 +599,6 @@ class RawVideo(object):
 
         return True
 
-    # unicamには効かな
     def set_exposure_time(self, ms=None):
         """
         Set exposure time.
