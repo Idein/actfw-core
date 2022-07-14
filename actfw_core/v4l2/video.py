@@ -1215,7 +1215,7 @@ class Video(object):
         return True
 
     def dequeue_buffer(self, timeout=1):
-        rlist, _, _ = select.select(self.device_fd], [], [], timeout)
+        rlist, _, _ = select.select([self.device_fd], [], [], timeout)
         if len(rlist) == 0:
             raise RuntimeError("Capture timeout")
 
