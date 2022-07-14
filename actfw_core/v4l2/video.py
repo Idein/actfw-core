@@ -732,14 +732,7 @@ class RawVideo(object):
 
     # blocking
     def dequeue_buffer(self, timeout=1, v4l2_memory: V4L2_MEMORY = V4L2_MEMORY.MMAP):
-        class FDWrapper:
-            def __init__(self, fd):
-                self.fd = fd
-
-            def fileno(self):
-                return self.fd
-
-        rlist, _, _ = select.select([FDWrapper(self.device_fd)], [], [], timeout)
+        rlist, _, _ = select.select([self.device_fd], [], [], timeout)
         if len(rlist) == 0:
             raise RuntimeError("Capture timeout")
 
@@ -1222,14 +1215,7 @@ class Video(object):
         return True
 
     def dequeue_buffer(self, timeout=1):
-        class FDWrapper:
-            def __init__(self, fd):
-                self.fd = fd
-
-            def fileno(self):
-                return self.fd
-
-        rlist, _, _ = select.select([FDWrapper(self.device_fd)], [], [], timeout)
+        rlist, _, _ = select.select(self.device_fd], [], [], timeout)
         if len(rlist) == 0:
             raise RuntimeError("Capture timeout")
 

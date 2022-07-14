@@ -35,10 +35,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_out_buffer_num = 4
         self.isp_out_metadata_buffer_num = 2
         self.shared_dma_fds: List[int] = []
-        self.unicam = RawVideo(unicam, V4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE)
+        self.unicam = RawVideo(unicam, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE)
         self.unicam_subdev = RawVideo(unicam_subdev, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE)
         self.isp_in = RawVideo(isp_in, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_OUTPUT)
-        self.isp_out_high = RawVideo(isp_out_high, V4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE)
+        self.isp_out_high = RawVideo(isp_out_high, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE)
         self.isp_out_metadata = RawVideo(isp_out_metadata, v4l2_buf_type=V4L2_BUF_TYPE.META_CAPTURE)
         self.do_awb = auto_whitebalance
 
@@ -177,22 +177,15 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_out_high.start_streaming()
         self.isp_out_metadata.start_streaming()
 
-        class FDWrapper:
-            def __init__(self, fd: int) -> None:
-                self.fd = fd
-
-            def fileno(self) -> int:
-                return self.fd
-
         while self._is_running():
             timeout = 1
             rlist, wlist, _ = select.select(
                 [
-                    FDWrapper(self.unicam.device_fd),
-                    FDWrapper(self.isp_out_high.device_fd),
-                    FDWrapper(self.isp_out_metadata.device_fd),
+                    self.unicam.device_fd,
+                    self.isp_out_high.device_fd,
+                    self.isp_out_metadata.device_fd,
                 ],
-                [FDWrapper(self.isp_in.device_fd)],
+                [self.isp_in.device_fd],
                 [],
                 timeout,
             )
@@ -201,12 +194,12 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 raise RuntimeError("Capture timeout")
 
             for r in rlist:
-                if r.fileno() == self.unicam.device_fd:
+                if r == self.unicam.device_fd:
                     self.unicam2isp()
-                elif r.fileno() == self.isp_out_high.device_fd:
+                elif r == self.isp_out_high.device_fd:
                     self.produce_image_from_isp()
-                elif r.fileno() == self.isp_out_metadata.device_fd:
+                elif r == self.isp_out_metadata.device_fd:
                     self.adust_setting_from_isp()
             for w in wlist:
-                if w.fileno() == self.isp_in.device_fd:
+                if w == self.isp_in.device_fd:
                     self.isp2unicam()
