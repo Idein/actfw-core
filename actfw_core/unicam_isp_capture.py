@@ -27,7 +27,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         isp_out_metadata: str = "/dev/video16",
         size: Tuple[int, int] = (640, 480),
         framerate: int = 30,
-        expected_format: V4L2_PIX_FMT = V4L2_PIX_FMT.YUV420,
+        expected_format: V4L2_PIX_FMT = V4L2_PIX_FMT.RGB24,
         auto_whitebalance: bool = True,
     ) -> None:
         super().__init__()
@@ -78,9 +78,13 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             raise RuntimeError("fail to setup isp input")
 
         # setup isp_out_high
+
+        # TODO: Ensure that the value of bytesperline is equal to width or appropriate handle padding.
+        # One possible solution is to use only width of multiples of 32.
         (isp_out_width, isp_out_height, isp_out_format) = self.isp_out_high.set_pix_format(
             self.expected_width, self.expected_height, self.expected_pix_format
         )
+
         self.output_fmt = self.converter.try_convert(
             self.isp_out_high.fmt, self.expected_width, self.expected_height, self.expected_pix_format
         )
@@ -100,6 +104,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         vblank_ctrl.id = V4L2_CID.VBLANK
         vblank_ctrl.value = expected_vblank
         ctrls = self.unicam_subdev.set_ext_controls([vblank_ctrl])
+
+    def capture_size(self) -> Tuple[int, int]:
+        return (self.output_fmt.fmt.pix.width, self.output_fmt.fmt.pix.height)
 
     def request_buffer(self) -> None:
         self.unicam.request_buffers(self.dma_buffer_num, V4L2_MEMORY.MMAP)
@@ -121,7 +128,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             return
         self.unicam.queue_buffer(buffer.buf.index)
 
-    def produceImageFromIsp(self) -> None:
+    def produce_image_from_isp(self) -> None:
         buffer = self.isp_out_high.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.MMAP)
         if buffer is None:
             return
@@ -131,7 +138,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self._outlet(frame)
         self.isp_out_high.queue_buffer(buffer.buf.index)
 
-    def adustSettingFromIsp(self) -> None:
+    def adust_setting_from_isp(self) -> None:
         buffer = self.isp_out_metadata.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.MMAP)
         if buffer is None:
             return
@@ -197,9 +204,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 if r.fileno() == self.unicam.device_fd:
                     self.unicam2isp()
                 elif r.fileno() == self.isp_out_high.device_fd:
-                    self.produceImageFromIsp()
+                    self.produce_image_from_isp()
                 elif r.fileno() == self.isp_out_metadata.device_fd:
-                    self.adustSettingFromIsp()
+                    self.adust_setting_from_isp()
             for w in wlist:
                 if w.fileno() == self.isp_in.device_fd:
                     self.isp2unicam()
