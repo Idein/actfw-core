@@ -436,7 +436,7 @@ class v4l2_ext_controls(Structure):
 
 
 # ISP statistics structures.
-# TODO: raspi固有なのでactfw-raspberypiで定義する
+# TODO: decide where to put the following definitions
 DEFAULT_AWB_REGIONS_X = 16
 DEFAULT_AWB_REGIONS_Y = 12
 

@@ -477,7 +477,6 @@ class RawVideo(object):
         fmt.format.height = expected_height
         fmt.format.code = expected_format
 
-        print(_VIDIOC.SUBDEV_S_FMT.value, sizeof(subdev_format), sizeof(mbus_framefmt))
         result = self._ioctl(_VIDIOC.SUBDEV_S_FMT, byref(fmt))
         if -1 == result:
             raise RuntimeError("ioctl(SUBDEV_S_FMT){}".format(errno.errorcode[get_errno()]))
@@ -488,7 +487,6 @@ class RawVideo(object):
     def get_ext_controls(self, ids: List[V4L2_CID]) -> List[v4l2_ext_control]:
         ctrls = v4l2_ext_controls()
         ctr_arr = (v4l2_ext_control * len(ids))()
-        print(len(ctr_arr))
         for (i, ctrl_id) in enumerate(ids):
             ctr_arr[i].id = ctrl_id
 
