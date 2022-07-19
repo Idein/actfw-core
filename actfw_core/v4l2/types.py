@@ -205,7 +205,7 @@ class sdr_format(Structure):
 class meta_format(Structure):
     _pack_ = 1
     _fields_ = [
-        ("pixelformat", c_uint32),
+        ("dataformat", c_uint32),
         ("buffersize", c_uint32),
     ]
 
@@ -297,6 +297,17 @@ class requestbuffers(Structure):
     ]
 
 
+class exportbuffer(Structure):
+    _fields_ = [
+        ("type", c_uint32),
+        ("index", c_uint32),
+        ("plane", c_uint32),
+        ("flags", c_uint32),
+        ("fd", c_int32),
+        ("reserved", c_uint32 * 11),
+    ]
+
+
 class timeval(Structure):
     # TODO: check
     _fields_ = [
@@ -366,4 +377,109 @@ class buffer(Structure):
         ("length", c_uint32),
         ("reserved2", c_uint32),
         ("reserved", _fd_or_reserved),
+    ]
+
+
+class mbus_framefmt(Structure):
+    _fields_ = [
+        ("width", c_uint32),
+        ("height", c_uint32),
+        ("code", c_uint32),
+        ("field", c_uint32),
+        ("colorspace", c_uint32),
+        ("ycbcr_enc", c_uint16),
+        ("quantization", c_uint16),
+        ("xfer_func", c_uint16),
+        ("reserved", c_uint16 * 11),
+    ]
+
+
+class subdev_format(Structure):
+    _fields_ = [("which", c_uint32), ("pad", c_uint32), ("format", mbus_framefmt), ("reserved", c_uint32 * 8)]
+
+
+class _value_for_ext_control(Union):
+    _fields_ = [
+        ("value", c_int32),
+        ("value64", c_int64),
+        ("string", c_char_p),
+        ("p_u8", POINTER(c_uint8)),
+        ("p_u16", POINTER(c_uint16)),
+        ("p_u32", POINTER(c_uint32)),
+        ("ptr", c_void_p),
+    ]
+
+
+class v4l2_ext_control(Structure):
+    _pack_ = 1
+    _anonymous_ = ("_value",)
+    _fields_ = [("id", c_uint32), ("size", c_uint32), ("reserved2", c_uint32 * 1), ("_value", _value_for_ext_control)]
+
+
+class _class_or_which_for_ext_controls(Union):
+    _fields_ = [
+        ("ctrl_class", c_uint32),
+        ("which", c_uint32),
+    ]
+
+
+class v4l2_ext_controls(Structure):
+    _anonymous_ = ("_class_or_which",)
+    _fields_ = [
+        ("_class_or_which", _class_or_which_for_ext_controls),
+        ("count", c_uint32),
+        ("error_idx", c_uint32),
+        ("request_fd", c_int32),
+        ("reserved", c_uint32),
+        ("controls", POINTER(v4l2_ext_control)),
+    ]
+
+
+# ISP statistics structures.
+# TODO: decide where to put the following definitions
+DEFAULT_AWB_REGIONS_X = 16
+DEFAULT_AWB_REGIONS_Y = 12
+
+NUM_HISTOGRAMS = 2
+NUM_HISTOGRAM_BINS = 128
+AWB_REGIONS = DEFAULT_AWB_REGIONS_X * DEFAULT_AWB_REGIONS_Y
+FLOATING_REGIONS = 16
+AGC_REGIONS = 16
+FOCUS_REGIONS = 12
+
+
+class bcm2835_isp_stats_hist(Structure):
+    _fields_ = [
+        ("r_hist", c_uint32 * NUM_HISTOGRAM_BINS),
+        ("g_hist", c_uint32 * NUM_HISTOGRAM_BINS),
+        ("b_hist", c_uint32 * NUM_HISTOGRAM_BINS),
+    ]
+
+
+class bcm2835_isp_stats_region(Structure):
+    _fields_ = [
+        ("counted", c_uint32),
+        ("noncounted", c_uint32),
+        ("r_sum", c_uint64),
+        ("g_sum", c_uint64),
+        ("b_sum", c_uint64),
+    ]
+
+
+class bcm2835_isp_stats_focus(Structure):
+    _fields_ = [
+        ("contrast_val", c_uint64 * 2 * 2),
+        ("contrast_val_num", c_uint32 * 2 * 2),
+    ]
+
+
+class bcm2835_isp_stats(Structure):
+    _fields_ = [
+        ("version", c_uint32),
+        ("size", c_uint32),
+        ("hist", bcm2835_isp_stats_hist * NUM_HISTOGRAMS),
+        ("awb_stats", bcm2835_isp_stats_region * AWB_REGIONS),
+        ("floating_stats", bcm2835_isp_stats_region * FLOATING_REGIONS),
+        ("agc_stats", bcm2835_isp_stats_region * AGC_REGIONS),
+        ("focus_stats", bcm2835_isp_stats_focus * FOCUS_REGIONS),
     ]
