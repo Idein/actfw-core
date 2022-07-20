@@ -415,7 +415,7 @@ class MEDIA_BUS_FMT(enum.IntEnum):
 
 
 class RawVideo(object):
-    def __init__(self, device, blocking=False, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE):
+    def __init__(self, device, blocking=False, init_controls=True, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE):
         self.device = device
         self.v4l2_buf_type = v4l2_buf_type
         flags = os.O_RDWR
@@ -424,7 +424,8 @@ class RawVideo(object):
         self.device_fd = os.open(self.device, flags)
         self.buffers: Optional[List[VideoBuffer]] = None  # set when enqueu
 
-        self.init_controls()
+        if init_controls:
+            self.init_controls()
 
     def close(self):
         os.close(self.device_fd)
@@ -489,20 +490,16 @@ class RawVideo(object):
         return (fmt.format.width, fmt.format.height, fmt.format.code)
 
     def init_controls(self):
-        print(f"init {self.device} controls")
         queries = self.query_ext_controls()
         if len(queries) == 0:
-            print("no controls")
+            return
         else:
-            print(f"  {len(queries)} controls:")
+            ctrls = []
             for q in queries:
-                print(
-                    f"    {q.name} 0x{q.id:08x} type=0x{q.type:08x} default={q.default_value} elems={q.elems} elem_size={q.elem_size}"
-                )
-                self.init_control(q)
-                # vs = self.get_ext_controls([cid])
-                # for v in vs:
-                #     print(f"{v.id}  =  {v.value}")
+                i = self.make_initializer(q)
+                if i is not None:
+                    ctrls.append(i)
+            self.set_ext_controls(ctrls)
 
     def query_ext_controls(self) -> List[v4l2_query_ext_ctrl]:
         res = []
@@ -516,17 +513,14 @@ class RawVideo(object):
 
         return res
 
-    def init_control(self, query):
-        print(f"    init {query.name}")
+    def make_initializer(self, query):
         if query.flags & V4L2_CTRL_FLAG_DISABLED:
-            print("      disabled")
-            return
+            return None
         if query.flags & V4L2_CTRL_FLAG_READ_ONLY:
-            print("      read-only")
-            return
-        # if query.flags & V4L2_CTRL_FLAG_EXECUTE_ON_WRITE:
-        #     print("      execute-on-write")
-        #     return
+            return None
+
+        if query.id == V4L2_CID.USER_BCM2835_ISP_LENS_SHADING:
+            return None
 
         ctrl = v4l2_ext_control()
         ctrl.id = query.id
@@ -545,10 +539,9 @@ class RawVideo(object):
                 val[i] = query.default_value
             ctrl.ptr = cast(val, c_void_p)
         else:
-            print("no change")
-            return
+            return None
 
-        self.set_ext_controls([ctrl])
+        return ctrl
 
     def get_ext_controls(self, ids: List[V4L2_CID]) -> List[v4l2_ext_control]:
         ctrls = v4l2_ext_controls()
@@ -559,6 +552,7 @@ class RawVideo(object):
         ctrls.which = V4L2_CTRL_WHICH_CUR_VAL
         ctrls.controls = ctr_arr
         ctrls.count = len(ctr_arr)
+        ctrls.request_fd = 0
         result = self._ioctl(_VIDIOC.G_EXT_CTRLS, byref(ctrls))
 
         if -1 == result:
