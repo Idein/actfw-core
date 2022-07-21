@@ -1,6 +1,7 @@
 # type: ignore
 # flake8: noqa
 
+import copy
 import enum
 import errno
 import io
@@ -165,6 +166,7 @@ class _VIDIOC(enum.IntEnum):
     S_EXT_CTRLS = _IOWR("V", 72, v4l2_ext_controls)
     ENUM_FRAMESIZES = _IOWR("V", 74, frmsizeenum)
     ENUM_FRAMEINTERVALS = _IOWR("V", 75, frmivalenum)
+    QUERY_EXT_CTRL = _IOWR("V", 103, v4l2_query_ext_ctrl)
 
 
 _V4L2_CAP_VIDEO_CAPTURE = 0x00000001
@@ -413,7 +415,7 @@ class MEDIA_BUS_FMT(enum.IntEnum):
 
 
 class RawVideo(object):
-    def __init__(self, device, blocking=False, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE):
+    def __init__(self, device, blocking=False, init_controls=True, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE):
         self.device = device
         self.v4l2_buf_type = v4l2_buf_type
         flags = os.O_RDWR
@@ -421,6 +423,9 @@ class RawVideo(object):
             flags |= os.O_NONBLOCK
         self.device_fd = os.open(self.device, flags)
         self.buffers: Optional[List[VideoBuffer]] = None  # set when enqueu
+
+        if init_controls:
+            self.init_controls()
 
     def close(self):
         os.close(self.device_fd)
@@ -484,15 +489,70 @@ class RawVideo(object):
         self.subdev_fmt = fmt
         return (fmt.format.width, fmt.format.height, fmt.format.code)
 
+    def init_controls(self):
+        queries = self.query_ext_controls()
+        if len(queries) == 0:
+            return
+        else:
+            ctrls = []
+            for q in queries:
+                i = self.make_initializer(q)
+                if i is not None:
+                    ctrls.append(i)
+            self.set_ext_controls(ctrls)
+
+    def query_ext_controls(self) -> List[v4l2_query_ext_ctrl]:
+        res = []
+        query = v4l2_query_ext_ctrl()
+        query.id = V4L2_CTRL_FLAG_NEXT_CTRL | V4L2_CTRL_FLAG_NEXT_COMPOUND
+        while 0 == self._ioctl(_VIDIOC.QUERY_EXT_CTRL, byref(query)):
+            if query.type != V4L2_CTRL_TYPE.CTRL_CLASS:
+                q = copy.copy(query)
+                res.append(q)
+            query.id |= V4L2_CTRL_FLAG_NEXT_CTRL | V4L2_CTRL_FLAG_NEXT_COMPOUND
+
+        return res
+
+    def make_initializer(self, query):
+        if query.flags & V4L2_CTRL_FLAG_DISABLED:
+            return None
+        if query.flags & V4L2_CTRL_FLAG_READ_ONLY:
+            return None
+
+        if query.id == V4L2_CID.USER_BCM2835_ISP_LENS_SHADING:
+            return None
+
+        ctrl = v4l2_ext_control()
+        ctrl.id = query.id
+        ctrl.size = 0
+        ctrl.reserved2 = (c_uint32 * 1)()
+        ctrl.reserved2[0] = 0
+
+        if query.type in [V4L2_CTRL_TYPE.INTEGER, V4L2_CTRL_TYPE.BOOLEAN, V4L2_CTRL_TYPE.MENU]:
+            ctrl.value = query.default_value
+        elif query.type == V4L2_CTRL_TYPE.INTEGER64:
+            ctrl.value64 = query.default_value
+        elif query.type == V4L2_CTRL_TYPE.U8:
+            ctrl.size = query.elems * query.elem_size
+            val = (c_uint8 * query.elems)()
+            for i in range(query.elems):
+                val[i] = query.default_value
+            ctrl.ptr = cast(val, c_void_p)
+        else:
+            return None
+
+        return ctrl
+
     def get_ext_controls(self, ids: List[V4L2_CID]) -> List[v4l2_ext_control]:
         ctrls = v4l2_ext_controls()
         ctr_arr = (v4l2_ext_control * len(ids))()
         for (i, ctrl_id) in enumerate(ids):
             ctr_arr[i].id = ctrl_id
 
-        ctrls.which = 0
+        ctrls.which = V4L2_CTRL_WHICH_CUR_VAL
         ctrls.controls = ctr_arr
         ctrls.count = len(ctr_arr)
+        ctrls.request_fd = 0
         result = self._ioctl(_VIDIOC.G_EXT_CTRLS, byref(ctrls))
 
         if -1 == result:
@@ -506,7 +566,7 @@ class RawVideo(object):
         for (i, ctrl) in enumerate(ctr_list):
             ctr_arr[i] = ctrl
 
-        ctrls.which = 0
+        ctrls.which = V4L2_CTRL_WHICH_CUR_VAL
         ctrls.controls = ctr_arr
         ctrls.count = len(ctr_arr)
         result = self._ioctl(_VIDIOC.S_EXT_CTRLS, byref(ctrls))

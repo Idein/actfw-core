@@ -29,17 +29,23 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         framerate: int = 30,
         expected_format: V4L2_PIX_FMT = V4L2_PIX_FMT.RGB24,
         auto_whitebalance: bool = True,
+        init_unicam_controls: bool = True,
+        init_isp_controls: bool = True,
     ) -> None:
         super().__init__()
         self.dma_buffer_num = 4
         self.isp_out_buffer_num = 4
         self.isp_out_metadata_buffer_num = 2
         self.shared_dma_fds: List[int] = []
-        self.unicam = RawVideo(unicam, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE)
-        self.unicam_subdev = RawVideo(unicam_subdev, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE)
-        self.isp_in = RawVideo(isp_in, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_OUTPUT)
-        self.isp_out_high = RawVideo(isp_out_high, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE)
-        self.isp_out_metadata = RawVideo(isp_out_metadata, v4l2_buf_type=V4L2_BUF_TYPE.META_CAPTURE)
+        self.unicam = RawVideo(unicam, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_unicam_controls)
+        self.unicam_subdev = RawVideo(
+            unicam_subdev, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_unicam_controls
+        )
+        self.isp_in = RawVideo(isp_in, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_OUTPUT, init_controls=init_isp_controls)
+        self.isp_out_high = RawVideo(isp_out_high, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_isp_controls)
+        self.isp_out_metadata = RawVideo(
+            isp_out_metadata, v4l2_buf_type=V4L2_BUF_TYPE.META_CAPTURE, init_controls=init_isp_controls
+        )
         self.do_awb = auto_whitebalance
 
         (self.expected_width, self.expected_height) = size

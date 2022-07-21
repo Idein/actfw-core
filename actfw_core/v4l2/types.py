@@ -288,6 +288,24 @@ class queryctrl(Structure):
     ]
 
 
+class v4l2_query_ext_ctrl(Structure):
+    _fields_ = [
+        ("id", c_uint32),
+        ("type", c_uint32),
+        ("name", c_char * 32),
+        ("minimum", c_longlong),
+        ("maximum", c_longlong),
+        ("step", c_int32),
+        ("default_value", c_longlong),
+        ("flags", c_uint32),
+        ("elem_size", c_uint32),
+        ("elems", c_uint32),
+        ("nr_of_dims", c_uint32),
+        ("dims", c_uint32 * 4),
+        ("reserved", c_uint32 * 32),
+    ]
+
+
 class requestbuffers(Structure):
     _fields_ = [
         ("count", c_uint32),
