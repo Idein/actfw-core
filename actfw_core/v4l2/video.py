@@ -415,7 +415,7 @@ class MEDIA_BUS_FMT(enum.IntEnum):
 
 
 class RawVideo(object):
-    def __init__(self, device, blocking=False, init_controls=True, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE):
+    def __init__(self, device, blocking=False, init_controls=[], v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE):
         self.device = device
         self.v4l2_buf_type = v4l2_buf_type
         flags = os.O_RDWR
@@ -424,8 +424,8 @@ class RawVideo(object):
         self.device_fd = os.open(self.device, flags)
         self.buffers: Optional[List[VideoBuffer]] = None  # set when enqueu
 
-        if init_controls:
-            self.init_controls()
+        if len(init_controls) != 0:
+            self.init_controls(init_controls)
 
     def close(self):
         os.close(self.device_fd)
@@ -489,17 +489,20 @@ class RawVideo(object):
         self.subdev_fmt = fmt
         return (fmt.format.width, fmt.format.height, fmt.format.code)
 
-    def init_controls(self):
+    def init_controls(self, targets):
         queries = self.query_ext_controls()
         if len(queries) == 0:
             return
         else:
             ctrls = []
             for q in queries:
-                i = self.make_initializer(q)
-                if i is not None:
-                    ctrls.append(i)
-            self.set_ext_controls(ctrls)
+                if targets == ["all"] or q.name.decode() in targets:
+                    i = self.make_initializer(q)
+                    if i is not None:
+                        print(f"init {q.name}")
+                        ctrls.append(i)
+            if len(ctrls) != 0:
+                self.set_ext_controls(ctrls)
 
     def query_ext_controls(self) -> List[v4l2_query_ext_ctrl]:
         res = []
