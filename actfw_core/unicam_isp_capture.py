@@ -67,6 +67,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.degital_gain = 1.0
         self.agc_count = 0
 
+
     def setup_pipeline(self) -> None:
         # setup unicam
         if not (self.unicam_subdev.set_vertical_flip(True) and self.unicam_subdev.set_horizontal_flip(True)):
@@ -81,6 +82,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
         if unicam_width != self.unicam_width or unicam_height != self.unicam_height or unicam_format != self.unicam_format:
             raise RuntimeError("fail to setup unicam device node")
+        
         self.set_unicam_fps()
 
         # sutup isp_in
@@ -117,6 +119,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         vblank_ctrl.id = V4L2_CID.VBLANK
         vblank_ctrl.value = expected_vblank
         ctrls = self.unicam_subdev.set_ext_controls([vblank_ctrl])
+
+        self.line_length = self.unicam_width + hblank # TODO: adhoc
+        self.pixel_late = pixel_late # TODO: adhoc
 
     def capture_size(self) -> Tuple[int, int]:
         return (self.output_fmt.fmt.pix.width, self.output_fmt.fmt.pix.height)
@@ -177,6 +182,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
 
     def agc(self, stats: bcm2835_isp_stats):
+        # TODO: adhoc
         if self.agc_count < 3:
             self.agc_count += 1
             return
@@ -185,7 +191,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         current_y = self.calculate_y(stats) * self.degital_gain # before apply degital gain
         # print(current_y)
-        target_y = 0.1 # ??
+        target_y = 0.16 # 固定
         additional_gain = min(10, target_y / (current_y + 0.001))
 
         SHUTTERS = [100, 10000, 30000, 60000, 66666]
@@ -216,11 +222,18 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         # TODO: need flicker avoidance?
         print(f"analogue_gain: {analogue_gain}, shutter: {shutter_time}")
         # shutter timeとvblankexposureへの分解
-
         self.exposure = shutter_time * analogue_gain
-        gain_code = (256 - (256 / analogue_gain)) # imx219固有部分
-        exposure_lines = shutter_time / self.unicam_height
-        # vblankの調整
+
+        # v4l2 control値に変換する
+        gain_code = (256 - (256 / analogue_gain)) # imx219固有部分 https://github.com/kbingham/libcamera/blob/37e31b2c6b241dff5153025af566ab671b10ff68/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67-L70
+
+        time_per_line = self.line_length * (1.0 / self.pixel_late) * 1e6 
+        exposure_lines = shutter_time / time_per_line # TODO: どういう単位なのかよくわからず
+
+        print(self.line_length, self.pixel_late)
+        print(f"gain code {gain_code}, exposure lines: {exposure_lines}" )
+
+        # TODO: vblankの調整?
 
         exposure_ctrl = v4l2_ext_control()
         exposure_ctrl.id = V4L2_CID.EXPOSURE
