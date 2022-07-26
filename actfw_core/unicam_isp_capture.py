@@ -5,6 +5,7 @@ from typing import List, Tuple
 from actfw_core.capture import Frame
 from actfw_core.task import Producer
 from actfw_core.v4l2.types import bcm2835_isp_black_level, bcm2835_isp_stats, v4l2_ext_control
+from actfw_core.v4l2.types import NUM_HISTOGRAM_BINS, bcm2835_isp_stats, v4l2_ext_control
 from actfw_core.v4l2.video import (  # type: ignore
     MEDIA_BUS_FMT,
     V4L2_BUF_TYPE,
@@ -44,6 +45,11 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         target_Y: float = 0.16,  # Temporary set for the developement of agc algorithm
     ) -> None:
         super().__init__()
+
+        self.aperture = 1.0
+        self.gain = 1.0
+        self.shutter_speed = 1000.0
+
         self.dma_buffer_num = 4
         self.isp_out_buffer_num = 4
         self.isp_out_metadata_buffer_num = 2
@@ -286,12 +292,41 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         blue_balance_ctrl.value64 = int(self.gain_b * 1000)
         self.isp_in.set_ext_controls([red_balance_ctrl, blue_balance_ctrl])
 
+    def calc_lux(self, isp_stats: bcm2835_isp_stats) -> None:
+        # imx219 data from libcamera (src/ipa/raspberrypi/data/imx219.json#L10-L17)
+        reference_shutter_speed = 27685.0
+        reference_gain = 1.0
+        reference_aperture = 1.0
+        reference_lux = 998.0
+        reference_Y = 12744.0
+
+        current_aperture = self.aperture
+        current_gain = self.gain
+        current_shutter_speed = self.shutter_speed
+
+        hist_sum = 0
+        hist_num = 0
+        hist = isp_stats.hist[0].g_hist
+        for i in range(NUM_HISTOGRAM_BINS):
+            hist_sum += hist[i] * i
+            hist_num += hist[i]
+        current_Y = float(hist_sum) / float(hist_num) + 0.5
+        gain_ratio = reference_gain / current_gain
+        shutter_speed_ratio = reference_shutter_speed / current_shutter_speed
+        aperture_ratio = reference_aperture / current_aperture
+        Y_ratio = current_Y * (65536.0 / NUM_HISTOGRAM_BINS) / reference_Y
+        estimated_lux = shutter_speed_ratio * gain_ratio * aperture_ratio * aperture_ratio * Y_ratio * reference_lux
+
+        print(f"estimated_lux = {estimated_lux}")
+        self.lux = estimated_lux
+
     def adjust_setting_from_isp(self) -> None:
         buffer = self.isp_out_metadata.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.MMAP)
         if buffer is None:
             return
 
         stats: bcm2835_isp_stats = cast(buffer.mapped_buf, POINTER(bcm2835_isp_stats)).contents
+        self.calc_lux(stats)
         if self.do_agc:
             if self.agc_interval_count < AGC_INTERVAL:
                 self.agc_interval_count += 1
