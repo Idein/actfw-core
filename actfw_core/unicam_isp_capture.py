@@ -82,7 +82,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
         if unicam_width != self.unicam_width or unicam_height != self.unicam_height or unicam_format != self.unicam_format:
             raise RuntimeError("fail to setup unicam device node")
-        
+
         self.set_unicam_fps()
 
         # sutup isp_in
@@ -218,19 +218,19 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
                 analogue_gain = max_analogue_gain
 
+        # may need flicker avoidance
 
-        # TODO: need flicker avoidance?
         print(f"analogue_gain: {analogue_gain}, shutter: {shutter_time}")
         # shutter timeとvblankexposureへの分解
         self.exposure = shutter_time * analogue_gain
 
-        # v4l2 control値に変換する
-        gain_code = (256 - (256 / analogue_gain)) # imx219固有部分 https://github.com/kbingham/libcamera/blob/37e31b2c6b241dff5153025af566ab671b10ff68/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67-L70
+        # convert analogue_gain to value for V4L2_CID.ANALOGUE_GAIN
+        # https://github.com/kbingham/libcamera/blob/37e31b2c6b241dff5153025af566ab671b10ff68/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67-L70
+        gain_code = (256 - (256 / analogue_gain)) # TODO: support other than imx219
+        # convert shutter time to value for V4L2_CID.EXPOSURE
+        time_per_line = self.line_length * (1.0 / self.pixel_late) * 1e6
+        exposure_lines = shutter_time / time_per_line
 
-        time_per_line = self.line_length * (1.0 / self.pixel_late) * 1e6 
-        exposure_lines = shutter_time / time_per_line # TODO: どういう単位なのかよくわからず
-
-        print(self.line_length, self.pixel_late)
         print(f"gain code {gain_code}, exposure lines: {exposure_lines}" )
 
         # TODO: vblankの調整?
