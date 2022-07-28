@@ -18,6 +18,7 @@ from actfw_core.v4l2.video import (  # type: ignore
 
 _EMPTY_LIST: List[str] = []
 
+AGC_INTERVAL = 3
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
@@ -32,7 +33,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         expected_format: V4L2_PIX_FMT = V4L2_PIX_FMT.RGB24,
         auto_whitebalance: bool = True,
         init_controls: List[str] = _EMPTY_LIST,
-        agc: bool = True
+        agc: bool = True,
+        target_Y: float = 1.6 # Temporary set for the developement of agc algorithm
     ) -> None:
         super().__init__()
         self.dma_buffer_num = 4
@@ -52,6 +54,22 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         (self.expected_width, self.expected_height) = size
         self.expected_pix_format = expected_format
         self.expected_fps = framerate
+
+        # control values
+        ## update by awb
+        self.gain_r = 1.6
+        self.gain_b = 1.6
+        ## update by agc
+        self.exposure = 100 # `shutter speed(us)` * `analogue gain`
+        self.degital_gain = 1.0 
+        self.agc_interval_count = 0
+        self.target_Y = target_Y
+
+        # some device status cache (set by set_unicam_fps)
+        self.vblank = 0
+        self.hblank = 0
+        self.pixel_late = 0
+
         # setup
         self.converter = V4LConverter(self.isp_out_high.device_fd)
         self.setup_pipeline()
@@ -60,12 +78,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
 
         self.request_buffer()
-        self.gain_r = 1.6
-        self.gain_b = 1.6
-
-        self.exposure = 100 # shutter speed: 100ms, gain: 1.0
-        self.degital_gain = 1.0
-        self.agc_count = 0
 
 
     def setup_pipeline(self) -> None:
@@ -108,9 +120,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_out_metadata.set_meta_format(V4L2_META_FMT.BCM2835_ISP_STATS, sizeof(bcm2835_isp_stats))
 
     def set_unicam_fps(self) -> None:
-        ctrls = self.unicam_subdev.get_ext_controls([V4L2_CID.HBLANK, V4L2_CID.PIXEL_RATE])
+        ctrls = self.unicam_subdev.get_ext_controls([V4L2_CID.HBLANK, V4L2_CID.PIXEL_RATE, V4L2_CID.VBLANK])
         hblank = ctrls[0].value
         pixel_late = ctrls[1].value64
+
         expected_pixel_per_second = pixel_late // self.expected_fps
         expected_line_num = expected_pixel_per_second // (self.unicam_width + hblank)
         expected_vblank = expected_line_num - self.unicam_height
@@ -120,8 +133,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         vblank_ctrl.value = expected_vblank
         ctrls = self.unicam_subdev.set_ext_controls([vblank_ctrl])
 
-        self.line_length = self.unicam_width + hblank # TODO: adhoc
-        self.pixel_late = pixel_late # TODO: adhoc
+        self.hblank = hblank
+        self.vblank = expected_vblank
+        self.pixel_late = pixel_late
 
     def capture_size(self) -> Tuple[int, int]:
         return (self.output_fmt.fmt.pix.width, self.output_fmt.fmt.pix.height)
@@ -178,22 +192,12 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         return y_sum / pixel_sum / (1 << PIPELINE_BITS)
 
-
-
-
     def agc(self, stats: bcm2835_isp_stats):
-        # TODO: adhoc
-        if self.agc_count < 3:
-            self.agc_count += 1
-            return
-        else:
-            self.agc_count = 0
-
         current_y = self.calculate_y(stats) * self.degital_gain # before apply degital gain
-        # print(current_y)
-        target_y = 0.16 # 固定
-        additional_gain = min(10, target_y / (current_y + 0.001))
+        additional_gain = min(10, self.target_Y / (current_y + 0.001))
 
+        # TODO: support other than imx219
+        # pick from https://github.com/kbingham/libcamera/blob/22ffeae04de2e7ce6b2476a35233c790beafb67f/src/ipa/raspberrypi/data/imx219.json#L132-L142
         SHUTTERS = [100, 10000, 30000, 60000, 66666]
         GAINS = [1.0, 2.0, 4.0, 6.0, 8.0]
 
@@ -218,29 +222,26 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
                 analogue_gain = max_analogue_gain
 
-        # may need flicker avoidance
+        # may need flicker avoidance here. ref. https://github.com/kbingham/libcamera/blob/d7415bc4e46fe8aa25a495c79516d9882a35a5aa/src/ipa/raspberrypi/controller/rpi/agc.cpp#L724
 
-        print(f"analogue_gain: {analogue_gain}, shutter: {shutter_time}")
-        # shutter timeとvblankexposureへの分解
+        # print(f"analogue_gain: {analogue_gain}, shutter: {shutter_time}")
+
         self.exposure = shutter_time * analogue_gain
 
-        # convert analogue_gain to value for V4L2_CID.ANALOGUE_GAIN
-        # https://github.com/kbingham/libcamera/blob/37e31b2c6b241dff5153025af566ab671b10ff68/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67-L70
-        gain_code = (256 - (256 / analogue_gain)) # TODO: support other than imx219
-        # convert shutter time to value for V4L2_CID.EXPOSURE
-        time_per_line = self.line_length * (1.0 / self.pixel_late) * 1e6
-        exposure_lines = shutter_time / time_per_line
+        # convert analogue_gain to V4L2_CID.ANALOGUE_GAIN 
+        # ref. https://github.com/kbingham/libcamera/blob/37e31b2c6b241dff5153025af566ab671b10ff68/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67-L70
+        unicam_subdev_analogue_gain = (256 - (256 / analogue_gain)) # TODO: support other than imx219
 
-        print(f"gain code {gain_code}, exposure lines: {exposure_lines}" )
-
-        # TODO: vblankの調整?
+        # convert shutter time to V4L2_CID.EXPOSURE
+        time_per_line = (self.unicam_width + self.hblank) * (1.0 / self.pixel_late) * 1e6
+        unicam_subdev_exposure = shutter_time / time_per_line
 
         exposure_ctrl = v4l2_ext_control()
         exposure_ctrl.id = V4L2_CID.EXPOSURE
-        exposure_ctrl.value = int(exposure_lines)
+        exposure_ctrl.value = int(unicam_subdev_exposure)
         gain_ctrl = v4l2_ext_control()
         gain_ctrl.id = V4L2_CID.ANALOGUE_GAIN
-        gain_ctrl.value = int(gain_code)
+        gain_ctrl.value = int(unicam_subdev_analogue_gain)
         self.unicam_subdev.set_ext_controls([exposure_ctrl, gain_ctrl])
 
 
@@ -250,10 +251,13 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             return
 
         stats: bcm2835_isp_stats = cast(buffer.mapped_buf, POINTER(bcm2835_isp_stats)).contents
-        current_y = self.calculate_y(stats) * self.degital_gain # before apply degital gain
-        print(current_y)
-        if self.do_agc:
-            self.agc(stats)
+        if self.do_agc:        
+            if self.agc_interval_count < AGC_INTERVAL:
+                self.agc_interval_count += 1
+            else:
+                self.agc_interval_count = 0
+                self.agc(stats)
+
         if self.do_awb:
             sum_r = 0
             sum_b = 0
