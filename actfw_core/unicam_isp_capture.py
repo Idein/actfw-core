@@ -46,12 +46,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
     ) -> None:
         super().__init__()
 
-        self.aperture = 1.0
-        #self.gain = 1.0
-        #self.shutter_speed = 1000.0
-        self.gain = 4.0
-        self.shutter_speed = 31455.44
-
         self.dma_buffer_num = 4
         self.isp_out_buffer_num = 4
         self.isp_out_metadata_buffer_num = 2
@@ -71,10 +65,13 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.expected_fps = framerate
 
         # control values
+        self.aperture: float = 1.0
         # - update by awb
         self.gain_r: float = 1.6
         self.gain_b: float = 1.6
         # - update by agc
+        self.gain: float = 1.0
+        self.shutter_speed: float = 1000.0
         self.exposure: float = 100  # `shutter speed(us)` * `analogue gain`
         self.degital_gain: float = 1.0  # Currently, this value is constant.
         self.agc_interval_count: int = 0
@@ -216,6 +213,41 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self._outlet(frame)
         self.isp_out_high.queue_buffer(buffer.buf.index)
 
+    def calc_lux(self, isp_stats: bcm2835_isp_stats) -> None:
+        # imx219 data from libcamera (src/ipa/raspberrypi/data/imx219.json#L10-L17)
+        reference_shutter_speed = 27685.0
+        reference_gain = 1.0
+        reference_aperture = 1.0
+        reference_lux = 998.0
+        reference_Y = 12744.0
+
+        current_aperture = self.aperture
+        current_gain = self.gain
+        current_shutter_speed = self.shutter_speed
+
+        hist_sum = 0
+        hist_num = 0
+        hist = isp_stats.hist[0].g_hist
+        for i in range(NUM_HISTOGRAM_BINS):
+            hist_sum += hist[i] * i
+            hist_num += hist[i]
+        current_Y = float(hist_sum) / float(hist_num) + 0.5
+        gain_ratio = reference_gain / current_gain
+        shutter_speed_ratio = reference_shutter_speed / current_shutter_speed
+        aperture_ratio = reference_aperture / current_aperture
+        Y_ratio = current_Y * (65536.0 / NUM_HISTOGRAM_BINS) / reference_Y
+        estimated_lux = shutter_speed_ratio * gain_ratio * aperture_ratio * aperture_ratio * Y_ratio * reference_lux
+
+        print(f"num_bins {NUM_HISTOGRAM_BINS}")
+        print(f"current_Y {current_Y} = {hist_sum} / {hist_num}")
+        print(f"reference_Y {reference_Y}")
+        print(f"gain_ratio {gain_ratio} = {reference_gain} / {current_gain}")
+        print(f"shutter_speed_ratio {shutter_speed_ratio} = {reference_shutter_speed} / {current_shutter_speed}")
+        print(f"aperture_ratio {aperture_ratio} = {reference_aperture} / {current_aperture}")
+        print(f"reference_lux {reference_lux}")
+        print(f"estimated_lux = {estimated_lux}")
+        self.lux = estimated_lux
+
     def calculate_y(self, stats: bcm2835_isp_stats, additional_gain: float) -> float:
         PIPELINE_BITS = 13  # https://github.com/kbingham/libcamera/blob/f995ff25a3326db90513d1fa936815653f7cade0/src/ipa/raspberrypi/controller/rpi/agc.cpp#L31 # noqa: E501, B950
         r_sum = 0
@@ -272,6 +304,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         # may need flicker avoidance here. ref. https://github.com/kbingham/libcamera/blob/d7415bc4e46fe8aa25a495c79516d9882a35a5aa/src/ipa/raspberrypi/controller/rpi/agc.cpp#L724 # noqa: E501, B950
 
+        self.shutter_speed = shutter_time
+        self.gain = analogue_gain
         self.exposure = shutter_time * analogue_gain
         self.set_unicam_exposure(analogue_gain, shutter_time)
 
@@ -293,41 +327,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         blue_balance_ctrl.id = V4L2_CID.BLUE_BALANCE
         blue_balance_ctrl.value64 = int(self.gain_b * 1000)
         self.isp_in.set_ext_controls([red_balance_ctrl, blue_balance_ctrl])
-
-    def calc_lux(self, isp_stats: bcm2835_isp_stats) -> None:
-        # imx219 data from libcamera (src/ipa/raspberrypi/data/imx219.json#L10-L17)
-        reference_shutter_speed = 27685.0
-        reference_gain = 1.0
-        reference_aperture = 1.0
-        reference_lux = 998.0
-        reference_Y = 12744.0
-
-        current_aperture = self.aperture
-        current_gain = self.gain
-        current_shutter_speed = self.shutter_speed
-
-        hist_sum = 0
-        hist_num = 0
-        hist = isp_stats.hist[0].g_hist
-        for i in range(NUM_HISTOGRAM_BINS):
-            hist_sum += hist[i] * i
-            hist_num += hist[i]
-        current_Y = float(hist_sum) / float(hist_num) + 0.5
-        gain_ratio = reference_gain / current_gain
-        shutter_speed_ratio = reference_shutter_speed / current_shutter_speed
-        aperture_ratio = reference_aperture / current_aperture
-        Y_ratio = current_Y * (65536.0 / NUM_HISTOGRAM_BINS) / reference_Y
-        estimated_lux = shutter_speed_ratio * gain_ratio * aperture_ratio * aperture_ratio * Y_ratio * reference_lux
-
-        print(f"num_bins {NUM_HISTOGRAM_BINS}")
-        print(f"current_Y {current_Y} = {hist_sum} / {hist_num}")
-        print(f"reference_Y {reference_Y}")
-        print(f"gain_ratio {gain_ratio} = {reference_gain} / {current_gain}")
-        print(f"shutter_speed_ratio {shutter_speed_ratio} = {reference_shutter_speed} / {current_shutter_speed}")
-        print(f"aperture_ratio {aperture_ratio} = {reference_aperture} / {current_aperture}")
-        print(f"reference_lux {reference_lux}")
-        print(f"estimated_lux = {estimated_lux}")
-        self.lux = estimated_lux
 
     def adjust_setting_from_isp(self) -> None:
         buffer = self.isp_out_metadata.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.MMAP)
