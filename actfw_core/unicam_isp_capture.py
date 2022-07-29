@@ -19,6 +19,10 @@ from actfw_core.v4l2.video import (  # type: ignore
 _EMPTY_LIST: List[str] = []
 
 AGC_INTERVAL: int = 3
+# TODO: support other than imx219
+# pick from https://github.com/kbingham/libcamera/blob/22ffeae04de2e7ce6b2476a35233c790beafb67f/src/ipa/raspberrypi/data/imx219.json#L132-L142 # noqa: E501, B950
+SHUTTERS: List[float] = [100, 10000, 30000, 60000, 66666]
+GAINS: List[float] = [1.0, 2.0, 4.0, 6.0, 8.0]
 
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
@@ -61,10 +65,14 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.gain_r: float = 1.6
         self.gain_b: float = 1.6
         # - update by agc
-        self.exposure: float = 100  # `shutter speed(us)` * `analogue gain`
-        self.degital_gain: float = 1.0
-        self.agc_interval_count: int = 0
-        self.target_Y: float = target_Y
+        if self.do_agc:
+            init_shutter_time = SHUTTERS[len(SHUTTERS) // 2]  # (us)
+            init_analogue_gain = GAINS[len(GAINS) // 2]
+            self.set_unicam_exposure(init_analogue_gain, init_shutter_time)
+            self.exposure: float = init_shutter_time * init_analogue_gain
+            self.degital_gain: float = 1.0
+            self.agc_interval_count: int = 0
+            self.target_Y: float = target_Y
 
         # some device status cache (set by set_unicam_fps)
         self.vblank: int = 0
@@ -137,6 +145,23 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.vblank = expected_vblank
         self.pixel_late = pixel_late
 
+    def set_unicam_exposure(self, analogue_gain: float, shutter_time: float) -> None:
+        # convert analogue_gain to V4L2_CID.ANALOGUE_GAIN
+        # ref. https://github.com/kbingham/libcamera/blob/37e31b2c6b241dff5153025af566ab671b10ff68/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67-L70 # noqa: E501, B950
+        unicam_subdev_analogue_gain = 256 - (256 / analogue_gain)  # TODO: support other than imx219
+
+        # convert shutter time to V4L2_CID.EXPOSURE
+        time_per_line = (self.unicam_width + self.hblank) * (1.0 / self.pixel_late) * 1e6
+        unicam_subdev_exposure = shutter_time / time_per_line
+
+        exposure_ctrl = v4l2_ext_control()
+        exposure_ctrl.id = V4L2_CID.EXPOSURE
+        exposure_ctrl.value = int(unicam_subdev_exposure)
+        gain_ctrl = v4l2_ext_control()
+        gain_ctrl.id = V4L2_CID.ANALOGUE_GAIN
+        gain_ctrl.value = int(unicam_subdev_analogue_gain)
+        self.unicam_subdev.set_ext_controls([exposure_ctrl, gain_ctrl])
+
     def capture_size(self) -> Tuple[int, int]:
         return (self.output_fmt.fmt.pix.width, self.output_fmt.fmt.pix.height)
 
@@ -194,11 +219,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         current_y = self.calculate_y(stats) * self.degital_gain  # apply degital gain
         additional_gain = min(10, self.target_Y / (current_y + 0.001))
 
-        # TODO: support other than imx219
-        # pick from https://github.com/kbingham/libcamera/blob/22ffeae04de2e7ce6b2476a35233c790beafb67f/src/ipa/raspberrypi/data/imx219.json#L132-L142 # noqa: E501, B950
-        SHUTTERS: List[float] = [100, 10000, 30000, 60000, 66666]
-        GAINS: List[float] = [1.0, 2.0, 4.0, 6.0, 8.0]
-
         max_exposure = SHUTTERS[-1] * GAINS[-1]
         target_exposure = min(self.exposure * additional_gain, max_exposure)
         analogue_gain = GAINS[0]
@@ -224,22 +244,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         # print(f"analogue_gain: {analogue_gain}, shutter: {shutter_time}")
 
         self.exposure = shutter_time * analogue_gain
-
-        # convert analogue_gain to V4L2_CID.ANALOGUE_GAIN
-        # ref. https://github.com/kbingham/libcamera/blob/37e31b2c6b241dff5153025af566ab671b10ff68/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67-L70 # noqa: E501, B950
-        unicam_subdev_analogue_gain = 256 - (256 / analogue_gain)  # TODO: support other than imx219
-
-        # convert shutter time to V4L2_CID.EXPOSURE
-        time_per_line = (self.unicam_width + self.hblank) * (1.0 / self.pixel_late) * 1e6
-        unicam_subdev_exposure = shutter_time / time_per_line
-
-        exposure_ctrl = v4l2_ext_control()
-        exposure_ctrl.id = V4L2_CID.EXPOSURE
-        exposure_ctrl.value = int(unicam_subdev_exposure)
-        gain_ctrl = v4l2_ext_control()
-        gain_ctrl.id = V4L2_CID.ANALOGUE_GAIN
-        gain_ctrl.value = int(unicam_subdev_analogue_gain)
-        self.unicam_subdev.set_ext_controls([exposure_ctrl, gain_ctrl])
+        self.set_unicam_exposure(analogue_gain, shutter_time)
 
     def awb(self, stats: bcm2835_isp_stats) -> None:
         sum_r = 0
