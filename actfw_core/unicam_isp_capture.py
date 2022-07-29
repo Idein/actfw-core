@@ -65,14 +65,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.gain_r: float = 1.6
         self.gain_b: float = 1.6
         # - update by agc
-        if self.do_agc:
-            init_shutter_time = SHUTTERS[len(SHUTTERS) // 2]  # (us)
-            init_analogue_gain = GAINS[len(GAINS) // 2]
-            self.set_unicam_exposure(init_analogue_gain, init_shutter_time)
-            self.exposure: float = init_shutter_time * init_analogue_gain
-            self.degital_gain: float = 1.0
-            self.agc_interval_count: int = 0
-            self.target_Y: float = target_Y
+        self.exposure: float = 100  # `shutter speed(us)` * `analogue gain`
+        self.degital_gain: float = 1.0  # Currently, this value is constant.
+        self.agc_interval_count: int = 0
+        self.target_Y: float = target_Y
 
         # some device status cache (set by set_unicam_fps)
         self.vblank: int = 0
@@ -104,6 +100,11 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             raise RuntimeError("fail to setup unicam device node")
 
         self.set_unicam_fps()
+        if self.do_agc:
+            init_shutter_time = SHUTTERS[len(SHUTTERS) // 2]  # (us)
+            init_analogue_gain = GAINS[len(GAINS) // 2]
+            self.set_unicam_exposure(init_analogue_gain, init_shutter_time)
+            self.exposure: float = init_shutter_time * init_analogue_gain
 
         # sutup isp_in
         (isp_in_width, isp_in_height, isp_in_format) = self.isp_in.set_pix_format(
@@ -218,7 +219,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
     def agc(self, stats: bcm2835_isp_stats) -> None:
         current_y = self.calculate_y(stats) * self.degital_gain  # apply degital gain
         additional_gain = min(10, self.target_Y / (current_y + 0.001))
-
         max_exposure = SHUTTERS[-1] * GAINS[-1]
         target_exposure = min(self.exposure * additional_gain, max_exposure)
         analogue_gain = GAINS[0]
