@@ -35,7 +35,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         auto_whitebalance: bool = True,
         init_controls: List[str] = _EMPTY_LIST,
         agc: bool = True,
-        target_Y: float = 1.6,  # Temporary set for the developement of agc algorithm
+        target_Y: float = 0.16,  # Temporary set for the developement of agc algorithm
     ) -> None:
         super().__init__()
         self.dma_buffer_num = 4
