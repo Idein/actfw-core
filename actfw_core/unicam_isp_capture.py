@@ -18,7 +18,8 @@ from actfw_core.v4l2.video import (  # type: ignore
 
 _EMPTY_LIST: List[str] = []
 
-AGC_INTERVAL = 3
+AGC_INTERVAL: int = 3
+
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
@@ -34,7 +35,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         auto_whitebalance: bool = True,
         init_controls: List[str] = _EMPTY_LIST,
         agc: bool = True,
-        target_Y: float = 1.6 # Temporary set for the developement of agc algorithm
+        target_Y: float = 1.6,  # Temporary set for the developement of agc algorithm
     ) -> None:
         super().__init__()
         self.dma_buffer_num = 4
@@ -56,19 +57,19 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.expected_fps = framerate
 
         # control values
-        ## update by awb
-        self.gain_r = 1.6
-        self.gain_b = 1.6
-        ## update by agc
-        self.exposure = 100 # `shutter speed(us)` * `analogue gain`
-        self.degital_gain = 1.0 
-        self.agc_interval_count = 0
-        self.target_Y = target_Y
+        # - update by awb
+        self.gain_r: float = 1.6
+        self.gain_b: float = 1.6
+        # - update by agc
+        self.exposure: float = 100  # `shutter speed(us)` * `analogue gain`
+        self.degital_gain: float = 1.0
+        self.agc_interval_count: int = 0
+        self.target_Y: float = target_Y
 
         # some device status cache (set by set_unicam_fps)
-        self.vblank = 0
-        self.hblank = 0
-        self.pixel_late = 0
+        self.vblank: int = 0
+        self.hblank: int = 0
+        self.pixel_late: int = 0
 
         # setup
         self.converter = V4LConverter(self.isp_out_high.device_fd)
@@ -78,7 +79,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
 
         self.request_buffer()
-
 
     def setup_pipeline(self) -> None:
         # setup unicam
@@ -170,8 +170,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self._outlet(frame)
         self.isp_out_high.queue_buffer(buffer.buf.index)
 
-    def calculate_y(self, stats: bcm2835_isp_stats):
-        PIPELINE_BITS = 13 # https://github.com/kbingham/libcamera/blob/f995ff25a3326db90513d1fa936815653f7cade0/src/ipa/raspberrypi/controller/rpi/agc.cpp#L31
+    def calculate_y(self, stats: bcm2835_isp_stats) -> float:
+        PIPELINE_BITS = 13  # https://github.com/kbingham/libcamera/blob/f995ff25a3326db90513d1fa936815653f7cade0/src/ipa/raspberrypi/controller/rpi/agc.cpp#L31 # noqa: E501, B950
         r_sum = 0
         g_sum = 0
         b_sum = 0
@@ -186,23 +186,21 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         if pixel_sum == 0:
             return 0
 
-        y_sum = (r_sum * self.gain_r * 0.299
-                 + b_sum * self.gain_b * 0.144
-                 + g_sum * 0.587)
+        y_sum = r_sum * self.gain_r * 0.299 + b_sum * self.gain_b * 0.144 + g_sum * 0.587
 
         return y_sum / pixel_sum / (1 << PIPELINE_BITS)
 
-    def agc(self, stats: bcm2835_isp_stats):
-        current_y = self.calculate_y(stats) * self.degital_gain # before apply degital gain
+    def agc(self, stats: bcm2835_isp_stats) -> None:
+        current_y = self.calculate_y(stats) * self.degital_gain  # before apply degital gain
         additional_gain = min(10, self.target_Y / (current_y + 0.001))
 
         # TODO: support other than imx219
-        # pick from https://github.com/kbingham/libcamera/blob/22ffeae04de2e7ce6b2476a35233c790beafb67f/src/ipa/raspberrypi/data/imx219.json#L132-L142
-        SHUTTERS = [100, 10000, 30000, 60000, 66666]
-        GAINS = [1.0, 2.0, 4.0, 6.0, 8.0]
+        # pick from https://github.com/kbingham/libcamera/blob/22ffeae04de2e7ce6b2476a35233c790beafb67f/src/ipa/raspberrypi/data/imx219.json#L132-L142 # noqa: E501, B950
+        SHUTTERS: List[float] = [100, 10000, 30000, 60000, 66666]
+        GAINS: List[float] = [1.0, 2.0, 4.0, 6.0, 8.0]
 
         max_exposure = SHUTTERS[-1] * GAINS[-1]
-        target_exposure = min(self.exposure * additional_gain , max_exposure)
+        target_exposure = min(self.exposure * additional_gain, max_exposure)
         analogue_gain = GAINS[0]
         shutter_time = SHUTTERS[0]
         if shutter_time * analogue_gain < target_exposure:
@@ -213,24 +211,23 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 if max_shutter_time * analogue_gain >= target_exposure:
                     shutter_time = target_exposure / analogue_gain
                     break
-
                 shutter_time = max_shutter_time
+
                 # fix shutter time, increase gain
                 if shutter_time * max_analogue_gain >= target_exposure:
                     analogue_gain = target_exposure / shutter_time
                     break
-
                 analogue_gain = max_analogue_gain
 
-        # may need flicker avoidance here. ref. https://github.com/kbingham/libcamera/blob/d7415bc4e46fe8aa25a495c79516d9882a35a5aa/src/ipa/raspberrypi/controller/rpi/agc.cpp#L724
+        # may need flicker avoidance here. ref. https://github.com/kbingham/libcamera/blob/d7415bc4e46fe8aa25a495c79516d9882a35a5aa/src/ipa/raspberrypi/controller/rpi/agc.cpp#L724 # noqa: E501, B950
 
         # print(f"analogue_gain: {analogue_gain}, shutter: {shutter_time}")
 
         self.exposure = shutter_time * analogue_gain
 
-        # convert analogue_gain to V4L2_CID.ANALOGUE_GAIN 
-        # ref. https://github.com/kbingham/libcamera/blob/37e31b2c6b241dff5153025af566ab671b10ff68/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67-L70
-        unicam_subdev_analogue_gain = (256 - (256 / analogue_gain)) # TODO: support other than imx219
+        # convert analogue_gain to V4L2_CID.ANALOGUE_GAIN
+        # ref. https://github.com/kbingham/libcamera/blob/37e31b2c6b241dff5153025af566ab671b10ff68/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67-L70 # noqa: E501, B950
+        unicam_subdev_analogue_gain = 256 - (256 / analogue_gain)  # TODO: support other than imx219
 
         # convert shutter time to V4L2_CID.EXPOSURE
         time_per_line = (self.unicam_width + self.hblank) * (1.0 / self.pixel_late) * 1e6
@@ -244,14 +241,13 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         gain_ctrl.value = int(unicam_subdev_analogue_gain)
         self.unicam_subdev.set_ext_controls([exposure_ctrl, gain_ctrl])
 
-
     def adjust_setting_from_isp(self) -> None:
         buffer = self.isp_out_metadata.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.MMAP)
         if buffer is None:
             return
 
         stats: bcm2835_isp_stats = cast(buffer.mapped_buf, POINTER(bcm2835_isp_stats)).contents
-        if self.do_agc:        
+        if self.do_agc:
             if self.agc_interval_count < AGC_INTERVAL:
                 self.agc_interval_count += 1
             else:
