@@ -104,7 +104,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             init_shutter_time = SHUTTERS[len(SHUTTERS) // 2]  # (us)
             init_analogue_gain = GAINS[len(GAINS) // 2]
             self.set_unicam_exposure(init_analogue_gain, init_shutter_time)
-            self.exposure: float = init_shutter_time * init_analogue_gain
+            self.exposure = init_shutter_time * init_analogue_gain
 
         # sutup isp_in
         (isp_in_width, isp_in_height, isp_in_format) = self.isp_in.set_pix_format(
