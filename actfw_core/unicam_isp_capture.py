@@ -47,8 +47,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         super().__init__()
 
         self.aperture = 1.0
-        self.gain = 1.0
-        self.shutter_speed = 1000.0
+        #self.gain = 1.0
+        #self.shutter_speed = 1000.0
+        self.gain = 4.0
+        self.shutter_speed = 31455.44
 
         self.dma_buffer_num = 4
         self.isp_out_buffer_num = 4
@@ -317,6 +319,13 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         Y_ratio = current_Y * (65536.0 / NUM_HISTOGRAM_BINS) / reference_Y
         estimated_lux = shutter_speed_ratio * gain_ratio * aperture_ratio * aperture_ratio * Y_ratio * reference_lux
 
+        print(f"num_bins {NUM_HISTOGRAM_BINS}")
+        print(f"current_Y {current_Y} = {hist_sum} / {hist_num}")
+        print(f"reference_Y {reference_Y}")
+        print(f"gain_ratio {gain_ratio} = {reference_gain} / {current_gain}")
+        print(f"shutter_speed_ratio {shutter_speed_ratio} = {reference_shutter_speed} / {current_shutter_speed}")
+        print(f"aperture_ratio {aperture_ratio} = {reference_aperture} / {current_aperture}")
+        print(f"reference_lux {reference_lux}")
         print(f"estimated_lux = {estimated_lux}")
         self.lux = estimated_lux
 
