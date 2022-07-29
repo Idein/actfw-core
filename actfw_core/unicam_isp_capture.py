@@ -241,8 +241,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         # may need flicker avoidance here. ref. https://github.com/kbingham/libcamera/blob/d7415bc4e46fe8aa25a495c79516d9882a35a5aa/src/ipa/raspberrypi/controller/rpi/agc.cpp#L724 # noqa: E501, B950
 
-        # print(f"analogue_gain: {analogue_gain}, shutter: {shutter_time}")
-
         self.exposure = shutter_time * analogue_gain
         self.set_unicam_exposure(analogue_gain, shutter_time)
 
