@@ -191,7 +191,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         return y_sum / pixel_sum / (1 << PIPELINE_BITS)
 
     def agc(self, stats: bcm2835_isp_stats) -> None:
-        current_y = self.calculate_y(stats) * self.degital_gain  # before apply degital gain
+        current_y = self.calculate_y(stats) * self.degital_gain  # apply degital gain
         additional_gain = min(10, self.target_Y / (current_y + 0.001))
 
         # TODO: support other than imx219
@@ -241,6 +241,25 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         gain_ctrl.value = int(unicam_subdev_analogue_gain)
         self.unicam_subdev.set_ext_controls([exposure_ctrl, gain_ctrl])
 
+    def awb(self, stats: bcm2835_isp_stats) -> None:
+        sum_r = 0
+        sum_b = 0
+        sum_g = 0
+        # len(stats.awb_stats) == 192
+        for region in stats.awb_stats:
+            sum_r += region.r_sum
+            sum_b += region.b_sum
+            sum_g += region.g_sum
+        self.gain_r = sum_g / (sum_r + 1)
+        self.gain_b = sum_g / (sum_b + 1)
+        red_balance_ctrl = v4l2_ext_control()
+        red_balance_ctrl.id = V4L2_CID.RED_BALANCE
+        red_balance_ctrl.value64 = int(self.gain_r * 1000)
+        blue_balance_ctrl = v4l2_ext_control()
+        blue_balance_ctrl.id = V4L2_CID.BLUE_BALANCE
+        blue_balance_ctrl.value64 = int(self.gain_b * 1000)
+        self.isp_in.set_ext_controls([red_balance_ctrl, blue_balance_ctrl])
+
     def adjust_setting_from_isp(self) -> None:
         buffer = self.isp_out_metadata.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.MMAP)
         if buffer is None:
@@ -255,25 +274,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 self.agc(stats)
 
         if self.do_awb:
-            sum_r = 0
-            sum_b = 0
-            sum_g = 0
-            # len(stats.awb_stats) == 192
-            for region in stats.awb_stats:
-                sum_r += region.r_sum
-                sum_b += region.b_sum
-                sum_g += region.g_sum
-
-            self.gain_r = sum_g / (sum_r + 1)
-            self.gain_b = sum_g / (sum_b + 1)
-
-            red_balance_ctrl = v4l2_ext_control()
-            red_balance_ctrl.id = V4L2_CID.RED_BALANCE
-            red_balance_ctrl.value64 = int(self.gain_r * 1000)
-            blue_balance_ctrl = v4l2_ext_control()
-            blue_balance_ctrl.id = V4L2_CID.BLUE_BALANCE
-            blue_balance_ctrl.value64 = int(self.gain_b * 1000)
-            self.isp_in.set_ext_controls([red_balance_ctrl, blue_balance_ctrl])
+            self.awb(stats)
 
         self.isp_out_metadata.queue_buffer(buffer.buf.index)
 
