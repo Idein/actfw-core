@@ -1,10 +1,10 @@
 import select
-from ctypes import POINTER, cast, sizeof
+from ctypes import POINTER, c_void_p, cast, pointer, sizeof
 from typing import List, Tuple
 
 from actfw_core.capture import Frame
 from actfw_core.task import Producer
-from actfw_core.v4l2.types import bcm2835_isp_stats, v4l2_ext_control
+from actfw_core.v4l2.types import bcm2835_isp_black_level, bcm2835_isp_stats, v4l2_ext_control
 from actfw_core.v4l2.video import (  # type: ignore
     MEDIA_BUS_FMT,
     V4L2_BUF_TYPE,
@@ -23,6 +23,8 @@ AGC_INTERVAL: int = 3
 # pick from https://github.com/kbingham/libcamera/blob/22ffeae04de2e7ce6b2476a35233c790beafb67f/src/ipa/raspberrypi/data/imx219.json#L132-L142 # noqa: E501, B950
 SHUTTERS: List[float] = [100, 10000, 30000, 60000, 66666]
 GAINS: List[float] = [1.0, 2.0, 4.0, 6.0, 8.0]
+
+BLACK_LEVEL: int = 4096
 
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
@@ -107,6 +109,16 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             self.exposure = init_shutter_time * init_analogue_gain
 
         # sutup isp_in
+        bl = bcm2835_isp_black_level()
+        bl.enabled = 1
+        bl.black_level_r = BLACK_LEVEL
+        bl.black_level_g = BLACK_LEVEL
+        bl.black_level_b = BLACK_LEVEL
+        black_level = v4l2_ext_control()
+        black_level.id = V4L2_CID.USER_BCM2835_ISP_BLACK_LEVEL
+        black_level.size = sizeof(bcm2835_isp_black_level)
+        black_level.ptr = cast(pointer(bl), c_void_p)
+        self.isp_in.set_ext_controls([black_level])
         (isp_in_width, isp_in_height, isp_in_format) = self.isp_in.set_pix_format(
             self.unicam_width, self.unicam_height, self.unicam_format
         )
