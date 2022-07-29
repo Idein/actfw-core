@@ -129,7 +129,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_out_metadata.set_meta_format(V4L2_META_FMT.BCM2835_ISP_STATS, sizeof(bcm2835_isp_stats))
 
     def set_unicam_fps(self) -> None:
-        ctrls = self.unicam_subdev.get_ext_controls([V4L2_CID.HBLANK, V4L2_CID.PIXEL_RATE, V4L2_CID.VBLANK])
+        ctrls = self.unicam_subdev.get_ext_controls([V4L2_CID.HBLANK, V4L2_CID.PIXEL_RATE])
         hblank = ctrls[0].value
         pixel_late = ctrls[1].value64
 
