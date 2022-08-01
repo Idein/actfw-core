@@ -4,8 +4,7 @@ from typing import List, Tuple
 
 from actfw_core.capture import Frame
 from actfw_core.task import Producer
-from actfw_core.v4l2.types import bcm2835_isp_black_level, bcm2835_isp_stats, v4l2_ext_control
-from actfw_core.v4l2.types import NUM_HISTOGRAM_BINS, bcm2835_isp_stats, v4l2_ext_control
+from actfw_core.v4l2.types import NUM_HISTOGRAM_BINS, bcm2835_isp_black_level, bcm2835_isp_stats, v4l2_ext_control
 from actfw_core.v4l2.video import (  # type: ignore
     MEDIA_BUS_FMT,
     V4L2_BUF_TYPE,
@@ -238,14 +237,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         Y_ratio = current_Y * (65536.0 / NUM_HISTOGRAM_BINS) / reference_Y
         estimated_lux = shutter_speed_ratio * gain_ratio * aperture_ratio * aperture_ratio * Y_ratio * reference_lux
 
-        print(f"num_bins {NUM_HISTOGRAM_BINS}")
-        print(f"current_Y {current_Y} = {hist_sum} / {hist_num}")
-        print(f"reference_Y {reference_Y}")
-        print(f"gain_ratio {gain_ratio} = {reference_gain} / {current_gain}")
-        print(f"shutter_speed_ratio {shutter_speed_ratio} = {reference_shutter_speed} / {current_shutter_speed}")
-        print(f"aperture_ratio {aperture_ratio} = {reference_aperture} / {current_aperture}")
-        print(f"reference_lux {reference_lux}")
-        print(f"estimated_lux = {estimated_lux}")
         self.lux = estimated_lux
 
     def calculate_y(self, stats: bcm2835_isp_stats, additional_gain: float) -> float:
