@@ -208,7 +208,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self._outlet(frame)
         self.isp_out_high.queue_buffer(buffer.buf.index)
 
-    def calculate_y(self, stats: bcm2835_isp_stats) -> float:
+    def calculate_y(self, stats: bcm2835_isp_stats, additional_gain: float) -> float:
         PIPELINE_BITS = 13  # https://github.com/kbingham/libcamera/blob/f995ff25a3326db90513d1fa936815653f7cade0/src/ipa/raspberrypi/controller/rpi/agc.cpp#L31 # noqa: E501, B950
         r_sum = 0
         g_sum = 0
@@ -216,9 +216,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         pixel_sum = 0
         for region in stats.agc_stats:
             counted = region.counted
-            r_sum += min(region.r_sum, ((1 << PIPELINE_BITS) - 1) * counted)
-            b_sum += min(region.b_sum, ((1 << PIPELINE_BITS) - 1) * counted)
-            g_sum += min(region.g_sum, ((1 << PIPELINE_BITS) - 1) * counted)
+            r_sum += min(region.r_sum * additional_gain, ((1 << PIPELINE_BITS) - 1) * counted)
+            b_sum += min(region.b_sum * additional_gain, ((1 << PIPELINE_BITS) - 1) * counted)
+            g_sum += min(region.g_sum * additional_gain, ((1 << PIPELINE_BITS) - 1) * counted)
             pixel_sum += counted
 
         if pixel_sum == 0:
@@ -229,10 +229,21 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         return y_sum / pixel_sum / (1 << PIPELINE_BITS)
 
     def agc(self, stats: bcm2835_isp_stats) -> None:
-        current_y = self.calculate_y(stats) * self.degital_gain  # apply degital gain
-        additional_gain = min(10, self.target_Y / (current_y + 0.001))
+        # compute addtional gain to acheive target_Y
+        # https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/controller/rpi/agc.cpp#L572-L582 # noqa: E501, B950
+        gain = 1.0
+        for _ in range(8):
+            initial_Y = self.calculate_y(stats, gain)
+            extra_gain = min(10.0, self.target_Y / (initial_Y + 0.001))
+            gain *= extra_gain
+            if extra_gain < 1.01:
+                break
+
         max_exposure = SHUTTERS[-1] * GAINS[-1]
-        target_exposure = min(self.exposure * additional_gain, max_exposure)
+        target_exposure = min(self.exposure * gain, max_exposure)
+
+        # decompose target_exposure to analogue_gain and shutter_time
+        # TODO: Also decompose to digital gain.
         analogue_gain = GAINS[0]
         shutter_time = SHUTTERS[0]
         if shutter_time * analogue_gain < target_exposure:
