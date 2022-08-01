@@ -466,6 +466,16 @@ AGC_REGIONS = 16
 FOCUS_REGIONS = 12
 
 
+class bcm2835_isp_black_level(Structure):
+    _fields_ = [
+        ("enabled", c_uint32),
+        ("black_level_r", c_uint16),
+        ("black_level_g", c_uint16),
+        ("black_level_b", c_uint16),
+        ("padding", c_uint8 * 2),
+    ]
+
+
 class bcm2835_isp_stats_hist(Structure):
     _fields_ = [
         ("r_hist", c_uint32 * NUM_HISTOGRAM_BINS),
