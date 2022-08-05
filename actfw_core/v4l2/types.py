@@ -464,6 +464,7 @@ AWB_REGIONS = DEFAULT_AWB_REGIONS_X * DEFAULT_AWB_REGIONS_Y
 FLOATING_REGIONS = 16
 AGC_REGIONS = 16
 FOCUS_REGIONS = 12
+CONTRAST_NUM_POINTS: int = 33
 
 
 class bcm2835_isp_black_level(Structure):
@@ -498,6 +499,14 @@ class bcm2835_isp_stats_focus(Structure):
     _fields_ = [
         ("contrast_val", c_uint64 * 2 * 2),
         ("contrast_val_num", c_uint32 * 2 * 2),
+    ]
+
+
+class bcm2835_isp_stats_contrast(Structure):
+    _fields_ = [
+        ("points", c_uint16 * 2 * CONTRAST_NUM_POINTS),
+        ("brightness", c_double),
+        ("contrast", c_double),
     ]
 
 

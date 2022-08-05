@@ -4,7 +4,7 @@ from typing import List, Tuple
 
 from actfw_core.capture import Frame
 from actfw_core.task import Producer
-from actfw_core.v4l2.types import NUM_HISTOGRAM_BINS, bcm2835_isp_black_level, bcm2835_isp_stats, v4l2_ext_control
+from actfw_core.v4l2.types import NUM_HISTOGRAM_BINS, CONTRAST_NUM_POINTS, bcm2835_isp_black_level, bcm2835_isp_stats_contrast, bcm2835_isp_stats, v4l2_ext_control
 from actfw_core.v4l2.video import (  # type: ignore
     MEDIA_BUS_FMT,
     V4L2_BUF_TYPE,
@@ -25,7 +25,6 @@ SHUTTERS: List[float] = [100, 10000, 30000, 60000, 66666]
 GAINS: List[float] = [1.0, 2.0, 4.0, 6.0, 8.0]
 
 BLACK_LEVEL: int = 4096
-
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
@@ -318,6 +317,52 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         blue_balance_ctrl.id = V4L2_CID.BLUE_BALANCE
         blue_balance_ctrl.value64 = int(self.gain_b * 1000)
         self.isp_in.set_ext_controls([red_balance_ctrl, blue_balance_ctrl])
+
+
+    def fill_in_contrast_status(status, brightness, contrast, gamma_curve):
+        status.brightness = brightness
+        status.contrast = contrast
+        for i in range(0, CONTRAST_NUM_POINTS):
+            if i < 16:
+                x = i * 1024
+             elif i < 24:
+                x = (i - 16) * 2048 + 16384
+             else
+                x = (i - 24) * 4096 + 32768
+             status.points[i * 2    ] = x
+             status.points[i * 2 + 1] = min(65535.0, self.eval_gamma_curve(gamma_curve, x)))
+        status.points[CONTRAST_NUM_POINTS * 2 - 2] = 65535;
+        status.points[CONTRAST_NUM_POINTS * 2 - 1] = 65535;
+
+    def contrast(isp_stats: bcm2835_isp_stats, brightness, contrast):
+        ce_enable = True
+        lo_histogram = 0.01
+        lo_level = 0.015
+        lo_max = 500
+        hi_histogram = 0.95
+        hi_level = 0.95
+        hi_max = 2000
+        gamma_curve = [
+            (0, 0), (1024, 5040), (2048, 9338), (3072, 12356), (4096, 15312), (5120, 18051), (6144, 20790), (7168, 23193),
+            (8192, 25744), (9216, 27942), (10240, 30035), (11264, 32005), (12288, 33975), (13312, 35815), (14336, 37600), (15360, 39168),
+            (16384, 40642), (18432, 43379), (20480, 45749), (22528, 47753), (24576, 49621), (26624, 51253), (28672, 52698), (30720, 53796),
+            (32768, 54876), (36864, 57012), (40960, 58656), (45056, 59954), (49152, 61183), (53248, 62355), (57344, 63419), (61440, 64476),
+            (65535, 65535)
+        ]
+        # histogram = isp_stats.hist[0].g_hist
+        # if ce_enable:
+        #     if lo_max != 0 or hi_max != 0:
+        #         gamma_curve = compute_stretch_curve(histogram, config).compose(gamma_curve)
+        if brightness != 0 or contrast != 1.0:
+            gamma_curve = [(x, max(0.0, min(65535.0, (y - 32768) * contrast + 32768 + brightness))) for (x, y) in gamma_curve]
+
+        gm = bcm2835_isp_stats_contrast()
+        self.fill_in_contrast_status(gm, brightness, contrast, gamma_curve)
+        gamma = v4l2_ext_control()
+        gamma.id = V4L2_CID.USER_BCM2835_ISP_GAMMA
+        gamma.size = sizeof(bcm2835_isp_stats_contrast)
+        gamma.ptr = cast(pointer(gm), c_void_p)
+        self.isp_in.set_ext_controls([gamma])
 
     def adjust_setting_from_isp(self) -> None:
         buffer = self.isp_out_metadata.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.MMAP)
