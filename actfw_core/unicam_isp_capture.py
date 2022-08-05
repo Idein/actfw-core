@@ -318,8 +318,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         blue_balance_ctrl.value64 = int(self.gain_b * 1000)
         self.isp_in.set_ext_controls([red_balance_ctrl, blue_balance_ctrl])
 
-
-    def fill_in_contrast_status(status, brightness, contrast, gamma_curve):
+    def fill_in_contrast_status(status: bcm2835_isp_stats_contrast, brightness: float, contrast: float, gamma_curve: List[Tuple[int, int]]): None
         status.brightness = brightness
         status.contrast = contrast
         for i in range(0, CONTRAST_NUM_POINTS):
@@ -334,7 +333,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         status.points[CONTRAST_NUM_POINTS * 2 - 2] = 65535;
         status.points[CONTRAST_NUM_POINTS * 2 - 1] = 65535;
 
-    def contrast(isp_stats: bcm2835_isp_stats, brightness, contrast):
+    def contrast(isp_stats: bcm2835_isp_stats, brightness: float, contrast: float):
         ce_enable = True
         lo_histogram = 0.01
         lo_level = 0.015
