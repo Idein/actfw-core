@@ -41,6 +41,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         init_controls: List[str] = _EMPTY_LIST,
         agc: bool = True,
         target_Y: float = 0.16,  # Temporary set for the developement of agc algorithm
+        contrast: bool = True,
+        brightness: float = 0.0,
+        contrast: float = 1.0
     ) -> None:
         super().__init__()
 
@@ -57,6 +60,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
         self.do_awb = auto_whitebalance
         self.do_agc = agc
+        self.do_contrast = contrast
 
         (self.expected_width, self.expected_height) = size
         self.expected_pix_format = expected_format
@@ -74,6 +78,15 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.degital_gain: float = 1.0  # Currently, this value is constant.
         self.agc_interval_count: int = 0
         self.target_Y: float = target_Y
+        # - update by contrast
+        self.brightness: float = brightness
+        self.contrast: float = contrast
+        # self.lo_histogram: float = 0.01
+        # self.lo_level: float = 0.015
+        # self.lo_max: int = 500
+        # self.hi_histogram: float = 0.95
+        # self.hi_level: float = 0.95
+        # self.hi_max: int = 2000
 
         # some device status cache (set by set_unicam_fps)
         self.vblank: int = 0
@@ -333,14 +346,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         status.points[CONTRAST_NUM_POINTS * 2 - 2] = 65535;
         status.points[CONTRAST_NUM_POINTS * 2 - 1] = 65535;
 
-    def contrast(isp_stats: bcm2835_isp_stats, brightness: float, contrast: float):
+    def contrast(isp_stats: bcm2835_isp_stats):
         # ce_enable = True
-        # lo_histogram = 0.01
-        # lo_level = 0.015
-        # lo_max = 500
-        # hi_histogram = 0.95
-        # hi_level = 0.95
-        # hi_max = 2000
         gamma_curve = [
             (0, 0), (1024, 5040), (2048, 9338), (3072, 12356), (4096, 15312), (5120, 18051), (6144, 20790), (7168, 23193),
             (8192, 25744), (9216, 27942), (10240, 30035), (11264, 32005), (12288, 33975), (13312, 35815), (14336, 37600), (15360, 39168),
@@ -352,11 +359,11 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         # if ce_enable:
         #     if lo_max != 0 or hi_max != 0:
         #         gamma_curve = compute_stretch_curve(histogram, config).compose(gamma_curve)
-        if brightness != 0 or contrast != 1.0:
-            gamma_curve = [(x, max(0.0, min(65535.0, (y - 32768) * contrast + 32768 + brightness))) for (x, y) in gamma_curve]
+        if self.brightness != 0 or self.contrast != 1.0:
+            gamma_curve = [(x, max(0.0, min(65535.0, (y - 32768) * contrast + 32768 + self.brightness))) for (x, y) in gamma_curve]
 
         gm = bcm2835_isp_stats_contrast()
-        self.fill_in_contrast_status(gm, brightness, contrast, gamma_curve)
+        self.fill_in_contrast_status(gm, self.brightness, self.contrast, gamma_curve)
         gamma = v4l2_ext_control()
         gamma.id = V4L2_CID.USER_BCM2835_ISP_GAMMA
         gamma.size = sizeof(bcm2835_isp_stats_contrast)
@@ -379,6 +386,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         if self.do_awb:
             self.awb(stats)
+
+        if self.do_contrast:
+            self.contrast(stats)
 
         self.isp_out_metadata.queue_buffer(buffer.buf.index)
 
