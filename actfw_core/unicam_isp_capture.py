@@ -330,6 +330,18 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         blue_balance_ctrl.value64 = int(self.gain_b * 1000)
         self.isp_in.set_ext_controls([red_balance_ctrl, blue_balance_ctrl])
 
+    # linearly find appropriate range, this might be inefficient
+    def find_span(self, gamma_curve: List[Tuple[float, float]], x: float) -> int:
+        last_span = len(gamma_curve) - 2
+        for i in range(0, last_span + 1):
+            if gamma_curve[i][0] <= x < gamma_curve[i + 1][0]:
+                return i
+        return last_span
+
+    def eval_gamma_curve(self, gamma_curve: List[Tuple[float, float]], x: float) -> float:
+        span = self.find_span(gamma_curve, x)
+        return gamma_curve[span][1] + (x - gamma_curve[span][0]) * (gamma_curve[span + 1][1] - gamma_curve[span][1]) / (gamma_curve[span + 1][0] - gamma_curve[span][0])
+
     def fill_in_contrast_status(self, status: bcm2835_isp_stats_contrast, brightness: float, contrast: float, gamma_curve: List[Tuple[int, int]]) -> None:
         status.brightness = brightness
         status.contrast = contrast
@@ -341,7 +353,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             else:
                 x = (i - 24) * 4096 + 32768
             status.points[i][0] = x
-            status.points[i][1] = min(65535.0, self.eval_gamma_curve(gamma_curve, x))
+            status.points[i][1] = int(min(65535.0, self.eval_gamma_curve(gamma_curve, x)))
         status.points[CONTRAST_NUM_POINTS - 1][0] = 65535;
         status.points[CONTRAST_NUM_POINTS - 1][1] = 65535;
 
