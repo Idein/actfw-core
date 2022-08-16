@@ -1,6 +1,6 @@
 import select
 from ctypes import POINTER, c_void_p, cast, pointer, sizeof
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from actfw_core.capture import Frame
 from actfw_core.task import Producer
@@ -41,9 +41,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         init_controls: List[str] = _EMPTY_LIST,
         agc: bool = True,
         target_Y: float = 0.16,  # Temporary set for the developement of agc algorithm
-        contrast: bool = True,
         brightness: float = 0.0,
-        contrast: float = 1.0
+        contrast: Optional[float] = 1.0
     ) -> None:
         super().__init__()
 
@@ -60,7 +59,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
         self.do_awb = auto_whitebalance
         self.do_agc = agc
-        self.do_contrast = contrast
+        self.do_contrast = not not contrast
 
         (self.expected_width, self.expected_height) = size
         self.expected_pix_format = expected_format
@@ -80,7 +79,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.target_Y: float = target_Y
         # - update by contrast
         self.brightness: float = brightness
-        self.contrast: float = contrast
+        self.contrast: float = contrast or 1.0
         # self.lo_histogram: float = 0.01
         # self.lo_level: float = 0.015
         # self.lo_max: int = 500
@@ -331,22 +330,22 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         blue_balance_ctrl.value64 = int(self.gain_b * 1000)
         self.isp_in.set_ext_controls([red_balance_ctrl, blue_balance_ctrl])
 
-    def fill_in_contrast_status(status: bcm2835_isp_stats_contrast, brightness: float, contrast: float, gamma_curve: List[Tuple[int, int]]): None
+    def fill_in_contrast_status(self, status: bcm2835_isp_stats_contrast, brightness: float, contrast: float, gamma_curve: List[Tuple[int, int]]) -> None:
         status.brightness = brightness
         status.contrast = contrast
         for i in range(0, CONTRAST_NUM_POINTS):
             if i < 16:
                 x = i * 1024
-             elif i < 24:
+            elif i < 24:
                 x = (i - 16) * 2048 + 16384
-             else
+            else:
                 x = (i - 24) * 4096 + 32768
-             status.points[i * 2    ] = x
-             status.points[i * 2 + 1] = min(65535.0, self.eval_gamma_curve(gamma_curve, x)))
-        status.points[CONTRAST_NUM_POINTS * 2 - 2] = 65535;
-        status.points[CONTRAST_NUM_POINTS * 2 - 1] = 65535;
+            status.points[i][0] = x
+            status.points[i][1] = min(65535.0, self.eval_gamma_curve(gamma_curve, x))
+        status.points[CONTRAST_NUM_POINTS - 1][0] = 65535;
+        status.points[CONTRAST_NUM_POINTS - 1][1] = 65535;
 
-    def contrast(isp_stats: bcm2835_isp_stats):
+    def contrast_control(self, isp_stats: bcm2835_isp_stats):
         # ce_enable = True
         gamma_curve = [
             (0, 0), (1024, 5040), (2048, 9338), (3072, 12356), (4096, 15312), (5120, 18051), (6144, 20790), (7168, 23193),
@@ -388,7 +387,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             self.awb(stats)
 
         if self.do_contrast:
-            self.contrast(stats)
+            self.contrast_control(stats)
 
         self.isp_out_metadata.queue_buffer(buffer.buf.index)
 
