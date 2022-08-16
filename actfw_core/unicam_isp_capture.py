@@ -371,7 +371,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         #     if lo_max != 0 or hi_max != 0:
         #         gamma_curve = compute_stretch_curve(histogram, config).compose(gamma_curve)
         if self.brightness != 0 or self.contrast != 1.0:
-            gamma_curve = [(x, max(0.0, min(65535.0, (y - 32768) * contrast + 32768 + self.brightness))) for (x, y) in gamma_curve]
+            gamma_curve = [(x, max(0.0, min(65535.0, (y - 32768) * self.contrast + 32768 + self.brightness))) for (x, y) in gamma_curve]
 
         gm = bcm2835_isp_stats_contrast()
         self.fill_in_contrast_status(gm, self.brightness, self.contrast, gamma_curve)
