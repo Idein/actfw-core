@@ -1,10 +1,17 @@
 import select
 from ctypes import POINTER, c_void_p, cast, pointer, sizeof
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 from actfw_core.capture import Frame
 from actfw_core.task import Producer
-from actfw_core.v4l2.types import NUM_HISTOGRAM_BINS, CONTRAST_NUM_POINTS, bcm2835_isp_black_level, bcm2835_isp_stats_contrast, bcm2835_isp_stats, v4l2_ext_control
+from actfw_core.v4l2.types import (
+    CONTRAST_NUM_POINTS,
+    NUM_HISTOGRAM_BINS,
+    bcm2835_isp_black_level,
+    bcm2835_isp_stats,
+    bcm2835_isp_stats_contrast,
+    v4l2_ext_control,
+)
 from actfw_core.v4l2.video import (  # type: ignore
     MEDIA_BUS_FMT,
     V4L2_BUF_TYPE,
@@ -342,7 +349,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         span = self.find_span(gamma_curve, x)
         return gamma_curve[span][1] + (x - gamma_curve[span][0]) * (gamma_curve[span + 1][1] - gamma_curve[span][1]) / (gamma_curve[span + 1][0] - gamma_curve[span][0])
 
-    def fill_in_contrast_status(self, status: bcm2835_isp_stats_contrast, brightness: float, contrast: float, gamma_curve: List[Tuple[int, int]]) -> None:
+    def fill_in_contrast_status(self, status: bcm2835_isp_stats_contrast, brightness: float, contrast: float, gamma_curve: List[Tuple[float, float]]) -> None:
         status.brightness = brightness
         status.contrast = contrast
         for i in range(0, CONTRAST_NUM_POINTS):
@@ -360,7 +367,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
     def contrast_control(self, isp_stats: bcm2835_isp_stats):
         # ce_enable = True
         gamma_curve = [
-            (0, 0), (1024, 5040), (2048, 9338), (3072, 12356), (4096, 15312), (5120, 18051), (6144, 20790), (7168, 23193),
+            (0.0, 0.0), (1024, 5040), (2048, 9338), (3072, 12356), (4096, 15312), (5120, 18051), (6144, 20790), (7168, 23193),
             (8192, 25744), (9216, 27942), (10240, 30035), (11264, 32005), (12288, 33975), (13312, 35815), (14336, 37600), (15360, 39168),
             (16384, 40642), (18432, 43379), (20480, 45749), (22528, 47753), (24576, 49621), (26624, 51253), (28672, 52698), (30720, 53796),
             (32768, 54876), (36864, 57012), (40960, 58656), (45056, 59954), (49152, 61183), (53248, 62355), (57344, 63419), (61440, 64476),
