@@ -364,7 +364,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         status.points[CONTRAST_NUM_POINTS - 1][0] = 65535;
         status.points[CONTRAST_NUM_POINTS - 1][1] = 65535;
 
-    def contrast_control(self, isp_stats: bcm2835_isp_stats):
+    def contrast_control(self, isp_stats: bcm2835_isp_stats) -> None:
         # ce_enable = True
         gamma_curve = [
             (0.0, 0.0), (1024, 5040), (2048, 9338), (3072, 12356), (4096, 15312), (5120, 18051), (6144, 20790), (7168, 23193),
