@@ -33,6 +33,7 @@ GAINS: List[float] = [1.0, 2.0, 4.0, 6.0, 8.0]
 
 BLACK_LEVEL: int = 4096
 
+
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
         self,
@@ -49,7 +50,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         agc: bool = True,
         target_Y: float = 0.16,  # Temporary set for the developement of agc algorithm
         brightness: float = 0.0,
-        contrast: Optional[float] = 1.0
+        contrast: Optional[float] = 1.0,
     ) -> None:
         super().__init__()
 
@@ -347,9 +348,13 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
     def eval_gamma_curve(self, gamma_curve: List[Tuple[float, float]], x: float) -> float:
         span = self.find_span(gamma_curve, x)
-        return gamma_curve[span][1] + (x - gamma_curve[span][0]) * (gamma_curve[span + 1][1] - gamma_curve[span][1]) / (gamma_curve[span + 1][0] - gamma_curve[span][0])
+        return gamma_curve[span][1] + (x - gamma_curve[span][0]) * (gamma_curve[span + 1][1] - gamma_curve[span][1]) / (
+            gamma_curve[span + 1][0] - gamma_curve[span][0]
+        )
 
-    def fill_in_contrast_status(self, status: bcm2835_isp_stats_contrast, brightness: float, contrast: float, gamma_curve: List[Tuple[float, float]]) -> None:
+    def fill_in_contrast_status(
+        self, status: bcm2835_isp_stats_contrast, brightness: float, contrast: float, gamma_curve: List[Tuple[float, float]]
+    ) -> None:
         status.brightness = brightness
         status.contrast = contrast
         for i in range(0, CONTRAST_NUM_POINTS):
@@ -361,24 +366,54 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 x = (i - 24) * 4096 + 32768
             status.points[i][0] = x
             status.points[i][1] = int(min(65535.0, self.eval_gamma_curve(gamma_curve, x)))
-        status.points[CONTRAST_NUM_POINTS - 1][0] = 65535;
-        status.points[CONTRAST_NUM_POINTS - 1][1] = 65535;
+        status.points[CONTRAST_NUM_POINTS - 1][0] = 65535
+        status.points[CONTRAST_NUM_POINTS - 1][1] = 65535
 
     def contrast_control(self, isp_stats: bcm2835_isp_stats) -> None:
         # ce_enable = True
         gamma_curve = [
-            (0.0, 0.0), (1024, 5040), (2048, 9338), (3072, 12356), (4096, 15312), (5120, 18051), (6144, 20790), (7168, 23193),
-            (8192, 25744), (9216, 27942), (10240, 30035), (11264, 32005), (12288, 33975), (13312, 35815), (14336, 37600), (15360, 39168),
-            (16384, 40642), (18432, 43379), (20480, 45749), (22528, 47753), (24576, 49621), (26624, 51253), (28672, 52698), (30720, 53796),
-            (32768, 54876), (36864, 57012), (40960, 58656), (45056, 59954), (49152, 61183), (53248, 62355), (57344, 63419), (61440, 64476),
-            (65535, 65535)
+            (0.0, 0.0),
+            (1024, 5040),
+            (2048, 9338),
+            (3072, 12356),
+            (4096, 15312),
+            (5120, 18051),
+            (6144, 20790),
+            (7168, 23193),
+            (8192, 25744),
+            (9216, 27942),
+            (10240, 30035),
+            (11264, 32005),
+            (12288, 33975),
+            (13312, 35815),
+            (14336, 37600),
+            (15360, 39168),
+            (16384, 40642),
+            (18432, 43379),
+            (20480, 45749),
+            (22528, 47753),
+            (24576, 49621),
+            (26624, 51253),
+            (28672, 52698),
+            (30720, 53796),
+            (32768, 54876),
+            (36864, 57012),
+            (40960, 58656),
+            (45056, 59954),
+            (49152, 61183),
+            (53248, 62355),
+            (57344, 63419),
+            (61440, 64476),
+            (65535, 65535),
         ]
         # histogram = isp_stats.hist[0].g_hist
         # if ce_enable:
         #     if lo_max != 0 or hi_max != 0:
         #         gamma_curve = compute_stretch_curve(histogram, config).compose(gamma_curve)
         if self.brightness != 0 or self.contrast != 1.0:
-            gamma_curve = [(x, max(0.0, min(65535.0, (y - 32768) * self.contrast + 32768 + self.brightness))) for (x, y) in gamma_curve]
+            gamma_curve = [
+                (x, max(0.0, min(65535.0, (y - 32768) * self.contrast + 32768 + self.brightness))) for (x, y) in gamma_curve
+            ]
 
         gm = bcm2835_isp_stats_contrast()
         self.fill_in_contrast_status(gm, self.brightness, self.contrast, gamma_curve)
