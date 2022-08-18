@@ -32,7 +32,7 @@ SHUTTERS: List[float] = [100, 10000, 30000, 60000, 66666]
 GAINS: List[float] = [1.0, 2.0, 4.0, 6.0, 8.0]
 
 BLACK_LEVEL: int = 4096
-
+DEFAULT_CONTRAST: float = 1.0
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
@@ -50,7 +50,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         agc: bool = True,
         target_Y: float = 0.16,  # Temporary set for the developement of agc algorithm
         brightness: float = 0.0,
-        contrast: Optional[float] = 1.0,
+        contrast: Optional[float] = DEFAULT_CONTRAST,
     ) -> None:
         super().__init__()
 
@@ -87,7 +87,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.target_Y: float = target_Y
         # - update by contrast
         self.brightness: float = brightness
-        self.contrast: float = contrast or 1.0
+        self.contrast: float = contrast or DEFAULT_CONTRAST
         # self.lo_histogram: float = 0.01
         # self.lo_level: float = 0.015
         # self.lo_max: int = 500
