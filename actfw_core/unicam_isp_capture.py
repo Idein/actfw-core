@@ -67,7 +67,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
         self.do_awb = auto_whitebalance
         self.do_agc = agc
-        self.do_contrast = not not contrast
+        self.do_contrast = contrast is not None
 
         (self.expected_width, self.expected_height) = size
         self.expected_pix_format = expected_format
