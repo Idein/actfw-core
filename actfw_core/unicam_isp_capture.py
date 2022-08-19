@@ -50,6 +50,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         init_controls: List[str] = _EMPTY_LIST,
         agc: bool = True,
         target_Y: float = 0.16,  # Temporary set for the developement of agc algorithm
+        ce_enable: bool = True,
         brightness: float = 0.0,
         contrast: Optional[float] = DEFAULT_CONTRAST,
     ) -> None:
@@ -87,6 +88,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.agc_interval_count: int = 0
         self.target_Y: float = target_Y
         # - update by contrast
+        self.ce_enable = ce_enable
         self.brightness: float = brightness
         self.contrast: float = contrast or DEFAULT_CONTRAST
         self.lo_histogram: float = 0.01
@@ -377,8 +379,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 this_span += 1
                 this_x = one[this_span][0]
                 this_y = one[this_span][1]
-            if result[-1].x + eps < this_x:
-                result.append(this_x, self.eval_gamma_curve(this_y))
+            if result[-1][0] + eps < this_y:
+                result.append((this_y, self.eval_gamma_curve(other, this_y)))
         return result
 
 
@@ -392,35 +394,49 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         if first == -1:
             first = 0
         if last == -1:
-            last = len(histogram)
-        items = q * cumulative[-1]
-        # TODO
+            last = len(cumulative)
+        assert first <= last
+        items = int(q * cumulative[-1])
+        while first < last:
+            middle = (first + last) // 2
+            if cumulative[middle + 1] > items:
+                last = middle
+            else:
+                first = middle + 1
+        assert items >= cumulative[first] and items <= cumulative[last + 1]
+        frac = 0 if cumulative[first + 1] == cumulative[first] else (items - cumulative[first]) / (cumulative[first + 1] - cumulative[first])
+        return first + frac
 
 
     def compute_stretch_curve(self, histogram):
         enhance = [(0, 0)]
+        eps = 1e-6
 
         # If the start of the histogram is rather empty, try to pull it down a
         # bit.
-        cumulative = self.histogram_cumulative(self, histogram)
-        hist_lo = histogram.quantile(self.lo_histogram) * (65536 / NUM_HISTOGRAM_BINS)
+        cumulative = self.histogram_cumulative(histogram)
+        hist_lo = self.cumulative_quantile(cumulative, self.lo_histogram) * (65536 / NUM_HISTOGRAM_BINS)
         level_lo = self.lo_level * 65536
         hist_lo = max(level_lo, min(65535, min(hist_lo, level_lo + self.lo_max)))
-        enhance.append((hist_lo, level_lo))
+        if enhance[-1][0] + eps < hist_lo:
+            enhance.append((hist_lo, level_lo))
 
         # Keep the mid-point (median) in the same place, though, to limit the
         # apparent amount of global brightness shift.
-        mid = histogram.quantile(0.5) * (65536 / NUM_HISTOGRAM_BINS)
-        enhance.append((mid, mid))
+        mid = self.cumulative_quantile(cumulative, 0.5) * (65536 / NUM_HISTOGRAM_BINS)
+        if enhance[-1][0] + eps < hist_lo:
+            enhance.append((mid, mid_lo))
 
         # If the top to the histogram is empty, try to pull the pixel values
         # there up.
-        hist_hi = histogram.quantile(self.hi_histogram) * (65536 / NUM_HISTOGRAM_BINS)
+        hist_hi = self.cumulative_quantile(cumulative, self.hi_histogram) * (65536 / NUM_HISTOGRAM_BINS)
         level_hi = self.hi_level * 65536
         hist_hi = min(level_hi, max(0.0, max(hist_hi, level_hi - self.hi_max)))
-        enhance.append((hist_hi, level_hi))
+        if enhance[-1][0] + eps < hist_hi:
+            enhance.append((hist_hi, level_hi))
 
-        enhance.append((65535, 65535))
+        if enhance[-1][0] + eps < 65535:
+            enhance.append((65535, 65535))
         return enhance
 
 
@@ -442,7 +458,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         status.points[CONTRAST_NUM_POINTS - 1][1] = 65535
 
     def contrast_control(self, isp_stats: bcm2835_isp_stats) -> None:
-        ce_enable = True
         gamma_curve = [
             (0.0, 0.0),
             (1024, 5040),
@@ -479,7 +494,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             (65535, 65535),
         ]
         histogram = isp_stats.hist[0].g_hist
-        if ce_enable:
+        if self.ce_enable:
             if self.lo_max != 0 or self.hi_max != 0:
                 gamma_curve = self.compose_gamma_curve(self.compute_stretch_curve(histogram), gamma_curve)
         if self.brightness != 0 or self.contrast != 1.0:
