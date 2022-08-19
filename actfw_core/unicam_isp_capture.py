@@ -89,12 +89,12 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         # - update by contrast
         self.brightness: float = brightness
         self.contrast: float = contrast or DEFAULT_CONTRAST
-        # self.lo_histogram: float = 0.01
-        # self.lo_level: float = 0.015
-        # self.lo_max: int = 500
-        # self.hi_histogram: float = 0.95
-        # self.hi_level: float = 0.95
-        # self.hi_max: int = 2000
+        self.lo_histogram: float = 0.01
+        self.lo_level: float = 0.015
+        self.lo_max: int = 500
+        self.hi_histogram: float = 0.95
+        self.hi_level: float = 0.95
+        self.hi_max: int = 2000
 
         # some device status cache (set by set_unicam_fps)
         self.vblank: int = 0
@@ -353,6 +353,77 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             gamma_curve[span + 1][0] - gamma_curve[span][0]
         )
 
+    # gamma2(gamma1(x)) with care of boundary values
+    def compose_gamma_curve(self, one, other, eps = 1e-6):
+        this_x = one[0][0]
+        this_y = one[0][1]
+        this_span = 0
+        other_span = self.find_span(other, this_y)
+        result = [(this_y, self.eval_gamma_curve(other, this_y))]
+        while this_span != len(one) - 1:
+            dx = one[this_span + 1][0] - one[this_span][0]
+            dy = one[this_span + 1][1] - one[this_span][1]
+            if abs(dy) > eps and other_span + 1 < len(other) and one[this_span + 1][1] >= other[other_span + 1][0] + eps:
+                # next control point in result will be where this
+                # function's y reaches the next span in other
+                this_x = one[this_span][0] + (other[other_span + 1][0] - one[this_span][1]) * dx / dy
+                other_span += 1
+                this_y = other[other_span][0]
+            elif abs(dy) > eps and other_span > 0 and one[this_span + 1][1] <= other[other_span - 1][0] - eps:
+                this_x = one[this_span][0] + (other[other_span + 1][0] - one[this_span][1]) * dx / dy
+                other_span -= 1
+                this_y = other[other_span][0]
+            else:
+                this_span += 1
+                this_x = one[this_span][0]
+                this_y = one[this_span][1]
+            if result[-1].x + eps < this_x:
+                result.append(this_x, self.eval_gamma_curve(this_y))
+        return result
+
+
+    def histogram_cumulative(self, histogram) -> List[float]:
+        cumulative = [0]
+        for i in range(0, len(histogram)):
+            cumulative.append(cumulative[-1] + histogram[i])
+        return cumulative
+
+    def cumulative_quantile(self, cumulative: List[float], q: float, first: float = -1, last: float = -1) -> float:
+        if first == -1:
+            first = 0
+        if last == -1:
+            last = len(histogram)
+        items = q * cumulative[-1]
+        # TODO
+
+
+    def compute_stretch_curve(self, histogram):
+        enhance = [(0, 0)]
+
+        # If the start of the histogram is rather empty, try to pull it down a
+        # bit.
+        cumulative = self.histogram_cumulative(self, histogram)
+        hist_lo = histogram.quantile(self.lo_histogram) * (65536 / NUM_HISTOGRAM_BINS)
+        level_lo = self.lo_level * 65536
+        hist_lo = max(level_lo, min(65535, min(hist_lo, level_lo + self.lo_max)))
+        enhance.append((hist_lo, level_lo))
+
+        # Keep the mid-point (median) in the same place, though, to limit the
+        # apparent amount of global brightness shift.
+        mid = histogram.quantile(0.5) * (65536 / NUM_HISTOGRAM_BINS)
+        enhance.append((mid, mid))
+
+        # If the top to the histogram is empty, try to pull the pixel values
+        # there up.
+        hist_hi = histogram.quantile(self.hi_histogram) * (65536 / NUM_HISTOGRAM_BINS)
+        level_hi = self.hi_level * 65536
+        hist_hi = min(level_hi, max(0.0, max(hist_hi, level_hi - self.hi_max)))
+        enhance.append((hist_hi, level_hi))
+
+        enhance.append((65535, 65535))
+        return enhance
+
+
     def fill_in_contrast_status(
         self, status: bcm2835_isp_stats_contrast, brightness: float, contrast: float, gamma_curve: List[Tuple[float, float]]
     ) -> None:
@@ -371,7 +442,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         status.points[CONTRAST_NUM_POINTS - 1][1] = 65535
 
     def contrast_control(self, isp_stats: bcm2835_isp_stats) -> None:
-        # ce_enable = True
+        ce_enable = True
         gamma_curve = [
             (0.0, 0.0),
             (1024, 5040),
@@ -407,10 +478,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             (61440, 64476),
             (65535, 65535),
         ]
-        # histogram = isp_stats.hist[0].g_hist
-        # if ce_enable:
-        #     if lo_max != 0 or hi_max != 0:
-        #         gamma_curve = compute_stretch_curve(histogram, config).compose(gamma_curve)
+        histogram = isp_stats.hist[0].g_hist
+        if ce_enable:
+            if self.lo_max != 0 or self.hi_max != 0:
+                gamma_curve = self.compose_gamma_curve(self.compute_stretch_curve(histogram), gamma_curve)
         if self.brightness != 0 or self.contrast != 1.0:
             gamma_curve = [
                 (x, max(0.0, min(65535.0, (y - 32768) * self.contrast + 32768 + self.brightness))) for (x, y) in gamma_curve
