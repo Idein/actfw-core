@@ -1,10 +1,17 @@
 import select
 from ctypes import POINTER, c_void_p, cast, pointer, sizeof
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from actfw_core.capture import Frame
 from actfw_core.task import Producer
-from actfw_core.v4l2.types import NUM_HISTOGRAM_BINS, bcm2835_isp_black_level, bcm2835_isp_stats, v4l2_ext_control
+from actfw_core.v4l2.types import (
+    CONTRAST_NUM_POINTS,
+    NUM_HISTOGRAM_BINS,
+    bcm2835_isp_black_level,
+    bcm2835_isp_stats,
+    bcm2835_isp_stats_contrast,
+    v4l2_ext_control,
+)
 from actfw_core.v4l2.video import (  # type: ignore
     MEDIA_BUS_FMT,
     V4L2_BUF_TYPE,
@@ -25,6 +32,7 @@ SHUTTERS: List[float] = [100, 10000, 30000, 60000, 66666]
 GAINS: List[float] = [1.0, 2.0, 4.0, 6.0, 8.0]
 
 BLACK_LEVEL: int = 4096
+DEFAULT_CONTRAST: float = 1.0
 
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
@@ -42,6 +50,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         init_controls: List[str] = _EMPTY_LIST,
         agc: bool = True,
         target_Y: float = 0.16,  # Temporary set for the developement of agc algorithm
+        brightness: float = 0.0,
+        contrast: Optional[float] = DEFAULT_CONTRAST,
     ) -> None:
         super().__init__()
 
@@ -58,6 +68,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
         self.do_awb = auto_whitebalance
         self.do_agc = agc
+        self.do_contrast = contrast is not None
 
         (self.expected_width, self.expected_height) = size
         self.expected_pix_format = expected_format
@@ -75,6 +86,15 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.degital_gain: float = 1.0  # Currently, this value is constant.
         self.agc_interval_count: int = 0
         self.target_Y: float = target_Y
+        # - update by contrast
+        self.brightness: float = brightness
+        self.contrast: float = contrast or DEFAULT_CONTRAST
+        # self.lo_histogram: float = 0.01
+        # self.lo_level: float = 0.015
+        # self.lo_max: int = 500
+        # self.hi_histogram: float = 0.95
+        # self.hi_level: float = 0.95
+        # self.hi_max: int = 2000
 
         # some device status cache (set by set_unicam_fps)
         self.vblank: int = 0
@@ -319,6 +339,91 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         blue_balance_ctrl.value64 = int(self.gain_b * 1000)
         self.isp_in.set_ext_controls([red_balance_ctrl, blue_balance_ctrl])
 
+    # linearly find appropriate range, this might be inefficient
+    def find_span(self, gamma_curve: List[Tuple[float, float]], x: float) -> int:
+        last_span = len(gamma_curve) - 2
+        for i in range(0, last_span + 1):
+            if gamma_curve[i][0] <= x < gamma_curve[i + 1][0]:
+                return i
+        return last_span
+
+    def eval_gamma_curve(self, gamma_curve: List[Tuple[float, float]], x: float) -> float:
+        span = self.find_span(gamma_curve, x)
+        return gamma_curve[span][1] + (x - gamma_curve[span][0]) * (gamma_curve[span + 1][1] - gamma_curve[span][1]) / (
+            gamma_curve[span + 1][0] - gamma_curve[span][0]
+        )
+
+    def fill_in_contrast_status(
+        self, status: bcm2835_isp_stats_contrast, brightness: float, contrast: float, gamma_curve: List[Tuple[float, float]]
+    ) -> None:
+        status.brightness = brightness
+        status.contrast = contrast
+        for i in range(0, CONTRAST_NUM_POINTS):
+            if i < 16:
+                x = i * 1024
+            elif i < 24:
+                x = (i - 16) * 2048 + 16384
+            else:
+                x = (i - 24) * 4096 + 32768
+            status.points[i][0] = x
+            status.points[i][1] = int(min(65535.0, self.eval_gamma_curve(gamma_curve, x)))
+        status.points[CONTRAST_NUM_POINTS - 1][0] = 65535
+        status.points[CONTRAST_NUM_POINTS - 1][1] = 65535
+
+    def contrast_control(self, isp_stats: bcm2835_isp_stats) -> None:
+        # ce_enable = True
+        gamma_curve = [
+            (0.0, 0.0),
+            (1024, 5040),
+            (2048, 9338),
+            (3072, 12356),
+            (4096, 15312),
+            (5120, 18051),
+            (6144, 20790),
+            (7168, 23193),
+            (8192, 25744),
+            (9216, 27942),
+            (10240, 30035),
+            (11264, 32005),
+            (12288, 33975),
+            (13312, 35815),
+            (14336, 37600),
+            (15360, 39168),
+            (16384, 40642),
+            (18432, 43379),
+            (20480, 45749),
+            (22528, 47753),
+            (24576, 49621),
+            (26624, 51253),
+            (28672, 52698),
+            (30720, 53796),
+            (32768, 54876),
+            (36864, 57012),
+            (40960, 58656),
+            (45056, 59954),
+            (49152, 61183),
+            (53248, 62355),
+            (57344, 63419),
+            (61440, 64476),
+            (65535, 65535),
+        ]
+        # histogram = isp_stats.hist[0].g_hist
+        # if ce_enable:
+        #     if lo_max != 0 or hi_max != 0:
+        #         gamma_curve = compute_stretch_curve(histogram, config).compose(gamma_curve)
+        if self.brightness != 0 or self.contrast != 1.0:
+            gamma_curve = [
+                (x, max(0.0, min(65535.0, (y - 32768) * self.contrast + 32768 + self.brightness))) for (x, y) in gamma_curve
+            ]
+
+        gm = bcm2835_isp_stats_contrast()
+        self.fill_in_contrast_status(gm, self.brightness, self.contrast, gamma_curve)
+        gamma = v4l2_ext_control()
+        gamma.id = V4L2_CID.USER_BCM2835_ISP_GAMMA
+        gamma.size = sizeof(bcm2835_isp_stats_contrast)
+        gamma.ptr = cast(pointer(gm), c_void_p)
+        self.isp_in.set_ext_controls([gamma])
+
     def adjust_setting_from_isp(self) -> None:
         buffer = self.isp_out_metadata.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.MMAP)
         if buffer is None:
@@ -335,6 +440,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         if self.do_awb:
             self.awb(stats)
+
+        if self.do_contrast:
+            self.contrast_control(stats)
 
         self.isp_out_metadata.queue_buffer(buffer.buf.index)
 
