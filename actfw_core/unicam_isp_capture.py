@@ -34,6 +34,7 @@ GAINS: List[float] = [1.0, 2.0, 4.0, 6.0, 8.0]
 BLACK_LEVEL: int = 4096
 DEFAULT_CONTRAST: float = 1.0
 
+
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
         self,
