@@ -477,6 +477,14 @@ class bcm2835_isp_black_level(Structure):
     ]
 
 
+class bcm2835_isp_gamma(Structure):
+    _fields_ = [
+        ("enabled", c_uint32),
+        ("x", c_uint16 * CONTRAST_NUM_POINTS),
+        ("y", c_uint16 * CONTRAST_NUM_POINTS),
+    ]
+
+
 class bcm2835_isp_stats_hist(Structure):
     _fields_ = [
         ("r_hist", c_uint32 * NUM_HISTOGRAM_BINS),
@@ -501,14 +509,12 @@ class bcm2835_isp_stats_focus(Structure):
         ("contrast_val_num", c_uint32 * 2 * 2),
     ]
 
-
 class bcm2835_isp_stats_contrast(Structure):
     _fields_ = [
         ("points", c_uint16 * 2 * CONTRAST_NUM_POINTS),
         ("brightness", c_double),
         ("contrast", c_double),
     ]
-
 
 class bcm2835_isp_stats(Structure):
     _fields_ = [

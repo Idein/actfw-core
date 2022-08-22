@@ -8,8 +8,8 @@ from actfw_core.v4l2.types import (
     CONTRAST_NUM_POINTS,
     NUM_HISTOGRAM_BINS,
     bcm2835_isp_black_level,
+    bcm2835_isp_gamma,
     bcm2835_isp_stats,
-    bcm2835_isp_stats_contrast,
     v4l2_ext_control,
 )
 from actfw_core.v4l2.video import (  # type: ignore
@@ -394,7 +394,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         if first == -1:
             first = 0
         if last == -1:
-            last = len(cumulative)
+            last = len(cumulative) - 2
         assert first <= last
         items = int(q * cumulative[-1])
         while first < last:
@@ -441,21 +441,21 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
 
     def fill_in_contrast_status(
-        self, status: bcm2835_isp_stats_contrast, brightness: float, contrast: float, gamma_curve: List[Tuple[float, float]]
+        self, gm: bcm2835_isp_gamma, gamma_curve: List[Tuple[float, float]]
     ) -> None:
-        status.brightness = brightness
-        status.contrast = contrast
-        for i in range(0, CONTRAST_NUM_POINTS):
+        gm.enabled = 1
+        for i in range(0, CONTRAST_NUM_POINTS - 1):
             if i < 16:
                 x = i * 1024
             elif i < 24:
                 x = (i - 16) * 2048 + 16384
             else:
                 x = (i - 24) * 4096 + 32768
-            status.points[i][0] = x
-            status.points[i][1] = int(min(65535.0, self.eval_gamma_curve(gamma_curve, x)))
-        status.points[CONTRAST_NUM_POINTS - 1][0] = 65535
-        status.points[CONTRAST_NUM_POINTS - 1][1] = 65535
+            gm.x[i] = x
+            gm.y[i] = int(min(65535.0, self.eval_gamma_curve(gamma_curve, x)))
+
+        gm.x[CONTRAST_NUM_POINTS - 1] = 65535
+        gm.y[CONTRAST_NUM_POINTS - 1] = 65535
 
     def contrast_control(self, isp_stats: bcm2835_isp_stats) -> None:
         gamma_curve = [
@@ -501,12 +501,11 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             gamma_curve = [
                 (x, max(0.0, min(65535.0, (y - 32768) * self.contrast + 32768 + self.brightness))) for (x, y) in gamma_curve
             ]
-
-        gm = bcm2835_isp_stats_contrast()
-        self.fill_in_contrast_status(gm, self.brightness, self.contrast, gamma_curve)
+        gm = bcm2835_isp_gamma()
+        self.fill_in_contrast_status(gm, gamma_curve)
         gamma = v4l2_ext_control()
         gamma.id = V4L2_CID.USER_BCM2835_ISP_GAMMA
-        gamma.size = sizeof(bcm2835_isp_stats_contrast)
+        gamma.size = sizeof(bcm2835_isp_gamma)
         gamma.ptr = cast(pointer(gm), c_void_p)
         self.isp_in.set_ext_controls([gamma])
 
