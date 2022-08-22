@@ -356,7 +356,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
 
     # gamma2(gamma1(x)) with care of boundary values
-    def compose_gamma_curve(self, one, other, eps = 1e-6):
+    def compose_gamma_curve(self, one, other, eps=1e-6):
         this_x = one[0][0]
         this_y = one[0][1]
         this_span = 0
@@ -383,7 +383,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 result.append((this_y, self.eval_gamma_curve(other, this_y)))
         return result
 
-
     def histogram_cumulative(self, histogram) -> List[float]:
         cumulative = [0]
         for i in range(0, len(histogram)):
@@ -404,9 +403,12 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             else:
                 first = middle + 1
         assert items >= cumulative[first] and items <= cumulative[last + 1]
-        frac = 0 if cumulative[first + 1] == cumulative[first] else (items - cumulative[first]) / (cumulative[first + 1] - cumulative[first])
+        frac = (
+            0
+            if cumulative[first + 1] == cumulative[first]
+            else (items - cumulative[first]) / (cumulative[first + 1] - cumulative[first])
+        )
         return first + frac
-
 
     def compute_stretch_curve(self, histogram):
         enhance = [(0, 0)]
@@ -439,10 +441,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             enhance.append((65535, 65535))
         return enhance
 
-
-    def fill_in_contrast_status(
-        self, gm: bcm2835_isp_gamma, gamma_curve: List[Tuple[float, float]]
-    ) -> None:
+    def fill_in_contrast_status(self, gm: bcm2835_isp_gamma, gamma_curve: List[Tuple[float, float]]) -> None:
         gm.enabled = 1
         for i in range(0, CONTRAST_NUM_POINTS - 1):
             if i < 16:
