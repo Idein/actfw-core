@@ -139,7 +139,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             (65535, 65535),
         ]
 
-
         # some device status cache (set by set_unicam_fps)
         self.vblank: int = 0
         self.hblank: int = 0
