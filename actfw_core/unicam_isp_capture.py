@@ -362,7 +362,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
 
     # gamma2(gamma1(x)) with care of boundary values
-    def compose_gamma_curve(self, one: List[Tuple[float, float]], other: List[Tuple[float, float]], eps: float = 1e-6) -> List[Tuple[float, float]]:
+    def compose_gamma_curve(
+        self, one: List[Tuple[float, float]], other: List[Tuple[float, float]], eps: float = 1e-6
+    ) -> List[Tuple[float, float]]:
         this_x = one[0][0]
         this_y = one[0][1]
         this_span = 0
