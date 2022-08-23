@@ -362,7 +362,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
 
     # gamma2(gamma1(x)) with care of boundary values
-    def compose_gamma_curve(self, one, other, eps=1e-6):
+    def compose_gamma_curve(self, one: List[Tuple[float, float]], other: List[Tuple[float, float]], eps: float = 1e-6) -> List[Tuple[float, float]]:
         this_x = one[0][0]
         this_y = one[0][1]
         this_span = 0
@@ -389,13 +389,13 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 result.append((this_x, self.eval_gamma_curve(other, this_y)))
         return result
 
-    def histogram_cumulative(self, histogram) -> List[float]:
+    def histogram_cumulative(self, histogram: List[int]) -> List[int]:
         cumulative = [0]
         for i in range(0, len(histogram)):
             cumulative.append(cumulative[-1] + histogram[i])
         return cumulative
 
-    def cumulative_quantile(self, cumulative: List[float], q: float, first: float = -1, last: float = -1) -> float:
+    def cumulative_quantile(self, cumulative: List[int], q: float, first: int = -1, last: int = -1) -> float:
         if first == -1:
             first = 0
         if last == -1:
@@ -416,8 +416,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
         return first + frac
 
-    def compute_stretch_curve(self, histogram):
-        enhance = [(0, 0)]
+    def compute_stretch_curve(self, histogram: List[int]) -> List[Tuple[float, float]]:
+        enhance = [(0.0, 0.0)]
         eps = 1e-6
 
         # If the start of the histogram is rather empty, try to pull it down a
