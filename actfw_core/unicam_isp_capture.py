@@ -53,6 +53,12 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         ce_enable: bool = True,
         brightness: float = 0.0,
         contrast: Optional[float] = DEFAULT_CONTRAST,
+        lo_histogram: float = 0.01,
+        lo_level: float = 0.015,
+        lo_max: int = 500,
+        hi_histogram: float = 0.95,
+        hi_level: float = 0.95,
+        hi_max: int = 2000,
     ) -> None:
         super().__init__()
 
@@ -91,12 +97,12 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.ce_enable = ce_enable
         self.brightness: float = brightness
         self.contrast: float = contrast or DEFAULT_CONTRAST
-        self.lo_histogram: float = 0.01
-        self.lo_level: float = 0.015
-        self.lo_max: int = 500
-        self.hi_histogram: float = 0.95
-        self.hi_level: float = 0.95
-        self.hi_max: int = 2000
+        self.lo_histogram: float = hi_histogram
+        self.lo_level: float = lo_level
+        self.lo_max: int = lo_max
+        self.hi_histogram: float = hi_histogram
+        self.hi_level: float = hi_level
+        self.hi_max: int = hi_max
 
         # some device status cache (set by set_unicam_fps)
         self.vblank: int = 0
@@ -436,7 +442,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         hist_hi = min(level_hi, max(0.0, max(hist_hi, level_hi - self.hi_max)))
         if enhance[-1][0] + eps < hist_hi:
             enhance.append((hist_hi, level_hi))
-
         if enhance[-1][0] + eps < 65535:
             enhance.append((65535, 65535))
         return enhance
