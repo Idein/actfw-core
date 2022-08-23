@@ -379,8 +379,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 this_span += 1
                 this_x = one[this_span][0]
                 this_y = one[this_span][1]
-            if result[-1][0] + eps < this_y:
-                result.append((this_y, self.eval_gamma_curve(other, this_y)))
+            if result[-1][0] + eps < this_x:
+                result.append((this_x, self.eval_gamma_curve(other, this_y)))
         return result
 
     def histogram_cumulative(self, histogram) -> List[float]:
@@ -426,8 +426,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         # Keep the mid-point (median) in the same place, though, to limit the
         # apparent amount of global brightness shift.
         mid = self.cumulative_quantile(cumulative, 0.5) * (65536 / NUM_HISTOGRAM_BINS)
-        if enhance[-1][0] + eps < hist_lo:
-            enhance.append((mid, mid_lo))
+        if enhance[-1][0] + eps < mid:
+            enhance.append((mid, mid))
 
         # If the top to the histogram is empty, try to pull the pixel values
         # there up.
