@@ -45,6 +45,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         isp_out_metadata: str = "/dev/video16",
         size: Tuple[int, int] = (640, 480),
         unicam_size: Tuple[int, int] = (1920, 1080),
+        crop_size: Tuple[int, int] = (0, 0, 640, 480),
         framerate: int = 30,
         expected_format: V4L2_PIX_FMT = V4L2_PIX_FMT.RGB24,
         auto_whitebalance: bool = True,
@@ -80,6 +81,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         (self.expected_width, self.expected_height) = size
         (self.expected_unicam_width, self.expected_unicam_height) = unicam_size
+        (self.crop_left, self.crop_top, self.crop_width, self.crop_height) = crop_size
         self.expected_pix_format = expected_format
         self.expected_fps = framerate
 
@@ -194,6 +196,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
         if isp_in_width != self.unicam_width or isp_in_height != self.unicam_height or isp_in_format != self.unicam_format:
             raise RuntimeError("fail to setup isp input")
+
+        self.isp_in.set_selection(self.crop_left, self.crop_top, self.crop_width, self.crop_height)
 
         # setup isp_out_high
 

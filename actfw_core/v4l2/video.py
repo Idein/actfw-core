@@ -151,6 +151,8 @@ class _VIDIOC(enum.IntEnum):
     ENUM_FMT = _IOWR("V", 2, fmtdesc)
     S_FMT = _IOWR("V", 5, format)
     SUBDEV_S_FMT = _IOWR("V", 5, subdev_format)
+    SUBDEV_S_SELECTION = _IOWR("V", 62, subdev_selection)
+    S_SELECTION = _IOWR("V", 95, selection)
     REQBUFS = _IOWR("V", 8, requestbuffers)
     QUERYBUF = _IOWR("V", 9, buffer)
     QBUF = _IOWR("V", 15, buffer)
@@ -413,6 +415,20 @@ class MEDIA_BUS_FMT(enum.IntEnum):
     SBGGR8_1X8 = 0x3001
     SBGGR10_1X10 = 0x3007
 
+class V4L2_SEL_TGT(enum.IntEnum):
+    CROP = 0x0000
+    CROP_DEFAULT = 0x0001
+    CROP_BOUNDS = 0x0002
+    NATIVE_SIZE = 0x0003
+    COMPOSE = 0x0100
+    COMPOSE_DEFAULT = 0x0101
+    COMPOSE_BOUNDS = 0x0102
+    COMPOSE_PADDED = 0x0103
+
+class V4L2_SEL_FLAG(enum.IntEnum):
+    GE = 1 << 0
+    LE = 1 << 1
+    KEEP_CONFIG = 1 << 2
 
 class RawVideo(object):
     def __init__(self, device, blocking=False, init_controls=[], v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE):
@@ -488,6 +504,35 @@ class RawVideo(object):
 
         self.subdev_fmt = fmt
         return (fmt.format.width, fmt.format.height, fmt.format.code)
+
+    def set_subdev_selection(self, left, top, width, height):
+        sel = subdev_selection()
+        sel.which = V4L2_SUBDEV_FORMAT_WHENCE.ACTIVE
+        sel.pad = 0
+        sel.target = V4L2_SEL_TGT.CROP
+        sel.flags = V4L2_SEL_FLAG.LE
+        sel.r.left = left
+        sel.r.top = top
+        sel.r.width = width
+        sel.r.height = height
+        
+        result = self._ioctl(_VIDIOC.SUBDEV_S_SELECTION, byref(sel))
+        if result != 0:
+            raise RuntimeError(f"ioctl(SUBDEV_S_SELECTION){errno.errorcode[get_errno()]}")
+
+    def set_selection(self, left, top, width, height):
+        sel = selection()
+        sel.type = self.v4l2_buf_type
+        sel.target = V4L2_SEL_TGT.CROP
+        sel.flags = 0
+        sel.r.left = left
+        sel.r.top = top
+        sel.r.width = width
+        sel.r.height = height
+        
+        result = self._ioctl(_VIDIOC.S_SELECTION, byref(sel))
+        if result != 0:
+            raise RuntimeError(f"ioctl(S_SELECTION){errno.errorcode[get_errno()]}")
 
     def init_controls(self, targets):
         queries = self.query_ext_controls()
