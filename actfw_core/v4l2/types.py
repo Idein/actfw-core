@@ -477,6 +477,14 @@ class bcm2835_isp_black_level(Structure):
     ]
 
 
+class bcm2835_isp_gamma(Structure):
+    _fields_ = [
+        ("enabled", c_uint32),
+        ("x", c_uint16 * CONTRAST_NUM_POINTS),
+        ("y", c_uint16 * CONTRAST_NUM_POINTS),
+    ]
+
+
 class bcm2835_isp_stats_hist(Structure):
     _fields_ = [
         ("r_hist", c_uint32 * NUM_HISTOGRAM_BINS),
