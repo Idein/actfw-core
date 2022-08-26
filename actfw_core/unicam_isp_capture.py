@@ -167,7 +167,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
         self.unicam_width = self.unicam_subdev.subdev_fmt.format.width
         self.unicam_height = self.unicam_subdev.subdev_fmt.format.height
-        print(f"unicam = ({self.unicam_width}, {self.unicam_height})")
         self.unicam_format = V4L2_PIX_FMT.SBGGR10P
         (unicam_width, unicam_height, unicam_format) = self.unicam.set_pix_format(
             self.unicam_width, self.unicam_height, self.unicam_format
