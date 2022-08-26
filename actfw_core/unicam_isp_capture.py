@@ -162,7 +162,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         if not (self.unicam_subdev.set_vertical_flip(True) and self.unicam_subdev.set_horizontal_flip(True)):
             raise RuntimeError("fail to setup unicam subdevice node")
 
-        self.unicam_subdev.set_subdev_format(self.expected_unicam_width, self.expected_unicam_height, MEDIA_BUS_FMT.SBGGR10_1X10)
+        self.unicam_subdev.set_subdev_format(
+            self.expected_unicam_width, self.expected_unicam_height, MEDIA_BUS_FMT.SBGGR10_1X10
+        )
         self.unicam_width = self.unicam_subdev.subdev_fmt.format.width
         self.unicam_height = self.unicam_subdev.subdev_fmt.format.height
         print(f"unicam = ({self.unicam_width}, {self.unicam_height})")
