@@ -44,6 +44,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         isp_out_high: str = "/dev/video14",
         isp_out_metadata: str = "/dev/video16",
         size: Tuple[int, int] = (640, 480),
+        unicam_size: Tuple[int, int] = (3280, 2464),
+        crop_size: Optional[Tuple[int, int, int, int]] = None,
         framerate: int = 30,
         expected_format: V4L2_PIX_FMT = V4L2_PIX_FMT.RGB24,
         auto_whitebalance: bool = True,
@@ -78,6 +80,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.do_contrast = contrast is not None
 
         (self.expected_width, self.expected_height) = size
+        (self.expected_unicam_width, self.expected_unicam_height) = unicam_size
+        self.crop_size = crop_size
         self.expected_pix_format = expected_format
         self.expected_fps = framerate
 
@@ -158,7 +162,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         if not (self.unicam_subdev.set_vertical_flip(True) and self.unicam_subdev.set_horizontal_flip(True)):
             raise RuntimeError("fail to setup unicam subdevice node")
 
-        self.unicam_subdev.set_subdev_format(self.expected_width, self.expected_height, MEDIA_BUS_FMT.SBGGR10_1X10)
+        self.unicam_subdev.set_subdev_format(
+            self.expected_unicam_width, self.expected_unicam_height, MEDIA_BUS_FMT.SBGGR10_1X10
+        )
         self.unicam_width = self.unicam_subdev.subdev_fmt.format.width
         self.unicam_height = self.unicam_subdev.subdev_fmt.format.height
         self.unicam_format = V4L2_PIX_FMT.SBGGR10P
@@ -191,6 +197,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
         if isp_in_width != self.unicam_width or isp_in_height != self.unicam_height or isp_in_format != self.unicam_format:
             raise RuntimeError("fail to setup isp input")
+
+        if self.crop_size is not None:
+            self.isp_in.set_selection(*self.crop_size)
 
         # setup isp_out_high
 

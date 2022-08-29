@@ -416,6 +416,10 @@ class subdev_format(Structure):
     _fields_ = [("which", c_uint32), ("pad", c_uint32), ("format", mbus_framefmt), ("reserved", c_uint32 * 8)]
 
 
+class selection(Structure):
+    _fields_ = [("type", c_uint32), ("target", c_uint32), ("flags", c_uint32), ("r", rect), ("reserved", c_uint32 * 9)]
+
+
 class _value_for_ext_control(Union):
     _fields_ = [
         ("value", c_int32),
