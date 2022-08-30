@@ -398,7 +398,14 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             calibration1 = calibrations[idx + 1]["table"]
             return [(x0 * (ct1 - ct) + x1 * (ct - ct0)) / (ct1 - ct0) for (x0, x1) in zip(calibration0, calibration1)]
 
+
+    # https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1343
+    # から以下を除いた処理を書こうとしている
+    # - resample_cal_table
+    # - "adaptive algorithm"にあたる部分
+    # - 色温度計算
     def alsc(self, stats: bcm2835_isp_stats) -> None:
+
         ct = 4500  # TODO: 色温度を計算する
         calibrations_Cr = self.ctt["rpi.alsc"]["calibrations_Cr"]
         calibrations_Cb = self.ctt["rpi.alsc"]["calibrations_Cb"]
@@ -412,9 +419,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.ls_table_r = [(r*(lut - 1)*luminace_strength) + 1 for (r, lut) in zip(cal_table_r, luminace_table)]
         self.ls_table_g = [(1.0*(lut - 1)*luminace_strength) +1 for lut in luminace_table]
         self.ls_table_b = [(b*(lut - 1)*luminace_strength) + 1 for (b, lut) in zip(cal_table_b, luminace_table)]
+        # TODO: libcameraはこれに対して、normalizationしてるので必要かもしれない https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/controller/rpi/alsc.cpp#L741
         self.apply_ls_tables()
 
-    
+    # libcameraのapplyLSを参考にしている: https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1343
     def apply_ls_tables(self):
         assert(len(self.ls_table_b) == 12 * 16)
         assert(len(self.ls_table_r) == 12 * 16)        
@@ -435,8 +443,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.populate_ls_table(self.ls_table_g, self.ls_table_mm, w, h)
         self.populate_ls_table(self.ls_table_g, self.ls_table_mm, w, h)
         self.populate_ls_table(self.ls_table_b, self.ls_table_mm, w, h)        
-        #ls_table_r = self.resmaple_ls_table(self.ls_table_r, 16, 12, w, h)
-        #ls_table_b = self.resmaple_ls_table(self.ls_table_g, 16, 12, w, h)
+        self.ls_table_mm.seek(0)
+        #print(self.ls_table_mm.readline())
 
         ls = bcm2835_isp_lens_shading()
         ls.enable = 1
@@ -455,6 +463,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         ls_ctrl.ptr = cast(pointer(ls), c_void_p)
         self.isp_in.set_ext_controls([ls_ctrl])
 
+    # resampleTable: https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1403
+    # にあたる部分
+    # ls_tableの一部分をpointerにして渡す方法がわからなかったので、直接writeで書き込んでいる
+    # 勢いで書いたのであまり自信なし
     def populate_ls_table(self, src: List[int], ls_table: mmap.mmap, dst_w: int, dst_h: int):
         src_w = 16
         src_h = 12
@@ -482,10 +494,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 above = (src[(y_lo*src_h)+x_lo[i]]*(1 - xf[i])) + (src[(y_lo*src_h)+x_hi[i]]*xf[i])
                 below = (src[(y_hi*src_h)+x_lo[i]]*(1 - xf[i])) + (src[(y_hi*src_h)+x_hi[i]]*xf[i])                
                 result = floor(1024*(above*(1 - yf) + below*yf)+ 0.5)
-                result = max(result, 16383)
+                result = min(result, 16383)
                 ls_table.write(bytes(c_int16(result)))
 
-        y += y_inc
+            y += y_inc
 
 
     def calculate_y(self, stats: bcm2835_isp_stats, additional_gain: float) -> float:
