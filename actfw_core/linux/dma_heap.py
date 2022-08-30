@@ -20,7 +20,6 @@ class DMAHeap(object):
         if -1 == result:
             raise RuntimeError(f"ioctl(_DMA_HEAP_IOCTL_ALLOC){errno.errorcode[get_errno()]}")
 
-        print(_DMA_BUF_SET_NAME)
         result = ioctl(alloc.fd, _DMA_BUF_SET_NAME, name)
         
         if -1 == result:

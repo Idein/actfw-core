@@ -1,7 +1,8 @@
 import json
+from math import floor
 import os
 import select
-from ctypes import POINTER, c_void_p, cast, pointer, sizeof
+from ctypes import POINTER, c_int16, c_void_p, cast, pointer, sizeof
 from typing import Any, Dict, List, Optional, Tuple
 import mmap
 
@@ -14,10 +15,13 @@ from actfw_core.v4l2.types import (
     bcm2835_isp_black_level,
     bcm2835_isp_gamma,
     bcm2835_isp_stats,
+    bcm2835_isp_lens_shading,
+    bcm2835_isp_gain_format,
     v4l2_ext_control,
 )
 from actfw_core.v4l2.video import (  # type: ignore
     MEDIA_BUS_FMT,
+    _VIDIOC,
     V4L2_BUF_TYPE,
     V4L2_CID,
     V4L2_MEMORY,
@@ -72,11 +76,12 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         hi_histogram: float = 0.95,
         hi_level: float = 0.95,
         hi_max: int = 2000,
+        alsc: bool = True
     ) -> None:
         super().__init__()
 
         self.dma_buffer_num = 4
-        self.isp_out_buffer_num = 4
+        self.isp_out_buffer_num = 3 # adhoc: 4だと3に修正されたのでひとまず回避
         self.isp_out_metadata_buffer_num = 2
         self.shared_dma_fds: List[int] = []
         self.unicam = RawVideo(unicam, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
@@ -183,6 +188,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             (61440, 64476),
             (65535, 65535),
         ]
+
+        self.do_alsc = alsc
 
         # - update by alsc
         self.ls_table_dma_heap_fd = DMAHeap("/dev/dma_heap/linux,cma").alloc("_ls_grid", MAX_LS_GRID_SIZE)
@@ -392,14 +399,94 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             return [(x0 * (ct1 - ct) + x1 * (ct - ct0)) / (ct1 - ct0) for (x0, x1) in zip(calibration0, calibration1)]
 
     def alsc(self, stats: bcm2835_isp_stats) -> None:
-        ct = 4500  # TODO: calculate
+        ct = 4500  # TODO: 色温度を計算する
         calibrations_Cr = self.ctt["rpi.alsc"]["calibrations_Cr"]
         calibrations_Cb = self.ctt["rpi.alsc"]["calibrations_Cb"]
 
         cal_table_r = self.get_cal_table(ct, calibrations_Cr)
         cal_table_b = self.get_cal_table(ct, calibrations_Cb)
 
-        print(len(cal_table_r))
+        luminace_table = self.ctt["rpi.alsc"]["luminance_lut"]
+        luminace_strength = self.ctt["rpi.alsc"]["luminance_strength"]
+
+        self.ls_table_r = [(r*(lut - 1)*luminace_strength) + 1 for (r, lut) in zip(cal_table_r, luminace_table)]
+        self.ls_table_g = [(1.0*(lut - 1)*luminace_strength) +1 for lut in luminace_table]
+        self.ls_table_b = [(b*(lut - 1)*luminace_strength) + 1 for (b, lut) in zip(cal_table_b, luminace_table)]
+        self.apply_ls_tables()
+
+    
+    def apply_ls_tables(self):
+        assert(len(self.ls_table_b) == 12 * 16)
+        assert(len(self.ls_table_r) == 12 * 16)        
+        assert(len(self.ls_table_g) == 12 * 16)                
+        cell_size_candidate = [16, 32, 64, 128, 256]
+        for i in range(0, len(cell_size_candidate)):
+            cell_size = cell_size_candidate[i]
+            w = (self.unicam_width + cell_size - 1) // cell_size
+            h = (self.unicam_height + cell_size - 1) // cell_size             
+            if (w < 64 and h <= 48):
+                break
+        
+        w += 1
+        h += 1
+
+        self.ls_table_mm.seek(0)
+        self.populate_ls_table(self.ls_table_r, self.ls_table_mm, w, h)
+        self.populate_ls_table(self.ls_table_g, self.ls_table_mm, w, h)
+        self.populate_ls_table(self.ls_table_g, self.ls_table_mm, w, h)
+        self.populate_ls_table(self.ls_table_b, self.ls_table_mm, w, h)        
+        #ls_table_r = self.resmaple_ls_table(self.ls_table_r, 16, 12, w, h)
+        #ls_table_b = self.resmaple_ls_table(self.ls_table_g, 16, 12, w, h)
+
+        ls = bcm2835_isp_lens_shading()
+        ls.enable = 1
+        ls.grid_cell_size = cell_size
+        ls.grid_width = w
+        ls.grid_stride = w
+        ls.grid_height = h
+        ls.dmabuf = self.ls_table_dma_heap_fd
+        ls.ref_transform = 0
+        ls.corner_sampled = 1
+        ls.gain_format = bcm2835_isp_gain_format.GAIN_FORMAT_U4P10
+
+        ls_ctrl = v4l2_ext_control()
+        ls_ctrl.id = V4L2_CID.USER_BCM2835_ISP_LENS_SHADING
+        ls_ctrl.size = sizeof(bcm2835_isp_lens_shading)
+        ls_ctrl.ptr = cast(pointer(ls), c_void_p)
+        self.isp_in.set_ext_controls([ls_ctrl])
+
+    def populate_ls_table(self, src: List[int], ls_table: mmap.mmap, dst_w: int, dst_h: int):
+        src_w = 16
+        src_h = 12
+        x_lo = [0] * dst_w
+        xf = [0] * dst_w
+        x_hi = [0] * dst_w
+
+        x = 0.5
+        x_inc = src_w / (dst_w - 1)
+        for i in range(0, dst_w):
+            x_lo[i] = floor(x)
+            xf[i] = x - x_lo[i]
+            x_hi[i] = min(x_lo[i] + 1, src_w - 1)
+            x_lo[i] = max(x_lo[i], 0)
+            x += x_inc
+
+        y = 0.5
+        y_inc = src_h / (dst_h - 1)
+        for _ in range(0, dst_h):
+            y_lo = floor(y)
+            yf = y - y_lo
+            y_hi = min(y_lo + 1, src_h - 1)
+            y_lo = max(y_lo, 0)
+            for i in range(0, dst_w):
+                above = (src[(y_lo*src_h)+x_lo[i]]*(1 - xf[i])) + (src[(y_lo*src_h)+x_hi[i]]*xf[i])
+                below = (src[(y_hi*src_h)+x_lo[i]]*(1 - xf[i])) + (src[(y_hi*src_h)+x_hi[i]]*xf[i])                
+                result = floor(1024*(above*(1 - yf) + below*yf)+ 0.5)
+                result = max(result, 16383)
+                ls_table.write(bytes(c_int16(result)))
+
+        y += y_inc
+
 
     def calculate_y(self, stats: bcm2835_isp_stats, additional_gain: float) -> float:
         PIPELINE_BITS = 13  # https://github.com/kbingham/libcamera/blob/f995ff25a3326db90513d1fa936815653f7cade0/src/ipa/raspberrypi/controller/rpi/agc.cpp#L31 # noqa: E501, B950
@@ -635,7 +722,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         if self.do_contrast:
             self.contrast_control(stats)
 
-        self.alsc(stats)
+        if self.do_alsc:
+            self.alsc(stats)
 
         self.isp_out_metadata.queue_buffer(buffer.buf.index)
 
