@@ -11,19 +11,32 @@ commands:
           command: |
             apt-get update
             apt-get install -y --no-install-recommends python3-pip
+  install-poetry:
+    steps:
+      - run:
+          name: Install poetry
+          command: |
+            curl -sSL https://install.python-poetry.org | python -
+            echo 'export PATH=$HOME/.local/bin:$PATH' >> $BASH_ENV
+            source $BASH_ENV
+  install-old-poetry:
+    steps:
+      - run:
+          name: Install poetry 1.1
+          command: |
+            python3 -m pip install --user pipx
+            python3 -m pipx ensurepath
+            echo 'export PATH=$HOME/.local/bin:$PATH' >> $BASH_ENV
+            source $BASH_ENV
+            pipx install poetry==1.1.15
   poetry-install:
     steps:
       # See: https://circleci.com/docs/2.0/language-python/#cache-dependencies
       - restore_cache:
           key: &cache-key-poetry cache-poetry-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "poetry.lock" }}
-      - install-python-dev-tools
       - run:
-          name: install poetry && poetry install
+          name: poetry install
           command: |
-            curl -sSL https://install.python-poetry.org | python -
-            echo 'export PATH=$HOME/.local/bin:$PATH' >> $BASH_ENV
-            source $BASH_ENV
-
             poetry config virtualenvs.in-project true
             poetry install
       - save_cache:
@@ -51,6 +64,8 @@ jobs:
           password: $DOCKER_PASS
     steps:
       - checkout
+      - install-python-dev-tools
+      - install-poetry
       - poetry-install
       - run:
           name: Lint
@@ -70,6 +85,18 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
+      - install-python-dev-tools
+      - when:
+          condition:
+            equal: ["3.6", << parameters.python-version >> ]
+          steps:
+            - install-old-poetry
+      - when:
+          condition:
+            not:
+              equal: ["3.6", << parameters.python-version >> ]
+          steps:
+            - install-poetry
       - poetry-install
       - run:
           name: Test
@@ -86,6 +113,18 @@ jobs:
       - run:
           name: remove lock file to get up-to-date dependencies
           command: rm poetry.lock
+      - install-python-dev-tools
+      - when:
+          condition:
+            equal: ["3.6", << parameters.python-version >> ]
+          steps:
+            - install-old-poetry
+      - when:
+          condition:
+            not:
+              equal: ["3.6", << parameters.python-version >> ]
+          steps:
+            - install-poetry
       - poetry-install
       - run:
           name: Test
@@ -97,6 +136,8 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
+      - install-python-dev-tools
+      - install-poetry
       - poetry-install
       - run:
           name: sphinx-build
@@ -116,6 +157,8 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
+      - install-python-dev-tools
+      - install-poetry
       - poetry-install
       - run:
           name: Make wheel & sdist
@@ -132,6 +175,8 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
+      - install-python-dev-tools
+      - install-poetry
       - poetry-install
       - run:
           name: Check if git tag name is appropriate for package version
@@ -175,6 +220,8 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
+      - install-python-dev-tools
+      - install-poetry
       - poetry-install
       - attach_workspace:
           at: /tmp/workspace
