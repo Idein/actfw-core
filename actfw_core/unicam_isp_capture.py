@@ -87,6 +87,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             (self.expected_unicam_width, self.expected_unicam_height) = unicam_size
             self.crop_size = crop_size
         elif unicam_size is None and crop_size is None:
+            # Auto selection of unicam_size and crop_size.
+            # Support only v2 camera module.
             if self.expected_width <= 1280 and self.expected_height <= 720:
                 if self.expected_fps <= 40:
                     (self.expected_unicam_width, self.expected_unicam_height) = (1640, 1232)
@@ -290,7 +292,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             w = w0
             h = unicam_height
         else:
-            # TODO: もっと適切な処理がないか?
+            # TODO: There may be more reasonable values.
             w = isp_out_width
             h = isp_out_height
 
