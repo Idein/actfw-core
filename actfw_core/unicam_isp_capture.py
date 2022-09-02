@@ -1,10 +1,13 @@
+import json
+import os
 import select
 from ctypes import POINTER, c_void_p, cast, pointer, sizeof
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from actfw_core.capture import Frame
 from actfw_core.task import Producer
 from actfw_core.v4l2.types import (
+    AWB_REGIONS,
     CONTRAST_NUM_POINTS,
     NUM_HISTOGRAM_BINS,
     bcm2835_isp_black_level,
@@ -35,6 +38,8 @@ BLACK_LEVEL: int = 4096
 DEFAULT_CONTRAST: float = 1.0
 
 V2_UNICAM_SIZES: List[Tuple[int, int]] = [(3280, 2464), (1920, 1080), (1640, 1232), (640, 480)]
+
+CTT_FILE = os.path.join(os.path.dirname(__file__), "data/imx219.json")
 
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
@@ -113,6 +118,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 )
         else:
             raise RuntimeError("Both unicam_size and crop_size must be None or tuples.")
+
+        with open(CTT_FILE, "r") as f:
+            self.ctt = json.load(f)
 
         # control values
         self.aperture: float = 1.0
@@ -352,6 +360,34 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         self.lux = estimated_lux
 
+    def get_cal_table(self, ct: float, calibrations: List[Dict[str, Any]]) -> List[float]:
+        if len(calibrations) == 0:
+            return [1.0] * AWB_REGIONS
+        elif ct <= calibrations[0]["ct"]:
+            return calibrations[0]["table"].copy()  # type: ignore
+        elif calibrations[-1]["ct"] <= ct:
+            return calibrations[-1]["table"].copy()  # type: ignore
+        else:
+            idx = 0
+            while calibrations[idx + 1]["ct"] < ct:
+                idx += 1
+
+            ct0 = calibrations[idx]["ct"]
+            ct1 = calibrations[idx + 1]["ct"]
+            calibration0 = calibrations[idx]["table"]
+            calibration1 = calibrations[idx + 1]["table"]
+            return [(x0 * (ct1 - ct) + x1 * (ct - ct0)) / (ct1 - ct0) for (x0, x1) in zip(calibration0, calibration1)]
+
+    def alsc(self, stats: bcm2835_isp_stats) -> None:
+        ct = 4500  # TODO: calculate
+        calibrations_Cr = self.ctt["rpi.alsc"]["calibrations_Cr"]
+        calibrations_Cb = self.ctt["rpi.alsc"]["calibrations_Cb"]
+
+        cal_table_r = self.get_cal_table(ct, calibrations_Cr)
+        cal_table_b = self.get_cal_table(ct, calibrations_Cb)
+
+        print(len(cal_table_r))
+
     def calculate_y(self, stats: bcm2835_isp_stats, additional_gain: float) -> float:
         PIPELINE_BITS = 13  # https://github.com/kbingham/libcamera/blob/f995ff25a3326db90513d1fa936815653f7cade0/src/ipa/raspberrypi/controller/rpi/agc.cpp#L31 # noqa: E501, B950
         r_sum = 0
@@ -585,6 +621,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         if self.do_contrast:
             self.contrast_control(stats)
+
+        self.alsc(stats)
 
         self.isp_out_metadata.queue_buffer(buffer.buf.index)
 
