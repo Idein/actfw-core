@@ -34,6 +34,8 @@ GAINS: List[float] = [1.0, 2.0, 4.0, 6.0, 8.0]
 BLACK_LEVEL: int = 4096
 DEFAULT_CONTRAST: float = 1.0
 
+V2_UNICAM_SIZES: List[Tuple[int, int]] = [(3280, 2464), (1920, 1080), (1640, 1232), (640, 480)]
+
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
@@ -91,28 +93,26 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             # Support only v2 camera module.
             if self.expected_width <= 1280 and self.expected_height <= 720:
                 if self.expected_fps <= 40:
-                    (self.expected_unicam_width, self.expected_unicam_height) = (1640, 1232)
+                    (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[2]
                     self.crop_size = self.calc_crop_size(
                         self.expected_width, self.expected_height, self.expected_unicam_width, self.expected_unicam_height
                     )
                 else:
                     if abs(self.expected_width / self.expected_height - 16 / 9) < 0.05:
-                        (self.expected_unicam_width, self.expected_unicam_height) = (1640, 1232)
+                        (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[2]
                         self.crop_size = (180, 256, 1280, 720)
                     else:
-                        (self.expected_unicam_width, self.expected_unicam_height) = (640, 480)
+                        (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[3]
                         self.crop_size = self.calc_crop_size(
                             self.expected_width, self.expected_height, self.expected_unicam_width, self.expected_unicam_height
                         )
             else:
-                (self.expected_unicam_width, self.expected_unicam_height) = (3280, 2464)
+                (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[0]
                 self.crop_size = self.calc_crop_size(
                     self.expected_width, self.expected_height, self.expected_unicam_width, self.expected_unicam_height
                 )
         else:
             raise RuntimeError("Both unicam_size and crop_size must be None or tuples.")
-
-        print(f"Selected: ({self.expected_unicam_width}, {self.expected_unicam_height}) {self.crop_size}")
 
         # control values
         self.aperture: float = 1.0
@@ -283,18 +283,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
     def calc_crop_size(
         self, isp_out_width: int, isp_out_height: int, unicam_width: int, unicam_height: int
     ) -> Tuple[int, int, int, int]:
-        w0 = int(unicam_height * isp_out_width / isp_out_height)
-        h0 = int(unicam_width * isp_out_height / isp_out_width)
-        if h0 <= unicam_height:
-            h = h0
-            w = unicam_width
-        elif w0 <= unicam_width:
-            w = w0
-            h = unicam_height
-        else:
-            # TODO: There may be more reasonable values.
-            w = isp_out_width
-            h = isp_out_height
+        scale = min(unicam_height / isp_out_height, unicam_width / isp_out_width)
+        w = round(isp_out_width * scale)
+        h = round(isp_out_height * scale)
+        assert w <= unicam_width and h <= unicam_height
 
         left = int((unicam_width - w) / 2)
         top = int((unicam_height - h) / 2)
