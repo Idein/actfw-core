@@ -3,6 +3,7 @@ import os
 import select
 from ctypes import POINTER, c_void_p, cast, pointer, sizeof
 from typing import Any, Dict, List, Optional, Tuple
+import mmap
 
 from actfw_core.capture import Frame
 from actfw_core.task import Producer
@@ -25,6 +26,7 @@ from actfw_core.v4l2.video import (  # type: ignore
     RawVideo,
     V4LConverter,
 )
+from actfw_core.linux.dma_heap import DMAHeap
 
 _EMPTY_LIST: List[str] = []
 
@@ -38,6 +40,8 @@ BLACK_LEVEL: int = 4096
 DEFAULT_CONTRAST: float = 1.0
 
 V2_UNICAM_SIZES: List[Tuple[int, int]] = [(3280, 2464), (1920, 1080), (1640, 1232), (640, 480)]
+
+MAX_LS_GRID_SIZE = 0x8000
 
 CTT_FILE = os.path.join(os.path.dirname(__file__), "data/imx219.json")
 
@@ -179,6 +183,15 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             (61440, 64476),
             (65535, 65535),
         ]
+
+        # - update by alsc
+        self.ls_table_dma_heap_fd = DMAHeap("/dev/dma_heap/linux,cma").alloc("_ls_grid", MAX_LS_GRID_SIZE)
+        self.ls_table_mm = mmap.mmap(
+            self.ls_table_dma_heap_fd,
+            MAX_LS_GRID_SIZE,
+            flags=mmap.MAP_SHARED,
+            prot=mmap.PROT_READ| mmap.PROT_WRITE,
+            )
 
         # some device status cache (set by set_unicam_fps)
         self.vblank: int = 0

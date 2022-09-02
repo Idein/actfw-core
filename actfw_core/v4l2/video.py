@@ -13,6 +13,7 @@ from ctypes import *
 from ctypes.util import find_library
 from typing import List
 
+from actfw_core.linux.ioctl import _IOR, _IOW, _IOWR
 from actfw_core.v4l2.control import *
 from actfw_core.v4l2.types import *
 
@@ -104,46 +105,6 @@ class _libv4lconvert(object):
 
 _v4l2 = _libv4l2()
 _v4lconvert = _libv4lconvert()
-
-_IOC_NRBITS = 8
-_IOC_TYPEBITS = 8
-
-_IOC_SIZEBITS = 14
-_IOC_DIRBITS = 2
-
-_IOC_NRMASK = (1 << _IOC_NRBITS) - 1
-_IOC_TYPEMASK = (1 << _IOC_TYPEBITS) - 1
-_IOC_SIZEMASK = (1 << _IOC_SIZEBITS) - 1
-_IOC_DIRMASK = (1 << _IOC_DIRBITS) - 1
-
-_IOC_NRSHIFT = 0
-_IOC_TYPESHIFT = _IOC_NRSHIFT + _IOC_NRBITS
-_IOC_SIZESHIFT = _IOC_TYPESHIFT + _IOC_TYPEBITS
-_IOC_DIRSHIFT = _IOC_SIZESHIFT + _IOC_SIZEBITS
-
-_IOC_NONE = 0
-_IOC_WRITE = 1
-_IOC_READ = 2
-
-
-def _IOC(dir, type, nr, size):
-    return (dir << _IOC_DIRSHIFT) | (ord(type) << _IOC_TYPESHIFT) | (nr << _IOC_NRSHIFT) | (size << _IOC_SIZESHIFT)
-
-
-def _IO(type, nr):
-    return _IOC(_IOC_NONE, type, nr, 0)
-
-
-def _IOR(type, nr, size):
-    return _IOC(_IOC_READ, type, nr, sizeof(size))
-
-
-def _IOW(type, nr, size):
-    return _IOC(_IOC_WRITE, type, nr, sizeof(size))
-
-
-def _IOWR(type, nr, size):
-    return _IOC(_IOC_READ | _IOC_WRITE, type, nr, sizeof(size))
 
 
 class _VIDIOC(enum.IntEnum):
