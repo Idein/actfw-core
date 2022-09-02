@@ -2,7 +2,7 @@ import json
 from math import floor
 import os
 import select
-from ctypes import POINTER, c_int16, c_void_p, cast, pointer, sizeof
+from ctypes import POINTER, c_int16, c_uint32, c_void_p, cast, pointer, sizeof
 from typing import Any, Dict, List, Optional, Tuple
 import mmap
 
@@ -81,7 +81,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         super().__init__()
 
         self.dma_buffer_num = 4
-        self.isp_out_buffer_num = 3 # adhoc: 4だと3に修正されたのでひとまず回避
+        self.isp_out_buffer_num = 4 
         self.isp_out_metadata_buffer_num = 2
         self.shared_dma_fds: List[int] = []
         self.unicam = RawVideo(unicam, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
@@ -444,10 +444,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.populate_ls_table(self.ls_table_g, self.ls_table_mm, w, h)
         self.populate_ls_table(self.ls_table_b, self.ls_table_mm, w, h)        
         self.ls_table_mm.seek(0)
-        #print(self.ls_table_mm.readline())
 
         ls = bcm2835_isp_lens_shading()
-        ls.enable = 1
+        ls.enabled = 1
         ls.grid_cell_size = cell_size
         ls.grid_width = w
         ls.grid_stride = w
