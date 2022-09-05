@@ -59,7 +59,10 @@ class CommandServer(Isolated):
                     else:
                         break
             try:
-                assert self.img is not None
+                if self.img is None:
+                    # this server may be terminating
+                    # re-check self.running
+                    continue
 
                 conn, _ = s.accept()
                 request, err = CommandRequest.parse(conn)
