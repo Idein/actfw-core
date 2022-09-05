@@ -415,11 +415,15 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         luminace_table = self.ctt["rpi.alsc"]["luminance_lut"]
         luminace_strength = self.ctt["rpi.alsc"]["luminance_strength"]
+        def normalize(table: List[float]) -> List[float]:
+            m = min(table)
+            return [x / m for x in table]
 
-        self.ls_table_r = [(r*(lut - 1)*luminace_strength) + 1 for (r, lut) in zip(cal_table_r, luminace_table)]
-        self.ls_table_g = [(1.0*(lut - 1)*luminace_strength) +1 for lut in luminace_table]
-        self.ls_table_b = [(b*(lut - 1)*luminace_strength) + 1 for (b, lut) in zip(cal_table_b, luminace_table)]
-        # TODO: libcameraはこれに対して、normalizationしてるので必要かもしれない https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/controller/rpi/alsc.cpp#L741
+        # normalize seemes to have no effect
+        self.ls_table_r = normalize([(r*(lut - 1)*luminace_strength) + 1 for (r, lut) in zip(cal_table_r, luminace_table)])
+        self.ls_table_g = normalize([(1.0*(lut - 1)*luminace_strength) +1 for lut in luminace_table])
+        self.ls_table_b = normalize([(b*(lut - 1)*luminace_strength) + 1 for (b, lut) in zip(cal_table_b, luminace_table)])
+
         self.apply_ls_tables()
 
     # libcameraのapplyLSを参考にしている: https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1343

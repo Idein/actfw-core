@@ -479,7 +479,7 @@ class bcm2835_isp_gain_format(enum.IntEnum):
     GAIN_FORMAT_U2P6_1 = 4
     GAIN_FORMAT_U3P5_0 = 5
     GAIN_FORMAT_U3P5_1 = 6
-    GAIN_FORMAT_U4P10  = 7
+    GAIN_FORMAT_U4P10 = 7
 
 
 class bcm2835_isp_black_level(Structure):
