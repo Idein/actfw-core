@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import threading
 import time
+from typing import Any
 
 import actfw_core
 
@@ -9,7 +10,7 @@ def test_command_server_terminate() -> None:
     # try to catch assert error
     exception = None
 
-    def excepthook(args: threading._ExceptHookArgs) -> None:
+    def excepthook(args: Any) -> None:
         nonlocal exception
         exception = args.exc_value
 
