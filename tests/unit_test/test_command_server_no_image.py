@@ -1,16 +1,18 @@
 #!/usr/bin/python3
-import time
-import actfw_core
 import threading
+import time
+
+import actfw_core
 
 
-def test_command_server_terminate():
+def test_command_server_terminate() -> None:
     # try to catch assert error
     exception = None
 
-    def excepthook(args, /):
+    def excepthook(args: threading._ExceptHookArgs) -> None:
         nonlocal exception
         exception = args.exc_value
+
     threading.excepthook = excepthook
 
     # Actcast application
@@ -19,7 +21,6 @@ def test_command_server_terminate():
     # CommandServer (for `Take Photo` command)
     cmd = actfw_core.CommandServer("/tmp/test.sock")
     app.register_task(cmd)
-
 
     # Start application
     th = threading.Thread(target=lambda: app.run())
