@@ -70,6 +70,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_out_buffer_num = 4
         self.isp_out_metadata_buffer_num = 2
         self.shared_dma_fds: List[int] = []
+        self.sensor_name = self.get_sensor_name()
+        if self.sensor_name not in ["imx219", "ov5647"]:
+            raise RuntimeError(f"not supported sensor: {self.sensor_name}")
         self.unicam = RawVideo(unicam, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
         self.unicam_subdev = RawVideo(unicam_subdev, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
         self.isp_in = RawVideo(isp_in, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_OUTPUT, init_controls=init_controls)
@@ -185,6 +188,11 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
 
         self.request_buffer()
+
+    def get_sensor_name(self) -> str:
+        with open("/sys/class/video4linux/v4l-subdev0/device/name") as f:
+            sensor_name = f.read()
+        return sensor_name.rstrip()
 
     def setup_pipeline(self) -> None:
         # setup unicam
