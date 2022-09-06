@@ -240,7 +240,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         # sutup isp_in
         bl = bcm2835_isp_black_level()
-        bl.enabled = 1
+        bl.enabled = 1  
         bl.black_level_r = BLACK_LEVEL
         bl.black_level_g = BLACK_LEVEL
         bl.black_level_b = BLACK_LEVEL
@@ -419,11 +419,19 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             m = min(table)
             return [x / m for x in table]
 
+        # cal tableをnormalize
         # normalize seemes to have no effect
-        self.ls_table_r = normalize([(r*(lut - 1)*luminace_strength) + 1 for (r, lut) in zip(cal_table_r, luminace_table)])
-        self.ls_table_g = normalize([(1.0*(lut - 1)*luminace_strength) +1 for lut in luminace_table])
-        self.ls_table_b = normalize([(b*(lut - 1)*luminace_strength) + 1 for (b, lut) in zip(cal_table_b, luminace_table)])
-
+        cal_table_r = normalize(cal_table_r)
+        cal_table_b = normalize(cal_table_b)
+        self.ls_table_r = normalize([r*((lut-1)*luminace_strength + 1) for (r, lut) in zip(cal_table_r, luminace_table)])
+        self.ls_table_g = normalize([1.0*((lut-1)*luminace_strength + 1) for lut in luminace_table])
+        self.ls_table_b = normalize([b*((lut-1)*luminace_strength + 1) for (b, lut) in zip(cal_table_b, luminace_table)])
+        print("RED")
+        print(self.ls_table_r)
+        print("GREEN")
+        print(self.ls_table_g)
+        print("BLUE")
+        print(self.ls_table_b)
         self.apply_ls_tables()
 
     # libcameraのapplyLSを参考にしている: https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1343
@@ -447,7 +455,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.populate_ls_table(self.ls_table_g, self.ls_table_mm, w, h)
         self.populate_ls_table(self.ls_table_g, self.ls_table_mm, w, h)
         self.populate_ls_table(self.ls_table_b, self.ls_table_mm, w, h)        
-        self.ls_table_mm.seek(0)
+        # self.ls_table_mm.flush() # seek(0)
 
         ls = bcm2835_isp_lens_shading()
         ls.enabled = 1
@@ -477,8 +485,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         xf = [0] * dst_w
         x_hi = [0] * dst_w
 
-        x = 0.5
-        x_inc = src_w / (dst_w - 1)
+        x = -0.5
+        x_inc = src_w / (dst_w - 1) # ここで-1してる理由
         for i in range(0, dst_w):
             x_lo[i] = floor(x)
             xf[i] = x - x_lo[i]
@@ -486,7 +494,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             x_lo[i] = max(x_lo[i], 0)
             x += x_inc
 
-        y = 0.5
+        y = -0.5
         y_inc = src_h / (dst_h - 1)
         for _ in range(0, dst_h):
             y_lo = floor(y)
@@ -494,8 +502,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             y_hi = min(y_lo + 1, src_h - 1)
             y_lo = max(y_lo, 0)
             for i in range(0, dst_w):
-                above = (src[(y_lo*src_h)+x_lo[i]]*(1 - xf[i])) + (src[(y_lo*src_h)+x_hi[i]]*xf[i])
-                below = (src[(y_hi*src_h)+x_lo[i]]*(1 - xf[i])) + (src[(y_hi*src_h)+x_hi[i]]*xf[i])                
+                above = (src[(y_lo*src_w)+x_lo[i]]*(1 - xf[i])) + (src[(y_lo*src_w)+x_hi[i]]*xf[i])
+                # print(f"src[{y_hi}][{x_lo[i]}] , src[{y_hi}][{x_hi[i]}]", flush=True)
+                below = (src[(y_hi*src_w)+x_lo[i]]*(1 - xf[i])) + (src[(y_hi*src_w)+x_hi[i]]*xf[i])                
                 result = floor(1024*(above*(1 - yf) + below*yf)+ 0.5)
                 result = min(result, 16383)
                 ls_table.write(bytes(c_int16(result)))
