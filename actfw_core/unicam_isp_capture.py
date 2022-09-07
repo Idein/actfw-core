@@ -5,6 +5,7 @@ import select
 from ctypes import POINTER, c_int16, c_uint32, c_void_p, cast, pointer, sizeof
 from typing import Any, Dict, List, Optional, Tuple
 import mmap
+from dataclasses import dataclass
 
 from actfw_core.capture import Frame
 from actfw_core.task import Producer
@@ -43,7 +44,19 @@ GAINS: List[float] = [1.0, 2.0, 4.0, 6.0, 8.0]
 BLACK_LEVEL: int = 4096
 DEFAULT_CONTRAST: float = 1.0
 
-V2_UNICAM_SIZES: List[Tuple[int, int]] = [(3280, 2464), (1920, 1080), (1640, 1232), (640, 480)]
+@dataclass(frozen=True, eq=True)
+class CameraMode:
+    size: Tuple[int, int]
+    scale: Tuple[float, float] # scaling factor (so if uncropped, width*scale_x is sensor_width)
+    crop: Tuple[int, int] # location of top left pixel in the sensor frame
+
+
+V2_UNICAM_MODES: List[CameraMode] = [
+    CameraMode(size=(3280, 2464), scale=(1.0, 1.0), crop=(0,0)),
+    CameraMode(size=(1920, 1080), scale=(1.0, 1.0), crop=(680, 692)), # TODO: confirm crop is appropriate
+    CameraMode(size=(1640, 1232), scale=(2.0, 2.0), crop=(0,0)),
+    CameraMode(size=(640, 480), scale=(2.0, 2.0), crop=(1000, 752)), # TODO: confirm crop is appropriate
+]
 
 MAX_LS_GRID_SIZE = 0x8000
 
@@ -100,30 +113,33 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.expected_fps = framerate
 
         if unicam_size is not None and crop_size is not None:
-            (self.expected_unicam_width, self.expected_unicam_height) = unicam_size
+            matched_modes = list(filter(lambda mode: mode.size == unicam_size, V2_UNICAM_MODES))
+            if len(matched_modes) == 0:
+                raise RuntimeError(f"({unicam_size}) is not supoorted for unicam size")
+            self.camera_mode = matched_modes[0]
             self.crop_size = crop_size
         elif unicam_size is None and crop_size is None:
             # Auto selection of unicam_size and crop_size.
             # Support only v2 camera module.
             if self.expected_width <= 1280 and self.expected_height <= 720:
                 if self.expected_fps <= 40:
-                    (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[2]
+                    self.camera_mode = V2_UNICAM_MODES[2]
                     self.crop_size = self.calc_crop_size(
-                        self.expected_width, self.expected_height, self.expected_unicam_width, self.expected_unicam_height
+                        self.expected_width, self.expected_height, *self.camera_mode.size
                     )
                 else:
                     if abs(self.expected_width / self.expected_height - 16 / 9) < 0.05:
-                        (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[2]
+                        self.camera_mode = V2_UNICAM_MODES[2]
                         self.crop_size = (180, 256, 1280, 720)
                     else:
-                        (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[3]
+                        self.camera_mode = V2_UNICAM_MODES[3]
                         self.crop_size = self.calc_crop_size(
-                            self.expected_width, self.expected_height, self.expected_unicam_width, self.expected_unicam_height
+                            self.expected_width, self.expected_height, *self.camera_mode.size
                         )
             else:
-                (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[0]
+                self.camera_mode = V2_UNICAM_MODES[0]
                 self.crop_size = self.calc_crop_size(
-                    self.expected_width, self.expected_height, self.expected_unicam_width, self.expected_unicam_height
+                    self.expected_width, self.expected_height, *self.camera_mode.size
                 )
         else:
             raise RuntimeError("Both unicam_size and crop_size must be None or tuples.")
@@ -214,14 +230,17 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         self.request_buffer()
 
+
     def setup_pipeline(self) -> None:
         # setup unicam
         if not (self.unicam_subdev.set_vertical_flip(True) and self.unicam_subdev.set_horizontal_flip(True)):
             raise RuntimeError("fail to setup unicam subdevice node")
 
         self.unicam_subdev.set_subdev_format(
-            self.expected_unicam_width, self.expected_unicam_height, MEDIA_BUS_FMT.SBGGR10_1X10
+            *self.camera_mode.size, MEDIA_BUS_FMT.SBGGR10_1X10
         )
+        if self.unicam_subdev.subdev_fmt.format.width != self.camera_mode.size[0] or self.unicam_subdev.subdev_fmt.format.height != self.camera_mode.size[1]:
+            raise RuntimeError("fail to setup unicam device node")
         self.unicam_width = self.unicam_subdev.subdev_fmt.format.width
         self.unicam_height = self.unicam_subdev.subdev_fmt.format.height
         self.unicam_format = V4L2_PIX_FMT.SBGGR10P
@@ -307,6 +326,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         gain_ctrl.id = V4L2_CID.ANALOGUE_GAIN
         gain_ctrl.value = int(unicam_subdev_analogue_gain)
         self.unicam_subdev.set_ext_controls([exposure_ctrl, gain_ctrl])
+
 
     def calc_crop_size(
         self, isp_out_width: int, isp_out_height: int, unicam_width: int, unicam_height: int
@@ -426,12 +446,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.ls_table_r = normalize([r*((lut-1)*luminace_strength + 1) for (r, lut) in zip(cal_table_r, luminace_table)])
         self.ls_table_g = normalize([1.0*((lut-1)*luminace_strength + 1) for lut in luminace_table])
         self.ls_table_b = normalize([b*((lut-1)*luminace_strength + 1) for (b, lut) in zip(cal_table_b, luminace_table)])
-        print("RED")
-        print(self.ls_table_r)
-        print("GREEN")
-        print(self.ls_table_g)
-        print("BLUE")
-        print(self.ls_table_b)
         self.apply_ls_tables()
 
     # libcameraのapplyLSを参考にしている: https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1343
@@ -473,6 +487,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         ls_ctrl.size = sizeof(bcm2835_isp_lens_shading)
         ls_ctrl.ptr = cast(pointer(ls), c_void_p)
         self.isp_in.set_ext_controls([ls_ctrl])
+
+    def resample_cal_table(self, src:List[int]) -> List[int]:
+        pass
 
     # resampleTable: https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1403
     # にあたる部分
