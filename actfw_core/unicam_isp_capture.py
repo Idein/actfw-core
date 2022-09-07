@@ -51,6 +51,7 @@ class CameraMode:
     crop: Tuple[int, int] # location of top left pixel in the sensor frame
 
 
+V2_SENSOR_SIZE = (3280, 2464)
 V2_UNICAM_MODES: List[CameraMode] = [
     CameraMode(size=(3280, 2464), scale=(1.0, 1.0), crop=(0,0)),
     CameraMode(size=(1920, 1080), scale=(1.0, 1.0), crop=(680, 692)), # TODO: confirm crop is appropriate
@@ -59,6 +60,8 @@ V2_UNICAM_MODES: List[CameraMode] = [
 ]
 
 MAX_LS_GRID_SIZE = 0x8000
+LS_TABLE_W = 16
+LS_TABLE_H = 12
 
 CTT_FILE = os.path.join(os.path.dirname(__file__), "data/imx219.json")
 
@@ -441,11 +444,15 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         # cal tableをnormalize
         # normalize seemes to have no effect
+        cal_table_r = self.resample_cal_table(cal_table_r, self.camera_mode)
+        cal_table_b = self.resample_cal_table(cal_table_b, self.camera_mode)
         cal_table_r = normalize(cal_table_r)
         cal_table_b = normalize(cal_table_b)
+
         self.ls_table_r = normalize([r*((lut-1)*luminace_strength + 1) for (r, lut) in zip(cal_table_r, luminace_table)])
         self.ls_table_g = normalize([1.0*((lut-1)*luminace_strength + 1) for lut in luminace_table])
         self.ls_table_b = normalize([b*((lut-1)*luminace_strength + 1) for (b, lut) in zip(cal_table_b, luminace_table)])
+
         self.apply_ls_tables()
 
     # libcameraのapplyLSを参考にしている: https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1343
@@ -488,8 +495,44 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         ls_ctrl.ptr = cast(pointer(ls), c_void_p)
         self.isp_in.set_ext_controls([ls_ctrl])
 
-    def resample_cal_table(self, src:List[int]) -> List[int]:
-        pass
+    def resample_cal_table(self, src:List[float], camera_mode: CameraMode) -> List[int]:
+        assert(len(src) == LS_TABLE_W * LS_TABLE_H)
+        new_table: List[float] = []
+
+        x_lo: List[int] = [0] * LS_TABLE_W
+        x_hi: List[int] = [0] * LS_TABLE_W
+        xf: List[float] = [0] * LS_TABLE_W
+        scale_x = V2_SENSOR_SIZE[0] / (camera_mode.size[0] * camera_mode.scale[0])
+        offset_x = (camera_mode.crop[0] / V2_SENSOR_SIZE[0]) * LS_TABLE_W
+        x = (0.5 / scale_x) + offset_x - 0.5
+        x_inc = 1 / scale_x
+        for i in range(0, LS_TABLE_W):
+            x_lo[i] = floor(x)
+            xf[i] = x - x_lo[i]
+            x_hi[i] = min(x_lo[i] + 1, LS_TABLE_W - 1)
+            x_lo[i] = max(x_lo[i], 0)
+            x += x_inc
+
+        scale_y = V2_SENSOR_SIZE[1] / (camera_mode.size[1] * camera_mode.scale[1])
+        offset_y = (camera_mode.crop[1] / V2_SENSOR_SIZE[1]) * LS_TABLE_H
+        y = (0.5 / scale_y) + offset_y - 0.5
+        y_inc = 1 / scale_y
+        for _ in range(0, LS_TABLE_H):
+            y_lo = floor(y)
+            yf = y - y_lo
+            y_hi = min(y_lo + 1, LS_TABLE_H - 1)
+            y_lo = max(y_lo, 0)
+            row_above = src[y_lo*LS_TABLE_W : (y_lo+1)*LS_TABLE_W]
+            row_below = src[y_hi*LS_TABLE_W : (y_hi+1)*LS_TABLE_W]
+            for i in range(0, LS_TABLE_W):
+                above = row_above[x_lo[i]]*(1 - xf[i]) + row_above[x_hi[i]]*xf[i]
+                below = row_below[x_lo[i]]*(1 - xf[i]) + row_below[x_hi[i]]*xf[i]
+                new_table.append(above * (1 - yf) + below * yf)
+            
+            y += y_inc
+
+        assert(len(new_table) == LS_TABLE_W * LS_TABLE_H)
+        return new_table
 
     # resampleTable: https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1403
     # にあたる部分
