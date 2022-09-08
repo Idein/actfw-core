@@ -2,13 +2,13 @@ import json
 import mmap
 import os
 import select
-from ctypes import POINTER, c_int16, c_uint32, c_void_p, cast, pointer, sizeof
+from ctypes import POINTER, c_int16, c_void_p, cast, pointer, sizeof
 from dataclasses import dataclass
 from math import floor
 from typing import Any, Dict, List, Optional, Tuple
 
 from actfw_core.capture import Frame
-from actfw_core.linux.dma_heap import DMAHeap
+from actfw_core.linux.dma_heap import DMAHeap  # type: ignore
 from actfw_core.task import Producer
 from actfw_core.v4l2.types import (
     AWB_REGIONS,
@@ -22,7 +22,6 @@ from actfw_core.v4l2.types import (
     v4l2_ext_control,
 )
 from actfw_core.v4l2.video import (  # type: ignore
-    _VIDIOC,
     MEDIA_BUS_FMT,
     V4L2_BUF_TYPE,
     V4L2_CID,
@@ -95,7 +94,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         hi_level: float = 0.95,
         hi_max: int = 2000,
         alsc: bool = True,
-        default_color_temperature=4500,
+        default_color_temperature: int = 4500,
     ) -> None:
         super().__init__()
 
@@ -103,12 +102,30 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_out_buffer_num = 4
         self.isp_out_metadata_buffer_num = 2
         self.shared_dma_fds: List[int] = []
-        self.unicam = RawVideo(unicam, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
-        self.unicam_subdev = RawVideo(unicam_subdev, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
-        self.isp_in = RawVideo(isp_in, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_OUTPUT, init_controls=init_controls)
-        self.isp_out_high = RawVideo(isp_out_high, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
+        self.unicam = RawVideo(
+            unicam,
+            v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE,
+            init_controls=init_controls,
+        )
+        self.unicam_subdev = RawVideo(
+            unicam_subdev,
+            v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE,
+            init_controls=init_controls,
+        )
+        self.isp_in = RawVideo(
+            isp_in,
+            v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_OUTPUT,
+            init_controls=init_controls,
+        )
+        self.isp_out_high = RawVideo(
+            isp_out_high,
+            v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE,
+            init_controls=init_controls,
+        )
         self.isp_out_metadata = RawVideo(
-            isp_out_metadata, v4l2_buf_type=V4L2_BUF_TYPE.META_CAPTURE, init_controls=init_controls
+            isp_out_metadata,
+            v4l2_buf_type=V4L2_BUF_TYPE.META_CAPTURE,
+            init_controls=init_controls,
         )
         self.do_awb = auto_whitebalance
         self.do_agc = agc
@@ -130,14 +147,22 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             if self.expected_width <= 1280 and self.expected_height <= 720:
                 if self.expected_fps <= 40:
                     self.camera_mode = V2_UNICAM_MODES[2]
-                    self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
+                    self.crop_size = self.calc_crop_size(
+                        self.expected_width,
+                        self.expected_height,
+                        *self.camera_mode.size,
+                    )
                 else:
                     if abs(self.expected_width / self.expected_height - 16 / 9) < 0.05:
                         self.camera_mode = V2_UNICAM_MODES[2]
                         self.crop_size = (180, 256, 1280, 720)
                     else:
                         self.camera_mode = V2_UNICAM_MODES[3]
-                        self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
+                        self.crop_size = self.calc_crop_size(
+                            self.expected_width,
+                            self.expected_height,
+                            *self.camera_mode.size,
+                        )
             else:
                 self.camera_mode = V2_UNICAM_MODES[0]
                 self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
@@ -226,7 +251,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.converter = V4LConverter(self.isp_out_high.device_fd)
         self.setup_pipeline()
         self.output_fmt = self.converter.try_convert(
-            self.isp_out_high.fmt, self.expected_width, self.expected_height, self.expected_pix_format
+            self.isp_out_high.fmt,
+            self.expected_width,
+            self.expected_height,
+            self.expected_pix_format,
         )
 
         self.request_buffer()
@@ -286,12 +314,17 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         # TODO: Ensure that the value of bytesperline is equal to width or handle padding appropriately.
         # One possible solution is to use only width of multiples of 32.
-        (isp_out_width, isp_out_height, isp_out_format) = self.isp_out_high.set_pix_format(
-            self.expected_width, self.expected_height, self.expected_pix_format
-        )
+        (
+            isp_out_width,
+            isp_out_height,
+            isp_out_format,
+        ) = self.isp_out_high.set_pix_format(self.expected_width, self.expected_height, self.expected_pix_format)
 
         self.output_fmt = self.converter.try_convert(
-            self.isp_out_high.fmt, self.expected_width, self.expected_height, self.expected_pix_format
+            self.isp_out_high.fmt,
+            self.expected_width,
+            self.expected_height,
+            self.expected_pix_format,
         )
 
         # setup isp_out_metadata
@@ -333,7 +366,11 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.unicam_subdev.set_ext_controls([exposure_ctrl, gain_ctrl])
 
     def calc_crop_size(
-        self, isp_out_width: int, isp_out_height: int, unicam_width: int, unicam_height: int
+        self,
+        isp_out_width: int,
+        isp_out_height: int,
+        unicam_width: int,
+        unicam_height: int,
     ) -> Tuple[int, int, int, int]:
         scale = min(unicam_height / isp_out_height, unicam_width / isp_out_width)
         w = round(isp_out_width * scale)
@@ -422,7 +459,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             calibration1 = calibrations[idx + 1]["table"]
             return [(x0 * (ct1 - ct) + x1 * (ct - ct0)) / (ct1 - ct0) for (x0, x1) in zip(calibration0, calibration1)]
 
-    # simplified version of [alsc algorithm in libcamera](https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/controller/rpi/alsc.cpp#L772)
+    # simplified version of [alsc algorithm in libcamera](https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/controller/rpi/alsc.cpp#L772) # noqa: E501, B950
     # with the following omitted
     #  - dynamic lens shading table calculation based on estimated colour templature
     #  - "Adaptive ALSC Algorithm"
@@ -450,8 +487,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         self.apply_ls_tables()
 
-    # correspond to [resampleCalTable](https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/controller/rpi/alsc.cpp#L463)
-    def resample_cal_table(self, src: List[float], camera_mode: CameraMode) -> List[int]:
+    # correspond to [resampleCalTable](https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/controller/rpi/alsc.cpp#L463) # noqa: E501, B950
+    def resample_cal_table(self, src: List[float], camera_mode: CameraMode) -> List[float]:
         assert len(src) == LS_TABLE_W * LS_TABLE_H
         new_table: List[float] = []
 
@@ -490,8 +527,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         assert len(new_table) == LS_TABLE_W * LS_TABLE_H
         return new_table
 
-    # correspond to [applyLS](https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1343)
-    def apply_ls_tables(self):
+    # correspond to [applyLS](https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1343) # noqa: E501, B950
+    def apply_ls_tables(self) -> None:
         assert len(self.ls_table_b) == LS_TABLE_W * LS_TABLE_H
         assert len(self.ls_table_r) == LS_TABLE_W * LS_TABLE_H
         assert len(self.ls_table_g) == LS_TABLE_W * LS_TABLE_H
@@ -528,12 +565,12 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         ls_ctrl.ptr = cast(pointer(ls), c_void_p)
         self.isp_in.set_ext_controls([ls_ctrl])
 
-    # correspond to [resampleTable](https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1403)
-    def populate_ls_table(self, src: List[int], dst_w: int, dst_h: int, ls_table: mmap.mmap, offset: int):
+    # correspond to [resampleTable](https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1403) # noqa: E501, B950
+    def populate_ls_table(self, src: List[float], dst_w: int, dst_h: int, ls_table: mmap.mmap, offset: int) -> None:
         assert len(src) == LS_TABLE_W * LS_TABLE_H
-        x_lo = [0] * dst_w
-        xf = [0] * dst_w
-        x_hi = [0] * dst_w
+        x_lo: List[int] = [0] * dst_w
+        xf: List[float] = [0.0] * dst_w
+        x_hi: List[int] = [0] * dst_w
 
         x = -0.5
         x_inc = LS_TABLE_W / (dst_w - 1)
@@ -559,7 +596,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 below = row_below[x_lo[i]] * (1 - xf[i]) + row_below[x_hi[i]] * xf[i]
                 result = floor(1024 * (above * (1 - yf) + below * yf) + 0.5)
                 result = min(result, 16383)
-                result_as_bytes = bytes(c_int16(result))
+                result_as_bytes = bytes(c_int16(result))  # type: ignore
                 assert len(result_as_bytes) == 2  # 16 bits
                 ls_table[ls_table_idx : ls_table_idx + 2] = result_as_bytes
                 ls_table_idx += 2
@@ -664,7 +701,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
     # gamma2(gamma1(x)) with care of boundary values
     def compose_gamma_curve(
-        self, one: List[Tuple[float, float]], other: List[Tuple[float, float]], eps: float = 1e-6
+        self,
+        one: List[Tuple[float, float]],
+        other: List[Tuple[float, float]],
+        eps: float = 1e-6,
     ) -> List[Tuple[float, float]]:
         this_x = one[0][0]
         this_y = one[0][1]
@@ -772,7 +812,17 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 gamma_curve = self.compose_gamma_curve(self.compute_stretch_curve(histogram), gamma_curve)
         if self.brightness != 0 or self.contrast != 1.0:
             gamma_curve = [
-                (x, max(0.0, min(65535.0, (y - 32768) * self.contrast + 32768 + self.brightness))) for (x, y) in gamma_curve
+                (
+                    x,
+                    max(
+                        0.0,
+                        min(
+                            65535.0,
+                            (y - 32768) * self.contrast + 32768 + self.brightness,
+                        ),
+                    ),
+                )
+                for (x, y) in gamma_curve
             ]
         gm = bcm2835_isp_gamma()
         self.fill_in_contrast_status(gm, gamma_curve)

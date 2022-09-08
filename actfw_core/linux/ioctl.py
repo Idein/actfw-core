@@ -1,4 +1,7 @@
-from ctypes import *
+# type: ignore
+# flake8: noqa
+
+from ctypes import sizeof
 
 _IOC_NRBITS = 8
 _IOC_TYPEBITS = 8

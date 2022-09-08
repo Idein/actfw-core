@@ -1,4 +1,4 @@
-from ctypes import *
+from ctypes import Structure, c_uint32, c_uint64
 
 
 class dma_heap_allocation_data(Structure):

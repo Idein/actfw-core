@@ -1,6 +1,8 @@
+# type: ignore
+# flake8: noqa
 import errno
 import os
-from ctypes import byref, c_char_p, get_errno
+from ctypes import c_char_p, get_errno
 from fcntl import ioctl
 
 from actfw_core.linux.ioctl import _IOW, _IOWR
