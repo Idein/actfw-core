@@ -1,6 +1,9 @@
 import select
 from ctypes import POINTER, c_void_p, cast, pointer, sizeof
+import json
+from os import path
 from typing import Any, Dict, List, Optional, Tuple
+
 
 from actfw_core.capture import Frame
 from actfw_core.task import Producer
@@ -31,93 +34,6 @@ AGC_INTERVAL: int = 3
 
 V2_UNICAM_SIZES: List[Tuple[int, int]] = [(3280, 2464), (1920, 1080), (1640, 1232), (640, 480)]
 
-
-DEFAULT_CONFIG = {
-    "rpi.black_level": {"black_level": 4096},
-    "rpi.lux": {
-        "reference_shutter_speed": 27685,
-        "reference_gain": 1.0,
-        "reference_aperture": 1.0,
-        "reference_lux": 998,
-        "reference_Y": 12744,
-    },
-    "rpi.agc": {
-        "exposure_modes": {"normal": {"shutter": [100, 10000, 30000, 60000, 66666], "gain": [1.0, 2.0, 4.0, 6.0, 8.0]}}
-    },
-    "rpi.contrast": {
-        "ce_enable": True,
-        "gamma_curve": [
-            0,
-            0,
-            1024,
-            5040,
-            2048,
-            9338,
-            3072,
-            12356,
-            4096,
-            15312,
-            5120,
-            18051,
-            6144,
-            20790,
-            7168,
-            23193,
-            8192,
-            25744,
-            9216,
-            27942,
-            10240,
-            30035,
-            11264,
-            32005,
-            12288,
-            33975,
-            13312,
-            35815,
-            14336,
-            37600,
-            15360,
-            39168,
-            16384,
-            40642,
-            18432,
-            43379,
-            20480,
-            45749,
-            22528,
-            47753,
-            24576,
-            49621,
-            26624,
-            51253,
-            28672,
-            52698,
-            30720,
-            53796,
-            32768,
-            54876,
-            36864,
-            57012,
-            40960,
-            58656,
-            45056,
-            59954,
-            49152,
-            61183,
-            53248,
-            62355,
-            57344,
-            63419,
-            61440,
-            64476,
-            65535,
-            65535,
-        ],
-    },
-}
-
-
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
         self,
@@ -136,7 +52,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         agc: bool = True,
         target_Y: float = 0.16,  # Temporary set for the developement of agc algorithm
         contrast: bool = True,
-        config: Dict[str, Any] = DEFAULT_CONFIG,
+        config: Dict[str, Any] = {},
     ) -> None:
         super().__init__()
 
@@ -147,6 +63,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.sensor_name = self.get_sensor_name(unicam_subdev)
         if self.sensor_name not in ["imx219", "ov5647"]:
             raise RuntimeError(f"not supported sensor: {self.sensor_name}")
+
         self.unicam = RawVideo(unicam, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
         self.unicam_subdev = RawVideo(unicam_subdev, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
         self.isp_in = RawVideo(isp_in, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_OUTPUT, init_controls=init_controls)
@@ -190,6 +107,13 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 )
         else:
             raise RuntimeError("Both unicam_size and crop_size must be None or tuples.")
+
+        # config precedence: default < sensor specific < user given
+        with open(path.join(path.dirname(__file__), 'data', self.sensor_name + ".json"), 'r') as f:
+            sensor_config = json.load(f)
+        sensor_config.update(config)
+        # just rename
+        config = sensor_config
 
         # black level config
         _bl = config.get("rpi.black_level", {})
