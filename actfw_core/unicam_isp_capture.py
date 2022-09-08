@@ -113,7 +113,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         if unicam_size is not None and crop_size is not None:
             matched_modes = list(filter(lambda mode: mode.size == unicam_size, V2_UNICAM_MODES))
             if len(matched_modes) == 0:
-                raise RuntimeError(f"({unicam_size}) is not supoorted for unicam size")
+                raise RuntimeError(f"({unicam_size}) is not supported for unicam size")
             self.camera_mode = matched_modes[0]
             self.crop_size = crop_size
         elif unicam_size is None and crop_size is None:
@@ -284,11 +284,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         # TODO: Ensure that the value of bytesperline is equal to width or handle padding appropriately.
         # One possible solution is to use only width of multiples of 32.
-        (
-            isp_out_width,
-            isp_out_height,
-            isp_out_format,
-        ) = self.isp_out_high.set_pix_format(self.expected_width, self.expected_height, self.expected_pix_format)
+        (isp_out_width, isp_out_height, isp_out_format) = self.isp_out_high.set_pix_format(
+            self.expected_width, self.expected_height, self.expected_pix_format
+        )
 
         self.output_fmt = self.converter.try_convert(
             self.isp_out_high.fmt,
@@ -775,17 +773,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 gamma_curve = self.compose_gamma_curve(self.compute_stretch_curve(histogram), gamma_curve)
         if self.brightness != 0 or self.contrast != 1.0:
             gamma_curve = [
-                (
-                    x,
-                    max(
-                        0.0,
-                        min(
-                            65535.0,
-                            (y - 32768) * self.contrast + 32768 + self.brightness,
-                        ),
-                    ),
-                )
-                for (x, y) in gamma_curve
+                (x, max(0.0, min(65535.0, (y - 32768) * self.contrast + 32768 + self.brightness))) for (x, y) in gamma_curve
             ]
         gm = bcm2835_isp_gamma()
         self.fill_in_contrast_status(gm, gamma_curve)
