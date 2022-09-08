@@ -31,6 +31,7 @@ AGC_INTERVAL: int = 3
 # TODO: support other than imx219
 # pick from https://github.com/kbingham/libcamera/blob/22ffeae04de2e7ce6b2476a35233c790beafb67f/src/ipa/raspberrypi/data/imx219.json#L132-L142 # noqa: E501, B950
 
+V1_UNICAM_SIZES: List[Tuple[int, int]] = [(2592, 1944), (1920, 1080), (1296, 972), (640, 480)]
 V2_UNICAM_SIZES: List[Tuple[int, int]] = [(3280, 2464), (1920, 1080), (1640, 1232), (640, 480)]
 
 
@@ -84,27 +85,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             self.crop_size = crop_size
         elif unicam_size is None and crop_size is None:
             # Auto selection of unicam_size and crop_size.
-            # Support only v2 camera module.
-            if self.expected_width <= 1280 and self.expected_height <= 720:
-                if self.expected_fps <= 40:
-                    (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[2]
-                    self.crop_size = self.calc_crop_size(
-                        self.expected_width, self.expected_height, self.expected_unicam_width, self.expected_unicam_height
-                    )
-                else:
-                    if abs(self.expected_width / self.expected_height - 16 / 9) < 0.05:
-                        (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[2]
-                        self.crop_size = (180, 256, 1280, 720)
-                    else:
-                        (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[3]
-                        self.crop_size = self.calc_crop_size(
-                            self.expected_width, self.expected_height, self.expected_unicam_width, self.expected_unicam_height
-                        )
+            if self.sensor_name == "imx219":
+                self.auto_size_selection_for_imx219()
             else:
-                (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[0]
-                self.crop_size = self.calc_crop_size(
-                    self.expected_width, self.expected_height, self.expected_unicam_width, self.expected_unicam_height
-                )
+                self.auto_size_selection_for_ov5647()
         else:
             raise RuntimeError("Both unicam_size and crop_size must be None or tuples.")
 
@@ -175,15 +159,18 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
     def setup_pipeline(self) -> None:
         # setup unicam
-        if not (self.unicam_subdev.set_vertical_flip(True) and self.unicam_subdev.set_horizontal_flip(True)):
-            raise RuntimeError("fail to setup unicam subdevice node")
+        if self.sensor_name == "imx219":
+            if not (self.unicam_subdev.set_vertical_flip(True) and self.unicam_subdev.set_horizontal_flip(True)):
+                raise RuntimeError("fail to setup unicam subdevice node")
 
-        self.unicam_subdev.set_subdev_format(
-            self.expected_unicam_width, self.expected_unicam_height, MEDIA_BUS_FMT.SBGGR10_1X10
-        )
+            bus_fmt = MEDIA_BUS_FMT.SBGGR10_1X10
+            self.unicam_format = V4L2_PIX_FMT.SBGGR10P
+        else:
+            bus_fmt = MEDIA_BUS_FMT.SGBRG10_1X10
+            self.unicam_format = V4L2_PIX_FMT.SGBRG10P
+        self.unicam_subdev.set_subdev_format(self.expected_unicam_width, self.expected_unicam_height, bus_fmt)
         self.unicam_width = self.unicam_subdev.subdev_fmt.format.width
         self.unicam_height = self.unicam_subdev.subdev_fmt.format.height
-        self.unicam_format = V4L2_PIX_FMT.SBGGR10P
         (unicam_width, unicam_height, unicam_format) = self.unicam.set_pix_format(
             self.unicam_width, self.unicam_height, self.unicam_format
         )
@@ -278,6 +265,35 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         left = int((unicam_width - w) / 2)
         top = int((unicam_height - h) / 2)
         return (left, top, w, h)
+
+    def auto_size_selection_for_imx219(self) -> None:
+        if self.expected_width <= 1280 and self.expected_height <= 720:
+            if self.expected_fps <= 40:
+                (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[2]
+                self.crop_size = self.calc_crop_size(
+                    self.expected_width, self.expected_height, self.expected_unicam_width, self.expected_unicam_height
+                )
+            else:
+                if abs(self.expected_width / self.expected_height - 16 / 9) < 0.05:
+                    (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[2]
+                    self.crop_size = (180, 256, 1280, 720)
+                else:
+                    (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[3]
+                    self.crop_size = self.calc_crop_size(
+                        self.expected_width, self.expected_height, self.expected_unicam_width, self.expected_unicam_height
+                    )
+        else:
+            (self.expected_unicam_width, self.expected_unicam_height) = V2_UNICAM_SIZES[0]
+            self.crop_size = self.calc_crop_size(
+                self.expected_width, self.expected_height, self.expected_unicam_width, self.expected_unicam_height
+            )
+
+    def auto_size_selection_for_ov5647(self) -> None:
+        # TODO: fix to make compatiblity with buster
+        (self.expected_unicam_width, self.expected_unicam_height) = V1_UNICAM_SIZES[0]
+        self.crop_size = self.calc_crop_size(
+            self.expected_width, self.expected_height, self.expected_unicam_width, self.expected_unicam_height
+        )
 
     def capture_size(self) -> Tuple[int, int]:
         return (self.output_fmt.fmt.pix.width, self.output_fmt.fmt.pix.height)
