@@ -1,10 +1,10 @@
 import json
 import mmap
-from os import path
 import select
 from ctypes import POINTER, c_int16, c_void_p, cast, pointer, sizeof
 from dataclasses import dataclass
 from math import floor
+from os import path
 from typing import Any, Dict, List, Optional, Tuple
 
 from actfw_core.capture import Frame
@@ -59,7 +59,7 @@ V2_UNICAM_MODES: List[CameraMode] = [
 ]
 
 
-CTT_FILE = os.path.join(os.path.dirname(__file__), "data/imx219.json")
+CTT_FILE = path.join(path.dirname(__file__), "data/imx219.json")
 
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
