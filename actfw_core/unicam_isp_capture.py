@@ -44,6 +44,10 @@ GAINS: List[float] = [1.0, 2.0, 4.0, 6.0, 8.0]
 BLACK_LEVEL: int = 4096
 DEFAULT_CONTRAST: float = 1.0
 
+MAX_LS_GRID_SIZE = 0x8000
+LS_TABLE_W = 16
+LS_TABLE_H = 12
+
 @dataclass(frozen=True, eq=True)
 class CameraMode:
     size: Tuple[int, int]
@@ -59,9 +63,6 @@ V2_UNICAM_MODES: List[CameraMode] = [
     CameraMode(size=(640, 480), scale=(2.0, 2.0), crop=(1000, 752)), # TODO: confirm crop is appropriate
 ]
 
-MAX_LS_GRID_SIZE = 0x8000
-LS_TABLE_W = 16
-LS_TABLE_H = 12
 
 CTT_FILE = os.path.join(os.path.dirname(__file__), "data/imx219.json")
 
@@ -92,7 +93,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         hi_histogram: float = 0.95,
         hi_level: float = 0.95,
         hi_max: int = 2000,
-        alsc: bool = True
+        alsc: bool = True,
+        default_color_temperature = 4500,
     ) -> None:
         super().__init__()
 
@@ -208,8 +210,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             (65535, 65535),
         ]
 
+        self.color_temperature = default_color_temperature
         self.do_alsc = alsc
-
+        
         # - update by alsc
         self.ls_table_dma_heap_fd = DMAHeap("/dev/dma_heap/linux,cma").alloc("_ls_grid", MAX_LS_GRID_SIZE)
         self.ls_table_mm = mmap.mmap(
@@ -259,6 +262,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             init_analogue_gain = GAINS[len(GAINS) // 2]
             self.set_unicam_exposure(init_analogue_gain, init_shutter_time)
             self.exposure = init_shutter_time * init_analogue_gain
+
+        # current alsc implementation does not change lens_shading table dynamically
+        if self.do_alsc:
+            self.alsc() 
 
         # sutup isp_in
         bl = bcm2835_isp_black_level()
@@ -422,32 +429,27 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             return [(x0 * (ct1 - ct) + x1 * (ct - ct0)) / (ct1 - ct0) for (x0, x1) in zip(calibration0, calibration1)]
 
 
-    # https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1343
-    # から以下を除いた処理を書こうとしている
-    # - resample_cal_table
-    # - "adaptive algorithm"にあたる部分
-    # - 色温度計算
-    def alsc(self, stats: bcm2835_isp_stats) -> None:
+    # simplified version of [alsc algorithm in libcamera](https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/controller/rpi/alsc.cpp#L772)
+    # with the following omitted
+    #  - dynamic lens shading table calculation based on estimated colour templature
+    #  - "Adaptive ALSC Algorithm"
+    def alsc(self) -> None:
+        ct = self.color_temperature
 
-        ct = 4500  # TODO: 色温度を計算する
         calibrations_Cr = self.ctt["rpi.alsc"]["calibrations_Cr"]
         calibrations_Cb = self.ctt["rpi.alsc"]["calibrations_Cb"]
-
         cal_table_r = self.get_cal_table(ct, calibrations_Cr)
         cal_table_b = self.get_cal_table(ct, calibrations_Cb)
-
         luminace_table = self.ctt["rpi.alsc"]["luminance_lut"]
         luminace_strength = self.ctt["rpi.alsc"]["luminance_strength"]
+
         def normalize(table: List[float]) -> List[float]:
             m = min(table)
             return [x / m for x in table]
 
-        # cal tableをnormalize
-        # normalize seemes to have no effect
         cal_table_r = self.resample_cal_table(cal_table_r, self.camera_mode)
         cal_table_b = self.resample_cal_table(cal_table_b, self.camera_mode)
-        cal_table_r = normalize(cal_table_r)
-        cal_table_b = normalize(cal_table_b)
+        luminace_table = self.resample_cal_table(luminace_table, self.camera_mode)
 
         self.ls_table_r = normalize([r*((lut-1)*luminace_strength + 1) for (r, lut) in zip(cal_table_r, luminace_table)])
         self.ls_table_g = normalize([1.0*((lut-1)*luminace_strength + 1) for lut in luminace_table])
@@ -455,44 +457,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         self.apply_ls_tables()
 
-    # libcameraのapplyLSを参考にしている: https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1343
-    def apply_ls_tables(self):
-        assert(len(self.ls_table_b) == 12 * 16)
-        assert(len(self.ls_table_r) == 12 * 16)        
-        assert(len(self.ls_table_g) == 12 * 16)                
-        cell_size_candidate = [16, 32, 64, 128, 256]
-        for i in range(0, len(cell_size_candidate)):
-            cell_size = cell_size_candidate[i]
-            w = (self.unicam_width + cell_size - 1) // cell_size
-            h = (self.unicam_height + cell_size - 1) // cell_size             
-            if (w < 64 and h <= 48):
-                break
-        
-        w += 1
-        h += 1
-
-        self.populate_ls_table(self.ls_table_r, w, h, self.ls_table_mm, 0)
-        self.populate_ls_table(self.ls_table_g, w, h, self.ls_table_mm, 1*(2*w*h))
-        self.ls_table_mm[2*(2*w*h) : 3*(2*w*h)] =  memoryview(self.ls_table_mm)[1*(2*w*h) : 2*(2*w*h)] 
-        self.populate_ls_table(self.ls_table_b, w, h, self.ls_table_mm, 3*(2*w*h))
-
-        ls = bcm2835_isp_lens_shading()
-        ls.enabled = 1
-        ls.grid_cell_size = cell_size
-        ls.grid_width = w
-        ls.grid_stride = w
-        ls.grid_height = h
-        ls.dmabuf = self.ls_table_dma_heap_fd
-        ls.ref_transform = 0
-        ls.corner_sampled = 1
-        ls.gain_format = bcm2835_isp_gain_format.GAIN_FORMAT_U4P10
-
-        ls_ctrl = v4l2_ext_control()
-        ls_ctrl.id = V4L2_CID.USER_BCM2835_ISP_LENS_SHADING
-        ls_ctrl.size = sizeof(bcm2835_isp_lens_shading)
-        ls_ctrl.ptr = cast(pointer(ls), c_void_p)
-        self.isp_in.set_ext_controls([ls_ctrl])
-
+    # correspond to [resampleCalTable](https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/controller/rpi/alsc.cpp#L463)
     def resample_cal_table(self, src:List[float], camera_mode: CameraMode) -> List[int]:
         assert(len(src) == LS_TABLE_W * LS_TABLE_H)
         new_table: List[float] = []
@@ -532,7 +497,46 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         assert(len(new_table) == LS_TABLE_W * LS_TABLE_H)
         return new_table
 
-    # correspond to resampleTable: https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1403
+    # correspond to [applyLS](https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1343)
+    def apply_ls_tables(self):
+        assert(len(self.ls_table_b) == LS_TABLE_W * LS_TABLE_H)
+        assert(len(self.ls_table_r) == LS_TABLE_W * LS_TABLE_H)
+        assert(len(self.ls_table_g) == LS_TABLE_W * LS_TABLE_H)
+        cell_size_candidate = [16, 32, 64, 128, 256]
+        for i in range(0, len(cell_size_candidate)):
+            cell_size = cell_size_candidate[i]
+            w = (self.unicam_width + cell_size - 1) // cell_size
+            h = (self.unicam_height + cell_size - 1) // cell_size             
+            if (w < 64 and h <= 48):
+                break
+        
+        w += 1
+        h += 1
+
+        self.populate_ls_table(self.ls_table_r, w, h, self.ls_table_mm, 0)
+        self.populate_ls_table(self.ls_table_g, w, h, self.ls_table_mm, 1*(2*w*h))
+        self.ls_table_mm[2*(2*w*h) : 3*(2*w*h)] =  memoryview(self.ls_table_mm)[1*(2*w*h) : 2*(2*w*h)] 
+        self.populate_ls_table(self.ls_table_b, w, h, self.ls_table_mm, 3*(2*w*h))
+
+        ls = bcm2835_isp_lens_shading()
+        ls.enabled = 1
+        ls.grid_cell_size = cell_size
+        ls.grid_width = w
+        ls.grid_stride = w
+        ls.grid_height = h
+        ls.dmabuf = self.ls_table_dma_heap_fd
+        ls.ref_transform = 0
+        ls.corner_sampled = 1
+        ls.gain_format = bcm2835_isp_gain_format.GAIN_FORMAT_U4P10
+
+        ls_ctrl = v4l2_ext_control()
+        ls_ctrl.id = V4L2_CID.USER_BCM2835_ISP_LENS_SHADING
+        ls_ctrl.size = sizeof(bcm2835_isp_lens_shading)
+        ls_ctrl.ptr = cast(pointer(ls), c_void_p)
+        self.isp_in.set_ext_controls([ls_ctrl])
+
+
+    # correspond to [resampleTable](https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1403)
     def populate_ls_table(self, src: List[int], dst_w: int, dst_h: int, ls_table: mmap.mmap, offset: int):
         assert(len(src) == LS_TABLE_W * LS_TABLE_H) 
         x_lo = [0] * dst_w
@@ -806,9 +810,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         if self.do_contrast:
             self.contrast_control(stats)
-
-        if self.do_alsc:
-            self.alsc(stats)
 
         self.isp_out_metadata.queue_buffer(buffer.buf.index)
 
