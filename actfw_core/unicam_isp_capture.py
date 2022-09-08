@@ -52,7 +52,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         agc: bool = True,
         target_Y: float = 0.16,  # Temporary set for the developement of agc algorithm
         contrast: bool = True,
-        config: Dict[str, Any] = {},
+        config: Optional[Dict[str, Any]] = None,
     ) -> None:
         super().__init__()
 
@@ -111,16 +111,14 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         # config precedence: default < sensor specific < user given
         with open(path.join(path.dirname(__file__), "data", self.sensor_name + ".json"), "r") as f:
             sensor_config = json.load(f)
-        sensor_config.update(config)
-        # just rename
-        config = sensor_config
+        sensor_config.update(config or {})
 
         # black level config
-        _bl = config.get("rpi.black_level", {})
+        _bl = sensor_config.get("rpi.black_level", {})
         self.black_level: int = _bl.get("black_level", 4096)
 
         # lux config
-        _lx = config.get("rpi.lux", {})
+        _lx = sensor_config.get("rpi.lux", {})
         self.reference_shutter_speed: float = _lx.get("reference_shutter_speed", 27685.0)
         self.reference_gain: float = _lx.get("reference_gain", 1.0)
         self.reference_aperture: float = _lx.get("reference_aperture", 1.0)
@@ -131,7 +129,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.gain_r: float = 1.6
         self.gain_b: float = 1.6
         # - update by agc
-        _ag = config.get("rpi.agc", {})
+        _ag = sensor_config.get("rpi.agc", {})
         self.shutters = _ag.get("exposure_modes", {}).get("normal", {}).get("shutter")
         self.gains = _ag.get("exposure_modes", {}).get("normal", {}).get("gain")
         self.gain: float = 1.0
@@ -141,7 +139,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.agc_interval_count: int = 0
         self.target_Y: float = target_Y
         # - update by contrast
-        _cr = config.get("rpi.contrast", {})
+        _cr = sensor_config.get("rpi.contrast", {})
         self.ce_enable = _cr.get("ce_enable", True)
         self.brightness: float = _cr.get("brightness", 0.0)
         self.contrast: float = _cr.get("contrast", 1.0)
