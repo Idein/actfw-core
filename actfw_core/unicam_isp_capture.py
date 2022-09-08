@@ -1,9 +1,8 @@
+import json
 import select
 from ctypes import POINTER, c_void_p, cast, pointer, sizeof
-import json
 from os import path
 from typing import Any, Dict, List, Optional, Tuple
-
 
 from actfw_core.capture import Frame
 from actfw_core.task import Producer
@@ -33,6 +32,7 @@ AGC_INTERVAL: int = 3
 # pick from https://github.com/kbingham/libcamera/blob/22ffeae04de2e7ce6b2476a35233c790beafb67f/src/ipa/raspberrypi/data/imx219.json#L132-L142 # noqa: E501, B950
 
 V2_UNICAM_SIZES: List[Tuple[int, int]] = [(3280, 2464), (1920, 1080), (1640, 1232), (640, 480)]
+
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
@@ -109,7 +109,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             raise RuntimeError("Both unicam_size and crop_size must be None or tuples.")
 
         # config precedence: default < sensor specific < user given
-        with open(path.join(path.dirname(__file__), 'data', self.sensor_name + ".json"), 'r') as f:
+        with open(path.join(path.dirname(__file__), "data", self.sensor_name + ".json"), "r") as f:
             sensor_config = json.load(f)
         sensor_config.update(config)
         # just rename
