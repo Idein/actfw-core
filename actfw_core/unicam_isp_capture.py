@@ -1,6 +1,8 @@
+import json
 import select
 from ctypes import POINTER, c_void_p, cast, pointer, sizeof
-from typing import List, Optional, Tuple
+from os import path
+from typing import Any, Dict, List, Optional, Tuple
 
 from actfw_core.capture import Frame
 from actfw_core.task import Producer
@@ -28,11 +30,6 @@ _EMPTY_LIST: List[str] = []
 AGC_INTERVAL: int = 3
 # TODO: support other than imx219
 # pick from https://github.com/kbingham/libcamera/blob/22ffeae04de2e7ce6b2476a35233c790beafb67f/src/ipa/raspberrypi/data/imx219.json#L132-L142 # noqa: E501, B950
-SHUTTERS: List[float] = [100, 10000, 30000, 60000, 66666]
-GAINS: List[float] = [1.0, 2.0, 4.0, 6.0, 8.0]
-
-BLACK_LEVEL: int = 4096
-DEFAULT_CONTRAST: float = 1.0
 
 V2_UNICAM_SIZES: List[Tuple[int, int]] = [(3280, 2464), (1920, 1080), (1640, 1232), (640, 480)]
 
@@ -54,15 +51,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         init_controls: List[str] = _EMPTY_LIST,
         agc: bool = True,
         target_Y: float = 0.16,  # Temporary set for the developement of agc algorithm
-        ce_enable: bool = True,
-        brightness: float = 0.0,
-        contrast: Optional[float] = DEFAULT_CONTRAST,
-        lo_histogram: float = 0.01,
-        lo_level: float = 0.015,
-        lo_max: int = 500,
-        hi_histogram: float = 0.95,
-        hi_level: float = 0.95,
-        hi_max: int = 2000,
+        contrast: bool = True,
+        config: Optional[Dict[str, Any]] = None,
     ) -> None:
         super().__init__()
 
@@ -73,6 +63,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.sensor_name = self.get_sensor_name(unicam_subdev)
         if self.sensor_name not in ["imx219", "ov5647"]:
             raise RuntimeError(f"not supported sensor: {self.sensor_name}")
+
         self.unicam = RawVideo(unicam, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
         self.unicam_subdev = RawVideo(unicam_subdev, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
         self.isp_in = RawVideo(isp_in, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_OUTPUT, init_controls=init_controls)
@@ -82,7 +73,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
         self.do_awb = auto_whitebalance
         self.do_agc = agc
-        self.do_contrast = contrast is not None
+        self.do_contrast = contrast
 
         (self.expected_width, self.expected_height) = size
         self.expected_pix_format = expected_format
@@ -117,12 +108,30 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         else:
             raise RuntimeError("Both unicam_size and crop_size must be None or tuples.")
 
-        # control values
+        # config precedence: default < sensor specific < user given
+        with open(path.join(path.dirname(__file__), "data", self.sensor_name + ".json"), "r") as f:
+            sensor_config = json.load(f)
+        sensor_config.update(config or {})
+
+        # black level config
+        _bl = sensor_config.get("rpi.black_level", {})
+        self.black_level: int = _bl.get("black_level", 4096)
+
+        # lux config
+        _lx = sensor_config.get("rpi.lux", {})
+        self.reference_shutter_speed: float = _lx.get("reference_shutter_speed", 27685.0)
+        self.reference_gain: float = _lx.get("reference_gain", 1.0)
+        self.reference_aperture: float = _lx.get("reference_aperture", 1.0)
+        self.reference_lux: float = _lx.get("reference_lux", 998.0)
+        self.reference_Y: float = _lx.get("reference_Y", 12744.0)
         self.aperture: float = 1.0
         # - update by awb
         self.gain_r: float = 1.6
         self.gain_b: float = 1.6
         # - update by agc
+        _ag = sensor_config.get("rpi.agc", {})
+        self.shutters = _ag.get("exposure_modes", {}).get("normal", {}).get("shutter")
+        self.gains = _ag.get("exposure_modes", {}).get("normal", {}).get("gain")
         self.gain: float = 1.0
         self.shutter_speed: float = 1000.0
         self.exposure: float = 100  # `shutter speed(us)` * `analogue gain`
@@ -130,49 +139,19 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.agc_interval_count: int = 0
         self.target_Y: float = target_Y
         # - update by contrast
-        self.ce_enable = ce_enable
-        self.brightness: float = brightness
-        self.contrast: float = contrast or DEFAULT_CONTRAST
-        self.lo_histogram: float = hi_histogram
-        self.lo_level: float = lo_level
-        self.lo_max: int = lo_max
-        self.hi_histogram: float = hi_histogram
-        self.hi_level: float = hi_level
-        self.hi_max: int = hi_max
-        self.gamma_curve = [
-            (0.0, 0.0),
-            (1024, 5040),
-            (2048, 9338),
-            (3072, 12356),
-            (4096, 15312),
-            (5120, 18051),
-            (6144, 20790),
-            (7168, 23193),
-            (8192, 25744),
-            (9216, 27942),
-            (10240, 30035),
-            (11264, 32005),
-            (12288, 33975),
-            (13312, 35815),
-            (14336, 37600),
-            (15360, 39168),
-            (16384, 40642),
-            (18432, 43379),
-            (20480, 45749),
-            (22528, 47753),
-            (24576, 49621),
-            (26624, 51253),
-            (28672, 52698),
-            (30720, 53796),
-            (32768, 54876),
-            (36864, 57012),
-            (40960, 58656),
-            (45056, 59954),
-            (49152, 61183),
-            (53248, 62355),
-            (57344, 63419),
-            (61440, 64476),
-            (65535, 65535),
+        _cr = sensor_config.get("rpi.contrast", {})
+        self.ce_enable = _cr.get("ce_enable", True)
+        self.brightness: float = _cr.get("brightness", 0.0)
+        self.contrast: float = _cr.get("contrast", 1.0)
+        self.lo_histogram: float = _cr.get("hi_histogram", 0.01)
+        self.lo_level: float = _cr.get("lo_level", 0.015)
+        self.lo_max: int = _cr.get("lo_max", 500)
+        self.hi_histogram: float = _cr.get("hi_histogram", 0.95)
+        self.hi_level: float = _cr.get("hi_level", 0.95)
+        self.hi_max: int = _cr.get("hi_max", 0.95)
+        gamma_curve = _cr["gamma_curve"]
+        self.gamma_curve: List[Tuple[float, float]] = [
+            (gamma_curve[2 * n], gamma_curve[2 * n]) for n in range(0, len(gamma_curve) // 2)
         ]
 
         # some device status cache (set by set_unicam_fps)
@@ -213,17 +192,17 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         self.set_unicam_fps()
         if self.do_agc:
-            init_shutter_time = SHUTTERS[len(SHUTTERS) // 2]  # (us)
-            init_analogue_gain = GAINS[len(GAINS) // 2]
+            init_shutter_time = self.shutters[len(self.shutters) // 2]  # (us)
+            init_analogue_gain = self.gains[len(self.gains) // 2]
             self.set_unicam_exposure(init_analogue_gain, init_shutter_time)
             self.exposure = init_shutter_time * init_analogue_gain
 
         # sutup isp_in
         bl = bcm2835_isp_black_level()
         bl.enabled = 1
-        bl.black_level_r = BLACK_LEVEL
-        bl.black_level_g = BLACK_LEVEL
-        bl.black_level_b = BLACK_LEVEL
+        bl.black_level_r = self.black_level
+        bl.black_level_g = self.black_level
+        bl.black_level_b = self.black_level
         black_level = v4l2_ext_control()
         black_level.id = V4L2_CID.USER_BCM2835_ISP_BLACK_LEVEL
         black_level.size = sizeof(bcm2835_isp_black_level)
@@ -334,13 +313,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_out_high.queue_buffer(buffer.buf.index)
 
     def calc_lux(self, isp_stats: bcm2835_isp_stats) -> None:
-        # imx219 data from libcamera (src/ipa/raspberrypi/data/imx219.json#L10-L17)
-        reference_shutter_speed = 27685.0
-        reference_gain = 1.0
-        reference_aperture = 1.0
-        reference_lux = 998.0
-        reference_Y = 12744.0
-
         current_aperture = self.aperture
         current_gain = self.gain
         current_shutter_speed = self.shutter_speed
@@ -352,11 +324,11 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             hist_sum += hist[i] * i
             hist_num += hist[i]
         current_Y = float(hist_sum) / float(hist_num) + 0.5
-        gain_ratio = reference_gain / current_gain
-        shutter_speed_ratio = reference_shutter_speed / current_shutter_speed
-        aperture_ratio = reference_aperture / current_aperture
-        Y_ratio = current_Y * (65536.0 / NUM_HISTOGRAM_BINS) / reference_Y
-        estimated_lux = shutter_speed_ratio * gain_ratio * aperture_ratio * aperture_ratio * Y_ratio * reference_lux
+        gain_ratio = self.reference_gain / current_gain
+        shutter_speed_ratio = self.reference_shutter_speed / current_shutter_speed
+        aperture_ratio = self.reference_aperture / current_aperture
+        Y_ratio = current_Y * (65536.0 / NUM_HISTOGRAM_BINS) / self.reference_Y
+        estimated_lux = shutter_speed_ratio * gain_ratio * aperture_ratio * aperture_ratio * Y_ratio * self.reference_lux
 
         self.lux = estimated_lux
 
@@ -391,17 +363,17 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             if extra_gain < 1.01:
                 break
 
-        max_exposure = SHUTTERS[-1] * GAINS[-1]
+        max_exposure = self.shutters[-1] * self.gains[-1]
         target_exposure = min(self.exposure * gain, max_exposure)
 
         # decompose target_exposure to analogue_gain and shutter_time
         # TODO: Also decompose to digital gain.
-        analogue_gain = GAINS[0]
-        shutter_time = SHUTTERS[0]
+        analogue_gain = self.gains[0]
+        shutter_time = self.shutters[0]
         if shutter_time * analogue_gain < target_exposure:
-            for stage in range(1, len(GAINS)):
-                max_analogue_gain = GAINS[stage]
-                max_shutter_time = SHUTTERS[stage]
+            for stage in range(1, len(self.gains)):
+                max_analogue_gain = self.gains[stage]
+                max_shutter_time = self.shutters[stage]
                 # fix gain, increase shutter time
                 if max_shutter_time * analogue_gain >= target_exposure:
                     shutter_time = target_exposure / analogue_gain
