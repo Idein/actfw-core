@@ -471,12 +471,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         w += 1
         h += 1
 
-        self.ls_table_mm.seek(0)
-        self.populate_ls_table(self.ls_table_r, self.ls_table_mm, w, h)
-        self.populate_ls_table(self.ls_table_g, self.ls_table_mm, w, h)
-        self.populate_ls_table(self.ls_table_g, self.ls_table_mm, w, h)
-        self.populate_ls_table(self.ls_table_b, self.ls_table_mm, w, h)        
-        # self.ls_table_mm.flush() # seek(0)
+        self.populate_ls_table(self.ls_table_r, w, h, self.ls_table_mm, 0)
+        self.populate_ls_table(self.ls_table_g, w, h, self.ls_table_mm, 1*(2*w*h))
+        self.ls_table_mm[2*(2*w*h) : 3*(2*w*h)] =  memoryview(self.ls_table_mm)[1*(2*w*h) : 2*(2*w*h)] 
+        self.populate_ls_table(self.ls_table_b, w, h, self.ls_table_mm, 3*(2*w*h))
 
         ls = bcm2835_isp_lens_shading()
         ls.enabled = 1
@@ -534,42 +532,45 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         assert(len(new_table) == LS_TABLE_W * LS_TABLE_H)
         return new_table
 
-    # resampleTable: https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1403
-    # にあたる部分
-    # ls_tableの一部分をpointerにして渡す方法がわからなかったので、直接writeで書き込んでいる
-    # 勢いで書いたのであまり自信なし
-    def populate_ls_table(self, src: List[int], ls_table: mmap.mmap, dst_w: int, dst_h: int):
-        src_w = 16
-        src_h = 12
+    # correspond to resampleTable: https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1403
+    def populate_ls_table(self, src: List[int], dst_w: int, dst_h: int, ls_table: mmap.mmap, offset: int):
+        assert(len(src) == LS_TABLE_W * LS_TABLE_H) 
         x_lo = [0] * dst_w
         xf = [0] * dst_w
         x_hi = [0] * dst_w
 
         x = -0.5
-        x_inc = src_w / (dst_w - 1) # ここで-1してる理由
+        x_inc = LS_TABLE_W / (dst_w - 1)
         for i in range(0, dst_w):
             x_lo[i] = floor(x)
             xf[i] = x - x_lo[i]
-            x_hi[i] = min(x_lo[i] + 1, src_w - 1)
+            x_hi[i] = min(x_lo[i] + 1, LS_TABLE_W - 1)
             x_lo[i] = max(x_lo[i], 0)
             x += x_inc
 
+        ls_table_idx = offset
         y = -0.5
-        y_inc = src_h / (dst_h - 1)
+        y_inc = LS_TABLE_H / (dst_h - 1)
         for _ in range(0, dst_h):
             y_lo = floor(y)
             yf = y - y_lo
-            y_hi = min(y_lo + 1, src_h - 1)
+            y_hi = min(y_lo + 1, LS_TABLE_H - 1)
             y_lo = max(y_lo, 0)
+            row_above = src[y_lo*LS_TABLE_W : (y_lo+1)*LS_TABLE_W]
+            row_below = src[y_hi*LS_TABLE_W : (y_hi+1)*LS_TABLE_W]
             for i in range(0, dst_w):
-                above = (src[(y_lo*src_w)+x_lo[i]]*(1 - xf[i])) + (src[(y_lo*src_w)+x_hi[i]]*xf[i])
-                # print(f"src[{y_hi}][{x_lo[i]}] , src[{y_hi}][{x_hi[i]}]", flush=True)
-                below = (src[(y_hi*src_w)+x_lo[i]]*(1 - xf[i])) + (src[(y_hi*src_w)+x_hi[i]]*xf[i])                
+                above = row_above[x_lo[i]]*(1 - xf[i]) + row_above[x_hi[i]]*xf[i]
+                below = row_below[x_lo[i]]*(1 - xf[i]) + row_below[x_hi[i]]*xf[i]
                 result = floor(1024*(above*(1 - yf) + below*yf)+ 0.5)
                 result = min(result, 16383)
-                ls_table.write(bytes(c_int16(result)))
+                result_as_bytes = bytes(c_int16(result))
+                assert(len(result_as_bytes) == 2) # 16 bits
+                ls_table[ls_table_idx : ls_table_idx + 2] = result_as_bytes
+                ls_table_idx += 2
 
             y += y_inc
+        
+        assert(ls_table_idx == offset + (2*dst_w*dst_h))
 
 
     def calculate_y(self, stats: bcm2835_isp_stats, additional_gain: float) -> float:
