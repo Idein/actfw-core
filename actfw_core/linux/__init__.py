@@ -1,1 +1,1 @@
-from . import ioctl, types, dma_heap  # noqa: F401
+from . import dma_heap, ioctl, types  # noqa: F401

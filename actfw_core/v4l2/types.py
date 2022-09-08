@@ -1,7 +1,8 @@
 # flake8: noqa
 
-from ctypes import *
 import enum
+from ctypes import *
+
 
 class capability(Structure):
     _fields_ = [
@@ -544,15 +545,16 @@ class bcm2835_isp_stats(Structure):
         ("focus_stats", bcm2835_isp_stats_focus * FOCUS_REGIONS),
     ]
 
+
 class bcm2835_isp_lens_shading(Structure):
     _fields_ = [
         ("enabled", c_uint32),
         ("grid_cell_size", c_uint32),
-	    ("grid_width", c_uint32),
-	    ("grid_stride", c_uint32),
-	    ("grid_height", c_uint32),
-    	("dmabuf", c_int32),
-    	("ref_transform", c_uint32),
-    	("corner_sampled", c_uint32),
-    	("gain_format", c_uint32)
+        ("grid_width", c_uint32),
+        ("grid_stride", c_uint32),
+        ("grid_height", c_uint32),
+        ("dmabuf", c_int32),
+        ("ref_transform", c_uint32),
+        ("corner_sampled", c_uint32),
+        ("gain_format", c_uint32),
     ]
