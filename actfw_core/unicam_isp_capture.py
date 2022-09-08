@@ -43,23 +43,21 @@ LS_TABLE_W = 16
 LS_TABLE_H = 12
 
 
+# correspond to [libcamera's CameraMode](https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/controller/camera_mode.h#L19) # noqa: E501, B950
 @dataclass(frozen=True, eq=True)
 class CameraMode:
     size: Tuple[int, int]
-    scale: Tuple[float, float]  # scaling factor (so if uncropped, width*scale_x is sensor_width)
-    crop: Tuple[int, int]  # location of top left pixel in the sensor frame
+    scale: Tuple[float, float]
+    crop: Tuple[int, int]
 
 
 V2_SENSOR_SIZE = (3280, 2464)
 V2_UNICAM_MODES: List[CameraMode] = [
     CameraMode(size=(3280, 2464), scale=(1.0, 1.0), crop=(0, 0)),
-    CameraMode(size=(1920, 1080), scale=(1.0, 1.0), crop=(680, 692)),  # TODO: confirm crop is appropriate
+    CameraMode(size=(1920, 1080), scale=(1.0, 1.0), crop=(680, 692)),
     CameraMode(size=(1640, 1232), scale=(2.0, 2.0), crop=(0, 0)),
-    CameraMode(size=(640, 480), scale=(2.0, 2.0), crop=(1000, 752)),  # TODO: confirm crop is appropriate
+    CameraMode(size=(640, 480), scale=(2.0, 2.0), crop=(1000, 752)),
 ]
-
-
-CTT_FILE = path.join(path.dirname(__file__), "data/imx219.json")
 
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
@@ -106,6 +104,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.do_awb = auto_whitebalance
         self.do_agc = agc
         self.do_contrast = contrast
+        self.do_alsc = alsc
 
         (self.expected_width, self.expected_height) = size
         self.expected_pix_format = expected_format
@@ -144,9 +143,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
         else:
             raise RuntimeError("Both unicam_size and crop_size must be None or tuples.")
-
-        with open(CTT_FILE, "r") as f:
-            self.ctt = json.load(f)
 
         # control values
         # config precedence: default < sensor specific < user given
@@ -196,7 +192,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         ]
 
         self.color_temperature = default_color_temperature
-        self.do_alsc = alsc
 
         # - update by alsc
         self.ls_table_dma_heap_fd = DMAHeap("/dev/dma_heap/linux,cma").alloc("_ls_grid", MAX_LS_GRID_SIZE)
@@ -206,6 +201,11 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             flags=mmap.MAP_SHARED,
             prot=mmap.PROT_READ | mmap.PROT_WRITE,
         )
+        _alsc = sensor_config.get("rpi.alsc", {})
+        self.calibrations_Cr: List[Dict[str, Any]] = _alsc["calibrations_Cr"]
+        self.calibrations_Cb: List[Dict[str, Any]] = _alsc["calibrations_Cb"]
+        self.luminace_lut: List[float] = _alsc["luminance_lut"]
+        self.luminace_strength: float = _alsc["luminance_strength"]
 
         # some device status cache (set by set_unicam_fps)
         self.vblank: int = 0
@@ -429,12 +429,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
     def alsc(self) -> None:
         ct = self.color_temperature
 
-        calibrations_Cr = self.ctt["rpi.alsc"]["calibrations_Cr"]
-        calibrations_Cb = self.ctt["rpi.alsc"]["calibrations_Cb"]
-        cal_table_r = self.get_cal_table(ct, calibrations_Cr)
-        cal_table_b = self.get_cal_table(ct, calibrations_Cb)
-        luminace_table = self.ctt["rpi.alsc"]["luminance_lut"]
-        luminace_strength = self.ctt["rpi.alsc"]["luminance_strength"]
+        cal_table_r = self.get_cal_table(ct, self.calibrations_Cr)
+        cal_table_b = self.get_cal_table(ct, self.calibrations_Cb)
 
         def normalize(table: List[float]) -> List[float]:
             m = min(table)
@@ -442,11 +438,11 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         cal_table_r = self.resample_cal_table(cal_table_r, self.camera_mode)
         cal_table_b = self.resample_cal_table(cal_table_b, self.camera_mode)
-        luminace_table = self.resample_cal_table(luminace_table, self.camera_mode)
+        luminace_table = self.resample_cal_table(self.luminace_lut, self.camera_mode)
 
-        self.ls_table_r = normalize([r * ((lut - 1) * luminace_strength + 1) for (r, lut) in zip(cal_table_r, luminace_table)])
-        self.ls_table_g = normalize([1.0 * ((lut - 1) * luminace_strength + 1) for lut in luminace_table])
-        self.ls_table_b = normalize([b * ((lut - 1) * luminace_strength + 1) for (b, lut) in zip(cal_table_b, luminace_table)])
+        self.ls_table_r = normalize([r * ((lut - 1) * self.luminace_strength + 1) for (r, lut) in zip(cal_table_r, luminace_table)])
+        self.ls_table_g = normalize([1.0 * ((lut - 1) * self.luminace_strength + 1) for lut in luminace_table])
+        self.ls_table_b = normalize([b * ((lut - 1) * self.luminace_strength + 1) for (b, lut) in zip(cal_table_b, luminace_table)])
 
         self.apply_ls_tables()
 
