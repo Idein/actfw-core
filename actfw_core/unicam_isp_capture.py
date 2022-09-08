@@ -440,9 +440,13 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         cal_table_b = self.resample_cal_table(cal_table_b, self.camera_mode)
         luminace_table = self.resample_cal_table(self.luminace_lut, self.camera_mode)
 
-        self.ls_table_r = normalize([r * ((lut - 1) * self.luminace_strength + 1) for (r, lut) in zip(cal_table_r, luminace_table)])
+        self.ls_table_r = normalize(
+            [r * ((lut - 1) * self.luminace_strength + 1) for (r, lut) in zip(cal_table_r, luminace_table)]
+        )
         self.ls_table_g = normalize([1.0 * ((lut - 1) * self.luminace_strength + 1) for lut in luminace_table])
-        self.ls_table_b = normalize([b * ((lut - 1) * self.luminace_strength + 1) for (b, lut) in zip(cal_table_b, luminace_table)])
+        self.ls_table_b = normalize(
+            [b * ((lut - 1) * self.luminace_strength + 1) for (b, lut) in zip(cal_table_b, luminace_table)]
+        )
 
         self.apply_ls_tables()
 
