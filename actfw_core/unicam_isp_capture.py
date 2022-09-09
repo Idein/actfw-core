@@ -56,7 +56,7 @@ V1_UNICAM_MODES: List[CameraMode] = [
     CameraMode(size=(2592, 1944), scale=(1.0, 1.0), crop=(0, 0)),
     CameraMode(size=(1920, 1080), scale=(1.0, 1.0), crop=(336, 432)),
     CameraMode(size=(1296, 972), scale=(2.0, 2.0), crop=(0, 0)),
-    CameraMode(size=(640, 480), scale=(2.0, 2.0), crop=(656, 492)),
+    CameraMode(size=(640, 480), scale=(4.0, 4.0), crop=(0, 0)),
 ]
 
 V2_SENSOR_SIZE = (3280, 2464)
