@@ -50,8 +50,9 @@ class CameraMode:
     scale: Tuple[float, float]
     crop: Tuple[int, int]
 
+
 V1_SENSOR_SIZE = (2592, 1944)
-V1_UNICAM_MODES: List[CameraMode] =[
+V1_UNICAM_MODES: List[CameraMode] = [
     CameraMode(size=(2592, 1944), scale=(1.0, 1.0), crop=(0, 0)),
     CameraMode(size=(1920, 1080), scale=(1.0, 1.0), crop=(336, 432)),
     CameraMode(size=(1296, 972), scale=(2.0, 2.0), crop=(0, 0)),
@@ -65,6 +66,7 @@ V2_UNICAM_MODES: List[CameraMode] = [
     CameraMode(size=(1640, 1232), scale=(2.0, 2.0), crop=(0, 0)),
     CameraMode(size=(640, 480), scale=(2.0, 2.0), crop=(1000, 752)),
 ]
+
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
