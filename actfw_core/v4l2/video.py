@@ -374,6 +374,7 @@ class V4L2_SUBDEV_FORMAT_WHENCE(enum.IntEnum):
 class MEDIA_BUS_FMT(enum.IntEnum):
     SBGGR8_1X8 = 0x3001
     SBGGR10_1X10 = 0x3007
+    SGBRG10_1X10 = 0x300E
 
 
 class V4L2_SEL_TGT(enum.IntEnum):

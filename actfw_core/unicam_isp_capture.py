@@ -50,6 +50,13 @@ class CameraMode:
     scale: Tuple[float, float]
     crop: Tuple[int, int]
 
+V1_SENSOR_SIZE = (2592, 1944)
+V1_UNICAM_MODES: List[CameraMode] =[
+    CameraMode(size=(2592, 1944), scale=(1.0, 1.0), crop=(0, 0)),
+    CameraMode(size=(1920, 1080), scale=(1.0, 1.0), crop=(336, 432)),
+    CameraMode(size=(1296, 972), scale=(2.0, 2.0), crop=(0, 0)),
+    CameraMode(size=(640, 480), scale=(2.0, 2.0), crop=(656, 492)),
+]
 
 V2_SENSOR_SIZE = (3280, 2464)
 V2_UNICAM_MODES: List[CameraMode] = [
@@ -58,7 +65,6 @@ V2_UNICAM_MODES: List[CameraMode] = [
     CameraMode(size=(1640, 1232), scale=(2.0, 2.0), crop=(0, 0)),
     CameraMode(size=(640, 480), scale=(2.0, 2.0), crop=(1000, 752)),
 ]
-
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
@@ -118,29 +124,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             self.crop_size = crop_size
         elif unicam_size is None and crop_size is None:
             # Auto selection of unicam_size and crop_size.
-            # Support only v2 camera module.
-            if self.expected_width <= 1280 and self.expected_height <= 720:
-                if self.expected_fps <= 40:
-                    self.camera_mode = V2_UNICAM_MODES[2]
-                    self.crop_size = self.calc_crop_size(
-                        self.expected_width,
-                        self.expected_height,
-                        *self.camera_mode.size,
-                    )
-                else:
-                    if abs(self.expected_width / self.expected_height - 16 / 9) < 0.05:
-                        self.camera_mode = V2_UNICAM_MODES[2]
-                        self.crop_size = (180, 256, 1280, 720)
-                    else:
-                        self.camera_mode = V2_UNICAM_MODES[3]
-                        self.crop_size = self.calc_crop_size(
-                            self.expected_width,
-                            self.expected_height,
-                            *self.camera_mode.size,
-                        )
+            if self.sensor_name == "imx219":
+                self.auto_size_selection_for_imx219()
             else:
-                self.camera_mode = V2_UNICAM_MODES[0]
-                self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
+                self.auto_size_selection_for_ov5647()
         else:
             raise RuntimeError("Both unicam_size and crop_size must be None or tuples.")
 
@@ -188,7 +175,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.hi_max: int = _cr.get("hi_max", 0.95)
         gamma_curve = _cr["gamma_curve"]
         self.gamma_curve: List[Tuple[float, float]] = [
-            (gamma_curve[2 * n], gamma_curve[2 * n]) for n in range(0, len(gamma_curve) // 2)
+            (gamma_curve[2 * n], gamma_curve[2 * n + 1]) for n in range(0, len(gamma_curve) // 2)
         ]
 
         self.color_temperature = default_color_temperature
@@ -231,18 +218,24 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
     def setup_pipeline(self) -> None:
         # setup unicam
-        if not (self.unicam_subdev.set_vertical_flip(True) and self.unicam_subdev.set_horizontal_flip(True)):
-            raise RuntimeError("fail to setup unicam subdevice node")
+        if self.sensor_name == "imx219":
+            if not (self.unicam_subdev.set_vertical_flip(True) and self.unicam_subdev.set_horizontal_flip(True)):
+                raise RuntimeError("fail to setup unicam subdevice node")
+            bus_fmt = MEDIA_BUS_FMT.SBGGR10_1X10
+            self.unicam_format = V4L2_PIX_FMT.SBGGR10P
+        else:
+            bus_fmt = MEDIA_BUS_FMT.SGBRG10_1X10
+            self.unicam_format = V4L2_PIX_FMT.SGBRG10P
 
-        self.unicam_subdev.set_subdev_format(*self.camera_mode.size, MEDIA_BUS_FMT.SBGGR10_1X10)
+        self.unicam_subdev.set_subdev_format(*self.camera_mode.size, bus_fmt)
         if (
             self.unicam_subdev.subdev_fmt.format.width != self.camera_mode.size[0]
             or self.unicam_subdev.subdev_fmt.format.height != self.camera_mode.size[1]
         ):
             raise RuntimeError("fail to setup unicam device node")
+
         self.unicam_width = self.unicam_subdev.subdev_fmt.format.width
         self.unicam_height = self.unicam_subdev.subdev_fmt.format.height
-        self.unicam_format = V4L2_PIX_FMT.SBGGR10P
         (unicam_width, unicam_height, unicam_format) = self.unicam.set_pix_format(
             self.unicam_width, self.unicam_height, self.unicam_format
         )
@@ -348,6 +341,32 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         left = int((unicam_width - w) / 2)
         top = int((unicam_height - h) / 2)
         return (left, top, w, h)
+
+    def auto_size_selection_for_imx219(self) -> None:
+        # Support only v2 camera module.
+        if self.expected_width <= 1280 and self.expected_height <= 720:
+            if self.expected_fps <= 40:
+                self.camera_mode = V2_UNICAM_MODES[2]
+                self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
+            else:
+                if abs(self.expected_width / self.expected_height - 16 / 9) < 0.05:
+                    self.camera_mode = V2_UNICAM_MODES[2]
+                    self.crop_size = (180, 256, 1280, 720)
+                else:
+                    self.camera_mode = V2_UNICAM_MODES[3]
+                    self.crop_size = self.calc_crop_size(
+                        self.expected_width,
+                        self.expected_height,
+                        *self.camera_mode.size,
+                    )
+        else:
+            self.camera_mode = V2_UNICAM_MODES[0]
+            self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
+
+    def auto_size_selection_for_ov5647(self) -> None:
+        # TODO: fix to make compatiblity with buster
+        self.camera_mode = V1_UNICAM_MODES[0]
+        self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
 
     def capture_size(self) -> Tuple[int, int]:
         return (self.output_fmt.fmt.pix.width, self.output_fmt.fmt.pix.height)
