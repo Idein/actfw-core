@@ -151,7 +151,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.hi_max: int = _cr.get("hi_max", 0.95)
         gamma_curve = _cr["gamma_curve"]
         self.gamma_curve: List[Tuple[float, float]] = [
-            (gamma_curve[2 * n], gamma_curve[2 * n]) for n in range(0, len(gamma_curve) // 2)
+            (gamma_curve[2 * n], gamma_curve[2 * n + 1]) for n in range(0, len(gamma_curve) // 2)
         ]
 
         # some device status cache (set by set_unicam_fps)
