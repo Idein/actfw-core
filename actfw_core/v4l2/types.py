@@ -1,5 +1,6 @@
 # flake8: noqa
 
+import enum
 from ctypes import *
 
 
@@ -471,6 +472,17 @@ FOCUS_REGIONS = 12
 CONTRAST_NUM_POINTS: int = 33
 
 
+class bcm2835_isp_gain_format(enum.IntEnum):
+    GAIN_FORMAT_U0P8_1 = 0
+    GAIN_FORMAT_U1P7_0 = 1
+    GAIN_FORMAT_U1P7_1 = 2
+    GAIN_FORMAT_U2P6_0 = 3
+    GAIN_FORMAT_U2P6_1 = 4
+    GAIN_FORMAT_U3P5_0 = 5
+    GAIN_FORMAT_U3P5_1 = 6
+    GAIN_FORMAT_U4P10 = 7
+
+
 class bcm2835_isp_black_level(Structure):
     _fields_ = [
         ("enabled", c_uint32),
@@ -531,4 +543,18 @@ class bcm2835_isp_stats(Structure):
         ("floating_stats", bcm2835_isp_stats_region * FLOATING_REGIONS),
         ("agc_stats", bcm2835_isp_stats_region * AGC_REGIONS),
         ("focus_stats", bcm2835_isp_stats_focus * FOCUS_REGIONS),
+    ]
+
+
+class bcm2835_isp_lens_shading(Structure):
+    _fields_ = [
+        ("enabled", c_uint32),
+        ("grid_cell_size", c_uint32),
+        ("grid_width", c_uint32),
+        ("grid_stride", c_uint32),
+        ("grid_height", c_uint32),
+        ("dmabuf", c_int32),
+        ("ref_transform", c_uint32),
+        ("corner_sampled", c_uint32),
+        ("gain_format", c_uint32),
     ]
