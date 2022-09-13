@@ -708,7 +708,7 @@ class RawVideo(object):
 
         return True
 
-    def request_buffers(self, n, v4l2_memory: V4L2_MEMORY = V4L2_MEMORY.MMAP, dma_fds=[]):
+    def request_buffers(self, n, v4l2_memory: V4L2_MEMORY = V4L2_MEMORY.MMAP, dma_fds=[]) -> int:
 
         req = requestbuffers()
         req.count = n
@@ -719,18 +719,20 @@ class RawVideo(object):
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_REQBUFS): {}".format(errno.errorcode[get_errno()]))
 
-        if req.count < n:
+        if req.count <= 0:
             raise RuntimeError("ioctl(VIDIOC_REQBUFS): insufficient buffer count")
 
         if v4l2_memory == V4L2_MEMORY.MMAP:
-            self.buffers = [VideoBuffer(self, i, V4L2_MEMORY.MMAP, v4l2_buf_type=self.v4l2_buf_type) for i in range(n)]
+            self.buffers = [VideoBuffer(self, i, V4L2_MEMORY.MMAP, v4l2_buf_type=self.v4l2_buf_type) for i in range(req.count)]
         elif v4l2_memory == V4L2_MEMORY.DMABUF:
-            if n != len(dma_fds):
+            if req.count != len(dma_fds):
                 raise RuntimeError("requested buffer count mismatch with number of given dma file descriptor")
 
             self.buffers = [
                 VideoBuffer(self, i, V4L2_MEMORY.DMABUF, fd, v4l2_buf_type=self.v4l2_buf_type) for (i, fd) in enumerate(dma_fds)
             ]
+
+        return req.count
 
     def export_buffers(self):
         export_fds = []

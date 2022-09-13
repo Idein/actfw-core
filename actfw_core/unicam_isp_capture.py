@@ -374,12 +374,14 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         return (self.output_fmt.fmt.pix.width, self.output_fmt.fmt.pix.height)
 
     def request_buffer(self) -> None:
-        self.unicam.request_buffers(self.dma_buffer_num, V4L2_MEMORY.MMAP)
+        self.dma_buffer_num = self.unicam.request_buffers(self.dma_buffer_num, V4L2_MEMORY.MMAP)
         self.dma_fds = self.unicam.export_buffers()
-        self.unicam.request_buffers(self.dma_buffer_num, V4L2_MEMORY.DMABUF, self.dma_fds)
-        self.isp_in.request_buffers(self.dma_buffer_num, V4L2_MEMORY.DMABUF, self.dma_fds)
-        self.isp_out_high.request_buffers(self.isp_out_buffer_num, V4L2_MEMORY.MMAP)
-        self.isp_out_metadata.request_buffers(self.isp_out_metadata_buffer_num, V4L2_MEMORY.MMAP)
+        if self.unicam.request_buffers(self.dma_buffer_num, V4L2_MEMORY.DMABUF, self.dma_fds) != self.dma_buffer_num:
+            raise RuntimeError("dma buffer count mismatch with the number of shared dma file descrptors")
+        if self.isp_in.request_buffers(self.dma_buffer_num, V4L2_MEMORY.DMABUF, self.dma_fds) != self.dma_buffer_num:
+            raise RuntimeError("dma buffer count mismatch with the number of shared dma file descrptors")
+        self.isp_out_buffer_num = self.isp_out_high.request_buffers(self.isp_out_buffer_num, V4L2_MEMORY.MMAP)
+        self.isp_out_buffer_num = self.isp_out_metadata.request_buffers(self.isp_out_metadata_buffer_num, V4L2_MEMORY.MMAP)
 
     def unicam2isp(self) -> None:
         buffer = self.unicam.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.DMABUF)
