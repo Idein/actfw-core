@@ -313,8 +313,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
     def set_unicam_exposure(self, analogue_gain: float, shutter_time: float) -> None:
         # convert analogue_gain to V4L2_CID.ANALOGUE_GAIN
-        # ref. https://github.com/kbingham/libcamera/blob/37e31b2c6b241dff5153025af566ab671b10ff68/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67-L70 # noqa: E501, B950
-        unicam_subdev_analogue_gain = 256 - (256 / analogue_gain)  # TODO: support other than imx219
+        unicam_subdev_analogue_gain = self.v4l2_control_value_for_analogue_gain(analogue_gain)
 
         # convert shutter time to V4L2_CID.EXPOSURE
         time_per_line = (self.unicam_width + self.hblank) * (1.0 / self.pixel_late) * 1e6
@@ -327,6 +326,18 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         gain_ctrl.id = V4L2_CID.ANALOGUE_GAIN
         gain_ctrl.value = int(unicam_subdev_analogue_gain)
         self.unicam_subdev.set_ext_controls([exposure_ctrl, gain_ctrl])
+
+    def v4l2_control_value_for_analogue_gain(self, analogue_gain: float) -> float:
+        if self.sensor_name == "imx219":
+            return 256 - (
+                256 / analogue_gain
+            )  # https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67 # noqa: E501, B950
+        elif self.sensor_name == "ov5647":
+            return (
+                analogue_gain * 16.0
+            )  # https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/cam_helper_ov5647.cpp#L45 # noqa: E501, B950
+        else:
+            raise RuntimeError(f"not supported sensor: {self.sensor_name}")
 
     def calc_crop_size(
         self,
