@@ -329,9 +329,13 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
     def v4l2_control_value_for_analogue_gain(self, analogue_gain: float) -> float:
         if self.sensor_name == "imx219":
-            return 256 - (256 / analogue_gain) # https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67 # noqa: E501, B950
+            return 256 - (
+                256 / analogue_gain
+            )  # https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67 # noqa: E501, B950
         elif self.sensor_name == "ov5647":
-            return analogue_gain * 16.0 # https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/cam_helper_ov5647.cpp#L45 # noqa: E501, B950
+            return (
+                analogue_gain * 16.0
+            )  # https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/cam_helper_ov5647.cpp#L45 # noqa: E501, B950
         else:
             raise RuntimeError(f"not supported sensor: {self.sensor_name}")
 
