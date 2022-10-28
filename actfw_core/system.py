@@ -5,32 +5,40 @@ from typing import Optional, cast
 def _get_env_str(name: str) -> str:
     return cast(str, os.environ.get(name))
 
+
 def _get_env_int(name: str) -> int:
     return int(cast(str, os.environ.get(name)))
+
 
 def get_actcast_protocol_version() -> str:
     "Protocol version of agent-app communication. Since ACTCAST_PROTOCOL_VERSION 1.0.0."
     return _get_env_str("ACTCAST_PROTOCOL_VERSION")
 
+
 def get_actcast_device_id() -> str:
     "Device ID of the device running the actcast application. Since ACTCAST_PROTOCOL_VERSION 1.0.0."
     return _get_env_str("ACTCAST_DEVICE_ID")
+
 
 def get_actcast_group_id() -> int:
     "Group ID that the device is belonging to. Since ACTCAST_PROTOCOL_VERSION 1.2.0."
     return _get_env_int("ACTCAST_GROUP_ID")
 
+
 def get_actcast_act_id() -> int:
     "Act ID of the actcast application. Since ACTCAST_PROTOCOL_VERSION 1.0.0."
     return _get_env_int("ACTCAST_ACT_ID")
+
 
 def get_actcast_instance_id() -> str:
     "ID that identifies the launch of the actcast application, like PID. Since ACTCAST_PROTOCOL_VERSION 1.0.0."
     return _get_env_str("ACTCAST_INSTANCE_ID")
 
+
 def get_actcast_device_type() -> str:
     "Device type. Since ACTCAST_PROTOCOL_VERSION 1.1.0."
     return _get_env_str("ACTCAST_DEVICE_TYPE")
+
 
 def get_act_settings_path() -> str:
     """
@@ -41,6 +49,7 @@ def get_act_settings_path() -> str:
     """
     return _get_env_str("ACT_SETTINGS_PATH")
 
+
 def get_actcast_command_sock() -> str:
     """
     Path of socket file to receive command from actcast agent.
@@ -49,6 +58,7 @@ def get_actcast_command_sock() -> str:
     Since ACTCAST_PROTOCOL_VERSION 1.0.0.
     """
     return _get_env_str("ACTCAST_COMMAND_SOCK")
+
 
 def get_actcast_service_sock() -> str:
     """
@@ -59,15 +69,17 @@ def get_actcast_service_sock() -> str:
     """
     return _get_env_str("ACTCAST_SERVICE_SOCK")
 
+
 def get_actcast_socks_server() -> Optional[str]:
     "URL of SOCKS5 proxy server. Since ACTCAST_PROTOCOL_VERSION 1.0.0."
     return os.environ.get("ACTCAST_SOCKS_SERVER")
 
+
 def get_actcast_agent_simulator() -> Optional[str]:
-    "Fixed value \"actsim\" if on actsim environment. Not set otherwise. Since ACTCAST_PROTOCOL_VERSION 1.1.0."
+    'Fixed value "actsim" if on actsim environment. Not set otherwise. Since ACTCAST_PROTOCOL_VERSION 1.1.0.'
     return os.environ.get("ACTCAST_AGENT_SIMULATOR")
+
 
 def get_actcast_firmware_type() -> str:
     "Firmware type of the host. Since ACTCAST_PROTOCOL_VERSION 1.3.0."
     return _get_env_str("ACTCAST_FIRMWARE_TYPE")
-
