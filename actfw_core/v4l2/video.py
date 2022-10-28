@@ -859,7 +859,7 @@ class Video(object):
         if not (cap.capabilities & _V4L2_CAP_STREAMING):
             raise RuntimeError("The device doesn't support the streaming I/O method.")
         driver = "".join(map(chr, itertools.takewhile(lambda x: x > 0, cap.driver)))
-        if driver == "bm2835 mmal":
+        if driver == "bm2835 mmal" or driver == "unicam":
             return VideoPort.CSI
         elif driver[: len("uvcvideo")] == "uvcvideo":
             return VideoPort.USB

@@ -1,6 +1,7 @@
 import enum
 from typing import Callable, Generic, Iterable, Tuple, TypeVar
 
+from actfw_core import get_firmware_type
 from actfw_core.v4l2.video import V4L2_PIX_FMT, Video, VideoPort  # type: ignore
 
 from .task import Producer
@@ -76,7 +77,12 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
 
         width, height = size
 
-        if self.video.query_capability() == VideoPort.CSI:
+        cap = self.video.query_capability()
+        firmware_type = get_firmware_type()
+        if firmware_type == "raspberrypi-bullseye" and cap == VideoPort.CSI:
+            raise RuntimeError("CSI camera is not supported in bullseye yet.")
+
+        if cap == VideoPort.CSI:
 
             # workaround for bcm2835-v4l2 format pixsize & bytesperline bug
             width = (width + 31) // 32 * 32
