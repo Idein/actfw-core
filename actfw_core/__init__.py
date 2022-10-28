@@ -1,7 +1,6 @@
 import json
-import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List
 
 from . import capture, linux, task, unicam_isp_capture  # noqa: F401
 from .application import Application  # noqa: F401
@@ -76,8 +75,3 @@ def heartbeat(*args: Any, **kwargs: Any) -> None:
 
     """
     _heartbeat_function(*args, **kwargs)
-
-
-def get_firmware_type() -> Optional[str]:
-    env = "ACTCAST_FIRMWARE_TYPE"
-    return os.environ.get(env)
