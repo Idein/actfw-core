@@ -1,12 +1,11 @@
 import os
-from typing import Optional
-from typing import cast
+from typing import Optional, cast
 
 
-def _get_env_str(name) -> str:
+def _get_env_str(name: str) -> str:
     return cast(str, os.environ.get(name))
 
-def _get_env_int(name) -> int:
+def _get_env_int(name: str) -> int:
     return int(cast(str, os.environ.get(name)))
 
 def get_actcast_protocol_version() -> str:
