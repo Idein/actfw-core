@@ -1,29 +1,37 @@
 import os
 from typing import Optional
+from typing import cast
+
+
+def _get_env_str(name) -> str:
+    return cast(str, os.environ.get(name))
+
+def _get_env_int(name) -> int:
+    return int(cast(str, os.environ.get(name)))
 
 def get_actcast_protocol_version() -> str:
     "Protocol version of agent-app communication. Since ACTCAST_PROTOCOL_VERSION 1.0.0."
-    return os.environ.get("ACTCAST_PROTOCOL_VERSION")
+    return _get_env_str("ACTCAST_PROTOCOL_VERSION")
 
 def get_actcast_device_id() -> str:
     "Device ID of the device running the actcast application. Since ACTCAST_PROTOCOL_VERSION 1.0.0."
-    return os.environ.get("ACTCAST_DEVICE_ID")
+    return _get_env_str("ACTCAST_DEVICE_ID")
 
 def get_actcast_group_id() -> int:
     "Group ID that the device is belonging to. Since ACTCAST_PROTOCOL_VERSION 1.2.0."
-    return int(os.environ.get("ACTCAST_GROUP_ID"))
+    return _get_env_int("ACTCAST_GROUP_ID")
 
 def get_actcast_act_id() -> int:
     "Act ID of the actcast application. Since ACTCAST_PROTOCOL_VERSION 1.0.0."
-    return int(os.environ.get("ACTCAST_ACT_ID"))
+    return _get_env_int("ACTCAST_ACT_ID")
 
 def get_actcast_instance_id() -> str:
     "ID that identifies the launch of the actcast application, like PID. Since ACTCAST_PROTOCOL_VERSION 1.0.0."
-    return os.environ.get("ACTCAST_INSTANCE_ID")
+    return _get_env_str("ACTCAST_INSTANCE_ID")
 
 def get_actcast_device_type() -> str:
     "Device type. Since ACTCAST_PROTOCOL_VERSION 1.1.0."
-    return os.environ.get("ACTCAST_DEVICE_TYPE")
+    return _get_env_str("ACTCAST_DEVICE_TYPE")
 
 def get_act_settings_path() -> str:
     """
@@ -32,7 +40,7 @@ def get_act_settings_path() -> str:
     Use get_settings in Application to get act settings.
     Since ACTCAST_PROTOCOL_VERSION 1.0.0.
     """
-    return os.environ.get("ACT_SETTINGS_PATH")
+    return _get_env_str("ACT_SETTINGS_PATH")
 
 def get_actcast_command_sock() -> str:
     """
@@ -41,7 +49,7 @@ def get_actcast_command_sock() -> str:
     Use CommandServer to receive commands from actcast agent.
     Since ACTCAST_PROTOCOL_VERSION 1.0.0.
     """
-    return os.environ.get("ACTCAST_COMMAND_SOCK")
+    return _get_env_str("ACTCAST_COMMAND_SOCK")
 
 def get_actcast_service_sock() -> str:
     """
@@ -50,7 +58,7 @@ def get_actcast_service_sock() -> str:
     Use ServiceClient to send commands to actcast agent.
     Since ACTCAST_PROTOCOL_VERSION 1.0.0.
     """
-    return os.environ.get("ACTCAST_SERVICE_SOCK")
+    return _get_env_str("ACTCAST_SERVICE_SOCK")
 
 def get_actcast_socks_server() -> Optional[str]:
     "URL of SOCKS5 proxy server. Since ACTCAST_PROTOCOL_VERSION 1.0.0."
@@ -62,5 +70,5 @@ def get_actcast_agent_simulator() -> Optional[str]:
 
 def get_actcast_firmware_type() -> str:
     "Firmware type of the host. Since ACTCAST_PROTOCOL_VERSION 1.3.0."
-    return os.environ.get("ACTCAST_FIRMWARE_TYPE")
+    return _get_env_str("ACTCAST_FIRMWARE_TYPE")
 
