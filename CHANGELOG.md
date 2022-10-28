@@ -2,6 +2,7 @@
 ## xxxx
 
 - Fix a bug: actfw doesn't raise assertion error when it is stopped before `update_image` is called.
+- Add functions in `actfw_core.system` in order to get environment variables available in the container.
 
 ## 2.2.0a0 (2022-03-14)
 
