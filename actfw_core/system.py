@@ -9,6 +9,7 @@ class EnvironmentVariableNotSet(Exception):
     def __str__(self) -> str:
         return f"Environment variable {self.name} is not set. Perhaps the host agent is too old?"
 
+
 def _get_env_str(name: str) -> str:
     ret = os.environ.get(name)
     if ret is None:
