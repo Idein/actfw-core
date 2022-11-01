@@ -171,6 +171,10 @@ def get_device_supply_path() -> str:
 
 
 def get_device_supply() -> DeviceSupply:
+    """
+    Device Supply from actcast agent.
+    Since ACTCAST_PROTOCOL_VERSION 1.3.0.
+    """
     path = get_device_supply_path()
     with open(path) as f:
         return DeviceSupply.from_json(json.load(f))
