@@ -1,25 +1,26 @@
 import os
 from typing import Optional, cast
 
+
 class EnvironmentVariableNotSet(Exception):
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         self.name = name
 
-    def __str__(self):
-        return f"Environment variable {name} is not set. Perhaps the host agent is too old?"
+    def __str__(self) -> str:
+        return f"Environment variable {self.name} is not set. Perhaps the host agent is too old?"
 
 def _get_env_str(name: str) -> str:
     ret = os.environ.get(name)
     if ret is None:
         raise EnvironmentVariableNotSet(name)
-    return cast(str, ret)
+    return ret
 
 
 def _get_env_int(name: str) -> int:
     ret = os.environ.get(name)
     if ret is None:
         raise EnvironmentVariableNotSet(name)
-    return int(cast(str, ret))
+    return int(ret)
 
 
 def get_actcast_protocol_version() -> str:
