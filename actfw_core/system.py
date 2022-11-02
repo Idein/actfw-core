@@ -1,5 +1,8 @@
+import json
 import os
-from typing import Optional
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 
 class EnvironmentVariableNotSet(Exception):
@@ -8,6 +11,64 @@ class EnvironmentVariableNotSet(Exception):
 
     def __str__(self) -> str:
         return f"Environment variable {self.name} is not set. Perhaps the host agent is too old?"
+
+
+@dataclass
+class DeviceNode:
+    path: Path
+    label: Optional[str] = None
+
+    @staticmethod
+    def from_json(json: Dict[str, Any]) -> "DeviceNode":
+        path = json.get("path", None)
+        if path is None:
+            raise ValueError("must have path property")
+
+        if type(path) is not str:
+            raise ValueError("path must be string")
+
+        path = Path(path)
+
+        label = json.get("label", None)
+        if label is None:
+            return DeviceNode(path=path, label=None)
+        else:
+            if type(label) is not str:
+                raise ValueError("label must be string")
+            return DeviceNode(path=path, label=label)
+
+
+@dataclass
+class DeviceInfo:
+    type: str
+    nodes: List[DeviceNode]
+
+    @staticmethod
+    def from_json(json: Dict[str, Any]) -> "DeviceInfo":
+        if "type" not in json.keys():
+            raise ValueError("must have type property")
+        if "nodes" not in json.keys():
+            raise ValueError("must have nodes property")
+
+        device_type = json["type"]
+        if type(device_type) is not str:
+            raise ValueError("type must be string")
+
+        nodes = [DeviceNode.from_json(node) for node in json["nodes"]]
+        return DeviceInfo(type=device_type, nodes=nodes)
+
+
+@dataclass
+class DeviceSupply:
+    devices: List[DeviceInfo]
+
+    @staticmethod
+    def from_json(json: Dict[str, Any]) -> "DeviceSupply":
+        if "devices" not in json.keys():
+            raise ValueError("must have devices property")
+
+        devices = [DeviceInfo.from_json(d) for d in json["devices"]]
+        return DeviceSupply(devices=devices)
 
 
 def _get_env_str(name: str) -> str:
@@ -97,3 +158,23 @@ def get_actcast_agent_simulator() -> Optional[str]:
 def get_actcast_firmware_type() -> str:
     "Firmware type of the host. Since ACTCAST_PROTOCOL_VERSION 1.3.0."
     return _get_env_str("ACTCAST_FIRMWARE_TYPE")
+
+
+def get_device_supply_path() -> str:
+    """
+    Path of device supply file.
+    This is rather low level API.
+    Use get_device_supply to get DeviceSupply object.
+    Since ACTCAST_PROTOCOL_VERSION 1.3.0.
+    """
+    return _get_env_str("DEVICE_SUPPLY_PATH")
+
+
+def get_device_supply() -> DeviceSupply:
+    """
+    Device Supply from actcast agent.
+    Since ACTCAST_PROTOCOL_VERSION 1.3.0.
+    """
+    path = get_device_supply_path()
+    with open(path) as f:
+        return DeviceSupply.from_json(json.load(f))
