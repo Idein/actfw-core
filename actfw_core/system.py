@@ -1,5 +1,6 @@
 import json
 import os
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -178,3 +179,42 @@ def get_device_supply() -> DeviceSupply:
     path = get_device_supply_path()
     with open(path) as f:
         return DeviceSupply.from_json(json.load(f))
+
+
+def _get_camera_device_info(devs: DeviceSupply, default_image_source: Optional[str] = None) -> DeviceInfo:
+    cameras = [dev for dev in devs.devices if dev.type == "camera"]
+    if len(cameras) >= 1:
+        if len(cameras) > 1:
+            warnings.warn(
+                "There are multiple camera candidates. Check your manifesto files.",
+                RuntimeWarning,
+            )
+        info = cameras[0]
+        sources = [node for node in info.nodes if node.label == "image_source"]
+        if len(sources) >= 1:
+            return info
+        elif default_image_source is not None:
+            if Path(default_image_source) in [node.path for node in info.nodes]:
+                for node in info.nodes:
+                    if node.path == Path(default_image_source):
+                        node.label = "image_source"
+                return info
+            else:
+                raise RuntimeError(f"default_image_source={default_image_source} is not mounted. Fix your manifesto files.")
+        else:
+            raise RuntimeError(
+                "Not found image_source. Fix your manifesto files or give default_image_source to get_camera_device_info."
+            )
+
+    else:
+        raise RuntimeError("Not found camera device. Fix your manifesto files.")
+
+
+def get_camera_device_info(default_image_source: Optional[str] = None) -> DeviceInfo:
+    """
+    DeviceInfo for camera.
+    Set `default_image_source` only if you write camera device path in manifesto files.
+    Since ACTCAST_PROTOCOL_VERSION 1.3.0.
+    """
+    devs = get_device_supply()
+    return _get_camera_device_info(devs, default_image_source)
