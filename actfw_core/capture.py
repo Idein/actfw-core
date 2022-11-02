@@ -1,7 +1,7 @@
 import enum
-from typing import Callable, Generic, Iterable, Tuple, TypeVar
+from typing import Callable, Generic, Iterable, Tuple, TypeVar, Union
 
-from actfw_core.system import EnvironmentVariableNotSet, get_actcast_firmware_type
+from actfw_core.system import DeviceInfo, EnvironmentVariableNotSet, get_actcast_firmware_type
 from actfw_core.v4l2.video import V4L2_PIX_FMT, Video, VideoPort  # type: ignore
 
 from .task import Producer
@@ -44,7 +44,7 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
 
     def __init__(
         self,
-        device: str = "/dev/video0",
+        device: Union[str, DeviceInfo] = "/dev/video0",
         size: Tuple[int, int] = (640, 480),
         framerate: int = 30,
         expected_format: V4L2_PIX_FMT = V4L2_PIX_FMT.RGB24,
@@ -54,7 +54,7 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
         """
 
         Args:
-            device (str): v4l device path
+            device (str | DeviceInfo): v4l device path or info
             size (int, int): expected capture resolution
             framerate (int): expected capture framerate
             expected_format (:class:`~actfw_core.v4l2.video.V4L2_PIX_FMT`): expected capture format
@@ -73,6 +73,20 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
 
         """
         super().__init__()
+        if isinstance(device, DeviceInfo):
+            device_path = None
+            for node in device.nodes:
+                if node.label == "image_source":
+                    device_path = node.path
+            if device_path is None:
+                raise RuntimeError("not found image_source.")
+            else:
+                device = str(device_path)
+        elif isinstance(device, str):
+            pass
+        else:
+            raise RuntimeError(f"the type of device={device} must be str or DeviceInfo.")
+
         self.video = Video(device)
 
         width, height = size
