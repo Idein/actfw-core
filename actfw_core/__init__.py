@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Any, Callable, Dict, List
 
-from . import capture, linux, task, unicam_isp_capture  # noqa: F401
+from . import capture, linux, system, task, unicam_isp_capture  # noqa: F401
 from .application import Application  # noqa: F401
 from .command_server import CommandServer  # noqa: F401
 from .service_client import ServiceClient  # noqa: F401
