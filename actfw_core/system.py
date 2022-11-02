@@ -212,6 +212,8 @@ def _get_camera_device_info(devs: DeviceSupply, default_image_source: Optional[s
 
 def get_camera_device_info(default_image_source: Optional[str] = None) -> DeviceInfo:
     """
+    DeviceInfo for camera.
+    Set `default_image_source` only if you write camera device path in manifesto files.
     Since ACTCAST_PROTOCOL_VERSION 1.3.0.
     """
     devs = get_device_supply()
