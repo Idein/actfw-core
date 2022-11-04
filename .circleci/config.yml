@@ -171,7 +171,7 @@ jobs:
 
   validate-version-with-tag:
     docker:
-      - image: python:3-buster
+      - image: python:3.10-buster
         auth: *docker-hub-auth
     steps:
       - checkout
