@@ -35,14 +35,10 @@ commands:
       - restore_cache:
           key: &cache-key-poetry cache-poetry-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "poetry.lock" }}
       - run:
-          name: poetry config
-          command: |
-            poetry config virtualenvs.in-project true
-            hoge
-      - run:
           name: poetry install
           command: |
-            poetry install
+            poetry config virtualenvs.in-project true
+            poetry install --no-ansi
       - save_cache:
           key: *cache-key-poetry
           paths:
