@@ -38,6 +38,7 @@ commands:
           name: poetry config
           command: |
             poetry config virtualenvs.in-project true
+            hoge
       - run:
           name: poetry install
           command: |
