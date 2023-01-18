@@ -38,7 +38,7 @@ commands:
           name: poetry install
           command: |
             poetry config virtualenvs.in-project true
-            poetry install
+            poetry install --no-ansi
       - save_cache:
           key: *cache-key-poetry
           paths:
