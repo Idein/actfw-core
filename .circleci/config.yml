@@ -53,7 +53,7 @@ commands:
             git config user.name "ideinbot"
       - add_ssh_keys:
           fingerprints:
-            - "1b:7a:57:1b:eb:5d:b8:c4:cd:02:e2:d2:81:d8:65:ee"
+            - "38:6d:d2:4d:a5:65:d9:b9:87:cd:f5:cf:a3:d4:e5:d6"
 
 jobs:
   lint:
