@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.1 (2023-07-13)
+
+- Add retry logic to open v4l2 Video device.
+
 ## 2.2.0 (2022-11-04)
 
 - Fix a bug: actfw doesn't raise assertion error when it is stopped before `update_image` is called.
