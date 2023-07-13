@@ -9,6 +9,8 @@ import itertools
 import mmap
 import os
 import select
+import time
+import warnings
 from ctypes import *
 from ctypes.util import find_library
 from typing import List
@@ -830,7 +832,21 @@ class Video(object):
         flags = os.O_RDWR
         if not blocking:
             flags |= os.O_NONBLOCK
-        self.device_fd = os.open(self.device, flags)
+
+        for i in range(3):
+            try:
+                self.device_fd = os.open(self.device, flags)
+                break
+            except OSError as e:
+                # retry 3 times when device is busy
+                if e.errno != errno.EBUSY or i == 2:
+                    raise RuntimeError(f"open {self.device}: {errno.errorcode[e.errno]}")
+            warnings.warn(
+                f"Retrying to open {self.device} after 1 second.",
+                RuntimeWarning,
+            )
+            time.sleep(1)
+
         self.converter = _v4lconvert.create(self.device_fd)
         self.buffers: Optional[List[VideoBuffer]] = None  # set when enqueu
 
