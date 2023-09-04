@@ -1,9 +1,12 @@
+import glob
 import json
 import os
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from actfw_core.v4l2.video import Video, VideoPort
 
 
 class EnvironmentVariableNotSet(Exception):
@@ -200,14 +203,16 @@ def _get_camera_device_info(devs: DeviceSupply, default_image_source: Optional[s
                         node.label = "image_source"
                 return info
             else:
-                raise RuntimeError(f"default_image_source={default_image_source} is not mounted. Fix your manifesto files.")
+                raise RuntimeError(
+                    f"default_image_source={default_image_source} is not mounted. Fix your manifesto files.")
         else:
             raise RuntimeError(
                 "Not found image_source. Fix your manifesto files or give default_image_source to get_camera_device_info."
             )
 
     else:
-        raise RuntimeError("Not found camera device. Fix your manifesto files.")
+        raise RuntimeError(
+            "Not found camera device. Fix your manifesto files.")
 
 
 def get_camera_device_info(default_image_source: Optional[str] = None) -> DeviceInfo:
@@ -218,3 +223,60 @@ def get_camera_device_info(default_image_source: Optional[str] = None) -> Device
     """
     devs = get_device_supply()
     return _get_camera_device_info(devs, default_image_source)
+
+
+def _list_video_devices() -> List[Path]:
+    return glob.glob("/dev/video*") + glob.glob("/dev/v4l-subdev*")
+
+
+def find_usb_camera_device() -> Optional[Path]:
+    """
+    Path of USB camera device.
+    Since ACTCAST_PROTOCOL_VERSION 1.3.0.
+    """
+    firmware_type = get_actcast_firmware_type()
+    if firmware_type == "raspberrypi-bullseye":
+        devs = _list_video_devices()
+        for dev in devs:
+            try:
+                video = Video(dev)
+                if video.query_capability() == VideoPort.USB:
+                    return dev
+            except RuntimeError:
+                continue
+        return None
+    elif firmware_type == "raspberrypi" or firmware_type == "raspberrypi-buster":
+        # TODO: check the case for no CSI camera
+        file = "/dev/video1"
+        if os.path.exists(file):
+            return file
+        else:
+            return None
+    else:
+        raise RuntimeError(f"Unknown firmware type: {firmware_type}")
+
+
+def find_csi_camera_device() -> Optional[Path]:
+    """
+    Path of CSI camera device.
+    Since ACTCAST_PROTOCOL_VERSION 1.3.0.
+    """
+    firmware_type = get_actcast_firmware_type()
+    if firmware_type == "raspberrypi-bullseye":
+        devs = _list_video_devices()
+        for dev in devs:
+            try:
+                video = Video(dev)
+                if video.query_capability() == VideoPort.CSI:
+                    return dev
+            except RuntimeError:
+                continue
+        return None
+    elif firmware_type == "raspberrypi" or firmware_type == "raspberrypi-buster":
+        file = "/dev/video0"
+        if os.path.exists(file):
+            return file
+        else:
+            return None
+    else:
+        raise RuntimeError(f"Unknown firmware type: {firmware_type}")
