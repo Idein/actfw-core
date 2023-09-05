@@ -225,11 +225,11 @@ def get_camera_device_info(default_image_source: Optional[str] = None) -> Device
     return _get_camera_device_info(devs, default_image_source)
 
 
-def _list_video_devices() -> List[Path]:
+def _list_video_devices() -> List[str]:
     return glob.glob("/dev/video*") + glob.glob("/dev/v4l-subdev*")
 
 
-def find_usb_camera_device() -> Optional[Path]:
+def find_usb_camera_device() -> Optional[str]:
     """
     Path of USB camera device.
     Since ACTCAST_PROTOCOL_VERSION 1.3.0.
@@ -256,7 +256,7 @@ def find_usb_camera_device() -> Optional[Path]:
         raise RuntimeError(f"Unknown firmware type: {firmware_type}")
 
 
-def find_csi_camera_device() -> Optional[Path]:
+def find_csi_camera_device() -> Optional[str]:
     """
     Path of CSI camera device.
     Since ACTCAST_PROTOCOL_VERSION 1.3.0.
