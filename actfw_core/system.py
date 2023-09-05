@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from actfw_core.v4l2.video import Video, VideoPort
+from actfw_core.v4l2.video import Video, VideoPort  # type: ignore
 
 
 class EnvironmentVariableNotSet(Exception):
@@ -203,16 +203,14 @@ def _get_camera_device_info(devs: DeviceSupply, default_image_source: Optional[s
                         node.label = "image_source"
                 return info
             else:
-                raise RuntimeError(
-                    f"default_image_source={default_image_source} is not mounted. Fix your manifesto files.")
+                raise RuntimeError(f"default_image_source={default_image_source} is not mounted. Fix your manifesto files.")
         else:
             raise RuntimeError(
                 "Not found image_source. Fix your manifesto files or give default_image_source to get_camera_device_info."
             )
 
     else:
-        raise RuntimeError(
-            "Not found camera device. Fix your manifesto files.")
+        raise RuntimeError("Not found camera device. Fix your manifesto files.")
 
 
 def get_camera_device_info(default_image_source: Optional[str] = None) -> DeviceInfo:
