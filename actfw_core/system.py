@@ -224,7 +224,21 @@ def get_camera_device_info(default_image_source: Optional[str] = None) -> Device
 
 
 def _list_video_devices() -> List[str]:
-    return glob.glob("/dev/video*") + glob.glob("/dev/v4l-subdev*")
+    # `/sys/class/video4linux` には /dev 以下のvideoデバイスと同名のシンボリックリンクがおいてある
+    files = os.listdir("sys/class/video4linux")
+    return [f"/dev/{f}" for f in files]
+
+
+def _find_specific_video_device(video_port: VideoPort) -> Optional[str]:
+    devs = _list_video_devices()
+    for dev in devs:
+        try:
+            video = Video(dev)
+            if video.query_capability() == video_port:
+                return dev
+        except RuntimeError:
+            continue
+    return None
 
 
 def find_usb_camera_device() -> Optional[str]:
@@ -232,26 +246,7 @@ def find_usb_camera_device() -> Optional[str]:
     Path of USB camera device.
     Since ACTCAST_PROTOCOL_VERSION 1.3.0.
     """
-    firmware_type = get_actcast_firmware_type()
-    if firmware_type == "raspberrypi-bullseye":
-        devs = _list_video_devices()
-        for dev in devs:
-            try:
-                video = Video(dev)
-                if video.query_capability() == VideoPort.USB:
-                    return dev
-            except RuntimeError:
-                continue
-        return None
-    elif firmware_type == "raspberrypi" or firmware_type == "raspberrypi-buster":
-        # TODO: check the case for no CSI camera
-        file = "/dev/video1"
-        if os.path.exists(file):
-            return file
-        else:
-            return None
-    else:
-        raise RuntimeError(f"Unknown firmware type: {firmware_type}")
+    return _find_specific_video_device(VideoPort.USB)
 
 
 def find_csi_camera_device() -> Optional[str]:
@@ -259,22 +254,4 @@ def find_csi_camera_device() -> Optional[str]:
     Path of CSI camera device.
     Since ACTCAST_PROTOCOL_VERSION 1.3.0.
     """
-    firmware_type = get_actcast_firmware_type()
-    if firmware_type == "raspberrypi-bullseye":
-        devs = _list_video_devices()
-        for dev in devs:
-            try:
-                video = Video(dev)
-                if video.query_capability() == VideoPort.CSI:
-                    return dev
-            except RuntimeError:
-                continue
-        return None
-    elif firmware_type == "raspberrypi" or firmware_type == "raspberrypi-buster":
-        file = "/dev/video0"
-        if os.path.exists(file):
-            return file
-        else:
-            return None
-    else:
-        raise RuntimeError(f"Unknown firmware type: {firmware_type}")
+    return _find_specific_video_device(VideoPort.CSI)
