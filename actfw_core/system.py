@@ -223,20 +223,24 @@ def get_camera_device_info(default_image_source: Optional[str] = None) -> Device
 
 
 def _list_video_devices() -> List[str]:
-    # `/sys/class/video4linux` には /dev 以下のvideoデバイスと同名のシンボリックリンクがおいてある
-    files = os.listdir("sys/class/video4linux")
-    return [f"/dev/{f}" for f in files]
+    devs = get_device_supply()
+    cameras = [dev for dev in devs.devices if dev.type == "camera"]
+    paths: List[str] = []
+    for c in cameras:
+        for node in c.nodes:
+            paths.append(str(node.path))
+    return paths
 
 
 def _find_specific_video_device(video_port: VideoPort) -> Optional[str]:
     devs = _list_video_devices()
     for dev in devs:
         try:
-            video = Video(dev)
-            if video.query_capability() == video_port:
-                return dev
+            with Video(dev) as video:
+                if video.query_capability() == video_port:
+                    return dev
         except RuntimeError:
-            continue
+            pass
     return None
 
 
