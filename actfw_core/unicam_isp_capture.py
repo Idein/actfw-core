@@ -89,6 +89,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         default_color_temperature: int = 4500,
         contrast: bool = True,
         config: Optional[Dict[str, Any]] = None,
+        vflip: bool = False,
+        hflip: bool = False,
     ) -> None:
         super().__init__()
 
@@ -201,6 +203,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.hblank: int = 0
         self.pixel_late: int = 0
 
+        # vflip & hflip
+        self.vflip = vflip
+        self.hflip = hflip
+
         # setup
         self.converter = V4LConverter(self.isp_out_high.device_fd)
         self.setup_pipeline()
@@ -221,13 +227,39 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
     def setup_pipeline(self) -> None:
         # setup unicam
         if self.sensor_name == "imx219":
-            if not (self.unicam_subdev.set_vertical_flip(True) and self.unicam_subdev.set_horizontal_flip(True)):
+            # imx219 is flipped by default
+            if not (
+                self.unicam_subdev.set_vertical_flip(not self.vflip) and self.unicam_subdev.set_horizontal_flip(not self.hflip)
+            ):
                 raise RuntimeError("fail to setup unicam subdevice node")
-            bus_fmt = MEDIA_BUS_FMT.SBGGR10_1X10
-            self.unicam_format = V4L2_PIX_FMT.SBGGR10P
+            # https://www.kernel.org/doc/html/v5.15/userspace-api/media/v4l/subdev-formats.html?highlight=media_bus_fmt
+            if self.vflip and self.hflip:
+                bus_fmt = MEDIA_BUS_FMT.SRGGB10_1X10
+                self.unicam_format = V4L2_PIX_FMT.SRGGB10P
+            elif self.vflip and not self.hflip:
+                bus_fmt = MEDIA_BUS_FMT.SGRBG10_1X10
+                self.unicam_format = V4L2_PIX_FMT.SGRBG10P
+            elif not self.vflip and self.hflip:
+                bus_fmt = MEDIA_BUS_FMT.SGBRG10_1X10
+                self.unicam_format = V4L2_PIX_FMT.SGBRG10P
+            else:
+                bus_fmt = MEDIA_BUS_FMT.SBGGR10_1X10
+                self.unicam_format = V4L2_PIX_FMT.SBGGR10P
         else:
-            bus_fmt = MEDIA_BUS_FMT.SGBRG10_1X10
-            self.unicam_format = V4L2_PIX_FMT.SGBRG10P
+            if not (self.unicam_subdev.set_vertical_flip(self.vflip) and self.unicam_subdev.set_horizontal_flip(self.hflip)):
+                raise RuntimeError("fail to setup unicam subdevice node")
+            if self.vflip and self.hflip:
+                bus_fmt = MEDIA_BUS_FMT.SGRBG10_1X10
+                self.unicam_format = V4L2_PIX_FMT.SGRBG10P
+            elif self.vflip and not self.hflip:
+                bus_fmt = MEDIA_BUS_FMT.SRGGB10_1X10
+                self.unicam_format = V4L2_PIX_FMT.SRGGB10P
+            elif not self.vflip and self.hflip:
+                bus_fmt = MEDIA_BUS_FMT.SBGGR10_1X10
+                self.unicam_format = V4L2_PIX_FMT.SBGGR10P
+            else:
+                bus_fmt = MEDIA_BUS_FMT.SGBRG10_1X10
+                self.unicam_format = V4L2_PIX_FMT.SGBRG10P
 
         self.unicam_subdev.set_subdev_format(*self.camera_mode.size, bus_fmt)
         if (
