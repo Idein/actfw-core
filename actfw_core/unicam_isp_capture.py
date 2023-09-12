@@ -233,33 +233,33 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             ):
                 raise RuntimeError("fail to setup unicam subdevice node")
             # https://www.kernel.org/doc/html/v5.15/userspace-api/media/v4l/subdev-formats.html?highlight=media_bus_fmt
-            if not self.vflip and not self.hflip:
-                bus_fmt = MEDIA_BUS_FMT.SBGGR10_1X10
-                self.unicam_format = V4L2_PIX_FMT.SBGGR10P
-            elif not self.vflip and self.hflip:
-                bus_fmt = MEDIA_BUS_FMT.SGBRG10_1X10
-                self.unicam_format = V4L2_PIX_FMT.SGBRG10P
+            if self.vflip and self.hflip:
+                bus_fmt = MEDIA_BUS_FMT.SRGGB10_1X10
+                self.unicam_format = V4L2_PIX_FMT.SRGGB10P
             elif self.vflip and not self.hflip:
                 bus_fmt = MEDIA_BUS_FMT.SGRBG10_1X10
                 self.unicam_format = V4L2_PIX_FMT.SGRBG10P
+            elif not self.vflip and self.hflip:
+                bus_fmt = MEDIA_BUS_FMT.SGBRG10_1X10
+                self.unicam_format = V4L2_PIX_FMT.SGBRG10P
             else:
-                bus_fmt = MEDIA_BUS_FMT.SRGGB10_1X10
-                self.unicam_format = V4L2_PIX_FMT.SRGGB10P
+                bus_fmt = MEDIA_BUS_FMT.SBGGR10_1X10
+                self.unicam_format = V4L2_PIX_FMT.SBGGR10P
         else:
             if not (self.unicam_subdev.set_vertical_flip(self.vflip) and self.unicam_subdev.set_horizontal_flip(self.hflip)):
                 raise RuntimeError("fail to setup unicam subdevice node")
             if self.vflip and self.hflip:
-                bus_fmt = MEDIA_BUS_FMT.SGBRG10_1X10
-                self.unicam_format = V4L2_PIX_FMT.SGBRG10P
-            elif self.vflip and not self.hflip:
-                bus_fmt = MEDIA_BUS_FMT.SBGGR10_1X10
-                self.unicam_format = V4L2_PIX_FMT.SBGGR10P
-            elif not self.vflip and self.hflip:
-                bus_fmt = MEDIA_BUS_FMT.SRGGB10_1X10
-                self.unicam_format = V4L2_PIX_FMT.SRGGB10P
-            else:
                 bus_fmt = MEDIA_BUS_FMT.SGRBG10_1X10
                 self.unicam_format = V4L2_PIX_FMT.SGRBG10P
+            elif self.vflip and not self.hflip:
+                bus_fmt = MEDIA_BUS_FMT.SRGGB10_1X10
+                self.unicam_format = V4L2_PIX_FMT.SRGGB10P
+            elif not self.vflip and self.hflip:
+                bus_fmt = MEDIA_BUS_FMT.SBGGR10_1X10
+                self.unicam_format = V4L2_PIX_FMT.SBGGR10P
+            else:
+                bus_fmt = MEDIA_BUS_FMT.SGBRG10_1X10
+                self.unicam_format = V4L2_PIX_FMT.SGBRG10P
 
         self.unicam_subdev.set_subdev_format(*self.camera_mode.size, bus_fmt)
         if (
