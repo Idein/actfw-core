@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from actfw_core.v4l2.video import Video, VideoPort  # type: ignore
+
 
 class EnvironmentVariableNotSet(Exception):
     def __init__(self, name: str) -> None:
@@ -218,3 +220,42 @@ def get_camera_device_info(default_image_source: Optional[str] = None) -> Device
     """
     devs = get_device_supply()
     return _get_camera_device_info(devs, default_image_source)
+
+
+def _list_video_devices() -> List[str]:
+    devs = get_device_supply()
+    cameras = [dev for dev in devs.devices if dev.type == "camera"]
+    paths: List[str] = []
+    for c in cameras:
+        for node in c.nodes:
+            paths.append(str(node.path))
+    return paths
+
+
+def _find_specific_video_device(video_port: VideoPort) -> Optional[str]:
+    devs = _list_video_devices()
+    for dev in devs:
+        try:
+            # No `video.close()` leads to Capture timeout error.
+            with Video(dev) as video:
+                if video.query_capability() == video_port:
+                    return dev
+        except RuntimeError:
+            pass
+    return None
+
+
+def find_usb_camera_device() -> Optional[str]:
+    """
+    Path of USB camera device.
+    Since ACTCAST_PROTOCOL_VERSION 1.3.0.
+    """
+    return _find_specific_video_device(VideoPort.USB)
+
+
+def find_csi_camera_device() -> Optional[str]:
+    """
+    Path of CSI camera device.
+    Since ACTCAST_PROTOCOL_VERSION 1.3.0.
+    """
+    return _find_specific_video_device(VideoPort.CSI)
