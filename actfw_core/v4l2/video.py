@@ -870,10 +870,10 @@ class Video(object):
     def query_capability(self):
         cap = capability()
         result = self._ioctl(_VIDIOC.QUERYCAP, byref(cap))
-        if not (cap.capabilities & _V4L2_CAP_VIDEO_CAPTURE):
-            raise RuntimeError("The device doesn't support the single-planar API through the Video Capture interface.")
-        if not (cap.capabilities & _V4L2_CAP_STREAMING):
-            raise RuntimeError("The device doesn't support the streaming I/O method.")
+        if not (cap.device_caps & _V4L2_CAP_VIDEO_CAPTURE):
+            raise RuntimeError("The device node doesn't support the single-planar API through the Video Capture interface.")
+        if not (cap.device_caps & _V4L2_CAP_STREAMING):
+            raise RuntimeError("The device node doesn't support the streaming I/O method.")
         driver = "".join(map(chr, itertools.takewhile(lambda x: x > 0, cap.driver)))
         if driver == "bm2835 mmal" or driver == "unicam":
             return VideoPort.CSI

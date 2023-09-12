@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add `find_usb_camera_device` and `find_csi_camera_device` functions to `actfw_core.system`.
+
 ## 2.2.1 (2023-07-13)
 
 - Add retry logic to open v4l2 Video device.
