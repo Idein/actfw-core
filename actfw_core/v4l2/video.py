@@ -377,6 +377,8 @@ class MEDIA_BUS_FMT(enum.IntEnum):
     SBGGR8_1X8 = 0x3001
     SBGGR10_1X10 = 0x3007
     SGBRG10_1X10 = 0x300E
+    SGRBG10_1X10 = 0x300A
+    SRGGB10_1X10 = 0x300F
 
 
 class V4L2_SEL_TGT(enum.IntEnum):
