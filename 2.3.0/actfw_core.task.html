@@ -1,0 +1,405 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>actfw_core.task package &mdash; actfw-core 2.3.0 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="actfw-core 2.3.0 documentation" href="index.html"/>
+        <link rel="up" title="actfw_core package" href="actfw_core.html"/>
+        <link rel="next" title="actfw_core.v4l2 package" href="actfw_core.v4l2.html"/>
+        <link rel="prev" title="actfw_core.linux package" href="actfw_core.linux.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> actfw-core
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="actfw_core.html">actfw_core package</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="actfw_core.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="actfw_core.linux.html">actfw_core.linux package</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">actfw_core.task package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-actfw_core.task.consumer">actfw_core.task.consumer module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-actfw_core.task.isolated">actfw_core.task.isolated module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-actfw_core.task.join">actfw_core.task.join module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-actfw_core.task.pipe">actfw_core.task.pipe module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-actfw_core.task.producer">actfw_core.task.producer module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-actfw_core.task.task">actfw_core.task.task module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-actfw_core.task.tee">actfw_core.task.tee module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-actfw_core.task">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="actfw_core.v4l2.html">actfw_core.v4l2 package</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="actfw_core.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="actfw_core.html#module-actfw_core.application">actfw_core.application module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="actfw_core.html#module-actfw_core.capture">actfw_core.capture module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="actfw_core.html#module-actfw_core.command_server">actfw_core.command_server module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="actfw_core.html#module-actfw_core.service_client">actfw_core.service_client module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="actfw_core.html#module-actfw_core.system">actfw_core.system module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="actfw_core.html#module-actfw_core.unicam_isp_capture">actfw_core.unicam_isp_capture module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="actfw_core.html#module-actfw_core">Module contents</a></li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">actfw-core</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="actfw_core.html">actfw_core package</a> &raquo;</li>
+        
+      <li>actfw_core.task package</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/actfw_core.task.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="actfw-core-task-package">
+<h1>actfw_core.task package<a class="headerlink" href="#actfw-core-task-package" title="Permalink to this headline">¶</a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="module-actfw_core.task.consumer">
+<span id="actfw-core-task-consumer-module"></span><h2>actfw_core.task.consumer module<a class="headerlink" href="#module-actfw_core.task.consumer" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="actfw_core.task.consumer.Consumer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">actfw_core.task.consumer.</span></span><span class="sig-name descname"><span class="pre">Consumer</span></span><a class="headerlink" href="#actfw_core.task.consumer.Consumer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">actfw_core.task.consumer.T_IN</span></code>], <a class="reference internal" href="#actfw_core.task.task.Task" title="actfw_core.task.task.Task"><code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.task.Task</span></code></a>, <code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.consumer._ConsumerMixin</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">actfw_core.task.consumer.T_IN</span></code>]</p>
+<p>Consumer Task.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="actfw_core.task.consumer.Consumer.proc">
+<span class="sig-name descname"><span class="pre">proc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">actfw_core.task.consumer.T_IN</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#actfw_core.task.consumer.Consumer.proc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Pipeline Task Processor</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>i</strong> – task input</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="actfw_core.task.consumer.Consumer.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#actfw_core.task.consumer.Consumer.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run and start the activity</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-actfw_core.task.isolated">
+<span id="actfw-core-task-isolated-module"></span><h2>actfw_core.task.isolated module<a class="headerlink" href="#module-actfw_core.task.isolated" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="actfw_core.task.isolated.Isolated">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">actfw_core.task.isolated.</span></span><span class="sig-name descname"><span class="pre">Isolated</span></span><a class="headerlink" href="#actfw_core.task.isolated.Isolated" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#actfw_core.task.task.Task" title="actfw_core.task.task.Task"><code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.task.Task</span></code></a></p>
+<p>A task which has no connection.</p>
+</dd></dl>
+
+</section>
+<section id="module-actfw_core.task.join">
+<span id="actfw-core-task-join-module"></span><h2>actfw_core.task.join module<a class="headerlink" href="#module-actfw_core.task.join" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="actfw_core.task.join.Join">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">actfw_core.task.join.</span></span><span class="sig-name descname"><span class="pre">Join</span></span><a class="headerlink" href="#actfw_core.task.join.Join" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#actfw_core.task.task.Task" title="actfw_core.task.task.Task"><code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.task.Task</span></code></a>, <code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.producer._ProducerMixin</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tuple</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">Any</span></code>, …]], <code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.consumer._ConsumerMixin</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">Any</span></code>]</p>
+<p>Join Task.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="actfw_core.task.join.Join.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#actfw_core.task.join.Join.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run and start the activity</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-actfw_core.task.pipe">
+<span id="actfw-core-task-pipe-module"></span><h2>actfw_core.task.pipe module<a class="headerlink" href="#module-actfw_core.task.pipe" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="actfw_core.task.pipe.Pipe">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">actfw_core.task.pipe.</span></span><span class="sig-name descname"><span class="pre">Pipe</span></span><a class="headerlink" href="#actfw_core.task.pipe.Pipe" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">actfw_core.task.pipe.T_OUT</span></code>, <code class="xref py py-obj docutils literal notranslate"><span class="pre">actfw_core.task.pipe.T_IN</span></code>], <a class="reference internal" href="#actfw_core.task.task.Task" title="actfw_core.task.task.Task"><code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.task.Task</span></code></a>, <code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.producer._ProducerMixin</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">actfw_core.task.pipe.T_OUT</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.consumer._ConsumerMixin</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">actfw_core.task.pipe.T_IN</span></code>]</p>
+<p>Straightforward Pipeline Task.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="actfw_core.task.pipe.Pipe.proc">
+<span class="sig-name descname"><span class="pre">proc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">actfw_core.task.pipe.T_IN</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">actfw_core.task.pipe.T_OUT</span></span></span><a class="headerlink" href="#actfw_core.task.pipe.Pipe.proc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Pipeline Task Processor</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="actfw_core.task.pipe.Pipe.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#actfw_core.task.pipe.Pipe.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run and start the activity</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-actfw_core.task.producer">
+<span id="actfw-core-task-producer-module"></span><h2>actfw_core.task.producer module<a class="headerlink" href="#module-actfw_core.task.producer" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="actfw_core.task.producer.Producer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">actfw_core.task.producer.</span></span><span class="sig-name descname"><span class="pre">Producer</span></span><a class="headerlink" href="#actfw_core.task.producer.Producer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">actfw_core.task.producer.T_OUT</span></code>], <a class="reference internal" href="#actfw_core.task.task.Task" title="actfw_core.task.task.Task"><code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.task.Task</span></code></a>, <code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.producer._ProducerMixin</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">actfw_core.task.producer.T_OUT</span></code>]</p>
+<p>Producer Task.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="actfw_core.task.producer.Producer.proc">
+<span class="sig-name descname"><span class="pre">proc</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">actfw_core.task.producer.T_OUT</span></span></span><a class="headerlink" href="#actfw_core.task.producer.Producer.proc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Pipeline Task Processor</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="actfw_core.task.producer.Producer.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#actfw_core.task.producer.Producer.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run and start the activity</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-actfw_core.task.task">
+<span id="actfw-core-task-task-module"></span><h2>actfw_core.task.task module<a class="headerlink" href="#module-actfw_core.task.task" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="actfw_core.task.task.Task">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">actfw_core.task.task.</span></span><span class="sig-name descname"><span class="pre">Task</span></span><a class="headerlink" href="#actfw_core.task.task.Task" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">threading.Thread</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.task._TaskI</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="actfw_core.task.task.Task.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#actfw_core.task.task.Task.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run and start the activity</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="actfw_core.task.task.Task.running">
+<span class="sig-name descname"><span class="pre">running</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#actfw_core.task.task.Task.running" title="Permalink to this definition">¶</a></dt>
+<dd><p>Actcast Application Task</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="actfw_core.task.task.Task.stop">
+<span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#actfw_core.task.task.Task.stop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Stop the activity</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-actfw_core.task.tee">
+<span id="actfw-core-task-tee-module"></span><h2>actfw_core.task.tee module<a class="headerlink" href="#module-actfw_core.task.tee" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="actfw_core.task.tee.Tee">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">actfw_core.task.tee.</span></span><span class="sig-name descname"><span class="pre">Tee</span></span><a class="headerlink" href="#actfw_core.task.tee.Tee" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Generic</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">actfw_core.task.tee.T</span></code>], <a class="reference internal" href="#actfw_core.task.task.Task" title="actfw_core.task.task.Task"><code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.task.Task</span></code></a>, <code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.producer._ProducerMixin</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">actfw_core.task.tee.T</span></code>], <code class="xref py py-class docutils literal notranslate"><span class="pre">actfw_core.task.consumer._ConsumerMixin</span></code>[<code class="xref py py-obj docutils literal notranslate"><span class="pre">actfw_core.task.tee.T</span></code>]</p>
+<p>Tee Task.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="actfw_core.task.tee.Tee.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#actfw_core.task.tee.Tee.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run and start the activity</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-actfw_core.task">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-actfw_core.task" title="Permalink to this headline">¶</a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="actfw_core.v4l2.html" class="btn btn-neutral float-right" title="actfw_core.v4l2 package" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="actfw_core.linux.html" class="btn btn-neutral" title="actfw_core.linux package" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019-2020, Idein Inc..
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> and ❤️  using a custom <a href="https://github.com/LinxiFan/Sphinx-theme">theme</a> based on <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'2.3.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/documentation_options.js"></script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
