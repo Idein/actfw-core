@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add `vflip` and `hflip` parameters to `UnicamIspCapture`.
+
 ## 2.2.1 (2023-07-13)
 
 - Add retry logic to open v4l2 Video device.
