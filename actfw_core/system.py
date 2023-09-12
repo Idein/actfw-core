@@ -236,6 +236,7 @@ def _find_specific_video_device(video_port: VideoPort) -> Optional[str]:
     devs = _list_video_devices()
     for dev in devs:
         try:
+            # No `video.close()` leads to Capture timeout error.
             with Video(dev) as video:
                 if video.query_capability() == video_port:
                     return dev
