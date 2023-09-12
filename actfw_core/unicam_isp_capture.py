@@ -228,7 +228,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         # setup unicam
         if self.sensor_name == "imx219":
             # imx219 is flipped by default
-            if not (self.unicam_subdev.set_vertical_flip(not self.vflip) and self.unicam_subdev.set_horizontal_flip(not self.hflip)):
+            if not (
+                self.unicam_subdev.set_vertical_flip(not self.vflip) and self.unicam_subdev.set_horizontal_flip(not self.hflip)
+            ):
                 raise RuntimeError("fail to setup unicam subdevice node")
             # https://www.kernel.org/doc/html/v5.15/userspace-api/media/v4l/subdev-formats.html?highlight=media_bus_fmt
             if not self.vflip and not self.hflip:
