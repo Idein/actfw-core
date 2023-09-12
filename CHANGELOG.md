@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.3.0 (2023-09-12)
+
 - Add `find_usb_camera_device` and `find_csi_camera_device` functions to `actfw_core.system`.
 - Add `vflip` and `hflip` parameters to `UnicamIspCapture`.
 
