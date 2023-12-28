@@ -68,6 +68,16 @@ V2_UNICAM_MODES: List[CameraMode] = [
 ]
 
 
+IMX519_SENSOR_SIZE = (4656, 3496)
+IMX519_UNICAM_MODES: List[CameraMode] = [
+    CameraMode(size=(4656, 3496), scale=(1.0, 1.0), crop=(0, 0)),
+    CameraMode(size=(3840, 2160), scale=(1.0, 1.0), crop=(408, 672)),
+    CameraMode(size=(2328, 1748), scale=(2.0, 2.0), crop=(0, 0)),
+    CameraMode(size=(1920, 1080), scale=(2.0, 2.0), crop=(408, 674)),
+    CameraMode(size=(1280, 720), scale=(2.0, 2.0), crop=(1048, 1042)),
+]
+
+
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
         self,
@@ -99,7 +109,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_out_metadata_buffer_num = 2
         self.shared_dma_fds: List[int] = []
         self.sensor_name = self.get_sensor_name(unicam_subdev)
-        if self.sensor_name not in ["imx219", "ov5647"]:
+        self.sensor_size = self.get_sensor_size(self.sensor_name)
+        if self.sensor_name not in ["imx219", "ov5647", "imx519"]:
             raise RuntimeError(f"not supported sensor: {self.sensor_name}")
 
         self.unicam = RawVideo(unicam, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
@@ -130,6 +141,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             # Auto selection of unicam_size and crop_size.
             if self.sensor_name == "imx219":
                 self.auto_size_selection_for_imx219()
+            elif self.sensor_name == "imx519":
+                self.auto_size_selection_for_imx519()
             else:
                 self.auto_size_selection_for_ov5647()
         else:
@@ -223,10 +236,17 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         with open(f"/sys/class/video4linux/{subdev[5:]}/device/name") as f:
             sensor_name = f.read()
         return sensor_name.rstrip()
+    
+    def get_sensor_size(self, sensor_name):
+        return {
+            "ov5640": V1_SENSOR_SIZE,
+            "imx219": V2_SENSOR_SIZE,
+            "imx519": IMX519_SENSOR_SIZE
+        }[sensor_name]
 
     def setup_pipeline(self) -> None:
         # setup unicam
-        if self.sensor_name == "imx219":
+        if self.sensor_name == "imx219" or self.sensor_name == "imx519":
             # imx219 is flipped by default
             if not (
                 self.unicam_subdev.set_vertical_flip(not self.vflip) and self.unicam_subdev.set_horizontal_flip(not self.hflip)
@@ -275,7 +295,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
         if unicam_width != self.unicam_width or unicam_height != self.unicam_height or unicam_format != self.unicam_format:
             raise RuntimeError("fail to setup unicam device node")
-
         self.set_unicam_fps()
         if self.do_agc:
             init_shutter_time = self.shutters[len(self.shutters) // 2]  # (us)
@@ -364,6 +383,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             return 256 - (
                 256 / analogue_gain
             )  # https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67 # noqa: E501, B950
+        elif self.sensor_name == "imx519":
+            return 1024 - (
+                1024 / analogue_gain
+            )  # https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/cam_helper_imx519.cpp#L75 # noqa: E501, B950
         elif self.sensor_name == "ov5647":
             return (
                 analogue_gain * 16.0
@@ -406,6 +429,27 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                     )
         else:
             self.camera_mode = V2_UNICAM_MODES[0]
+            self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
+    
+    def auto_size_selection_for_imx519(self) -> None:
+        # Support only v2 camera module.
+        if self.expected_width <= 1280 and self.expected_height <= 720:
+            if self.expected_fps <= 40:
+                self.camera_mode = IMX519_UNICAM_MODES[2]
+                self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
+            else:
+                if abs(self.expected_width / self.expected_height - 16 / 9) < 0.05:
+                    self.camera_mode = IMX519_UNICAM_MODES[2]
+                    self.crop_size = (180, 256, 1280, 720)
+                else:
+                    self.camera_mode = IMX519_UNICAM_MODES[3]
+                    self.crop_size = self.calc_crop_size(
+                        self.expected_width,
+                        self.expected_height,
+                        *self.camera_mode.size,
+                    )
+        else:
+            self.camera_mode = IMX519_UNICAM_MODES[0]
             self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
 
     def auto_size_selection_for_ov5647(self) -> None:
@@ -524,8 +568,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         x_lo: List[int] = [0] * LS_TABLE_W
         x_hi: List[int] = [0] * LS_TABLE_W
         xf: List[float] = [0] * LS_TABLE_W
-        scale_x = V2_SENSOR_SIZE[0] / (camera_mode.size[0] * camera_mode.scale[0])
-        offset_x = (camera_mode.crop[0] / V2_SENSOR_SIZE[0]) * LS_TABLE_W
+        scale_x = self.sensor_size[0] / (camera_mode.size[0] * camera_mode.scale[0])
+        offset_x = (camera_mode.crop[0] / self.sensor_size[0]) * LS_TABLE_W
         x = (0.5 / scale_x) + offset_x - 0.5
         x_inc = 1 / scale_x
         for i in range(0, LS_TABLE_W):
@@ -535,8 +579,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             x_lo[i] = max(x_lo[i], 0)
             x += x_inc
 
-        scale_y = V2_SENSOR_SIZE[1] / (camera_mode.size[1] * camera_mode.scale[1])
-        offset_y = (camera_mode.crop[1] / V2_SENSOR_SIZE[1]) * LS_TABLE_H
+        scale_y = self.sensor_size[1] / (camera_mode.size[1] * camera_mode.scale[1])
+        offset_y = (camera_mode.crop[1] / self.sensor_size[1]) * LS_TABLE_H
         y = (0.5 / scale_y) + offset_y - 0.5
         y_inc = 1 / scale_y
         for _ in range(0, LS_TABLE_H):
