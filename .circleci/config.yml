@@ -1,7 +1,7 @@
 version: 2.1
 
 references:
-  python-versions: &python-versions ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+  python-versions: &python-versions ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
 
 commands:
   install-python-dev-tools:
@@ -91,12 +91,6 @@ jobs:
       - install-python-dev-tools
       - when:
           condition:
-            equal: ["3.6", << parameters.python-version >> ]
-          steps:
-            - install-old-poetry:
-                poetry-version: "1.1.15"
-      - when:
-          condition:
             equal: ["3.7", << parameters.python-version >> ]
           steps:
             - install-old-poetry:
@@ -104,9 +98,7 @@ jobs:
       - when:
           condition:
             not:
-              or:
-                - equal: ["3.6", << parameters.python-version >> ]
-                - equal: ["3.7", << parameters.python-version >> ]
+              equal: ["3.7", << parameters.python-version >> ]
           steps:
             - install-poetry
       - poetry-install
@@ -128,12 +120,6 @@ jobs:
       - install-python-dev-tools
       - when:
           condition:
-            equal: ["3.6", << parameters.python-version >> ]
-          steps:
-            - install-old-poetry:
-                poetry-version: "1.1.15"
-      - when:
-          condition:
             equal: ["3.7", << parameters.python-version >> ]
           steps:
             - install-old-poetry:
@@ -141,9 +127,7 @@ jobs:
       - when:
           condition:
             not:
-              or:
-                - equal: ["3.6", << parameters.python-version >> ]
-                - equal: ["3.7", << parameters.python-version >> ]
+              equal: ["3.7", << parameters.python-version >> ]
           steps:
             - install-poetry
       - poetry-install
