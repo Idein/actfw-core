@@ -15,7 +15,10 @@ class Application:
 
     """Actcast Application"""
 
-    def __init__(self, stop_by_signals: Iterable[signal.Signals] = (signal.SIGINT, signal.SIGTERM)) -> None:
+    def __init__(
+        self,
+        stop_by_signals: Iterable[signal.Signals] = (signal.SIGINT, signal.SIGTERM),
+    ) -> None:
         self.running = True
         for sig in stop_by_signals:
             signal.signal(sig, self._handler)

@@ -26,11 +26,11 @@ pyproject-indirect-import-detector = "^0.1.2"
 pysen = {version = "^0.10.1"}
 pytest = "^6.2.3"
 sphinx-theme = "^1.0"
-black = "21.10b0"
+black = "^23"
 flake8 = "3.9.2"
 flake8-bugbear = "21.9.2"
 isort = "5.1.4"
-mypy = "0.991"
+mypy = "^1"
 
 [tool.poetry.urls]
 "Repository" = "https://github.com/Idein/actfw-core"

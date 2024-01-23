@@ -10,7 +10,7 @@ from queue import Queue
 
 from actfw_core.util.pad import _PadDiscardingOld
 
-COUNT = 10 ** 6
+COUNT = 10**6
 
 
 def f():

@@ -26,10 +26,10 @@ def test_roundtrip() -> None:
         assert sock.is_consumed_all()
         assert x.to_bytes() == data
 
-    HUGE_DATA_SIZE = 2 ** 13  # 8KB
+    HUGE_DATA_SIZE = 2**13  # 8KB
     HUGE_DATA = f"0 0 {HUGE_DATA_SIZE} ".encode() + b"a" * HUGE_DATA_SIZE
 
     CLASSES = [CommandRequest, CommandResponse, ServiceRequest, ServiceResponse]
     DATAS = [b"0 0 0 ", b"0 0 1 a", HUGE_DATA]
-    for (cls, data) in itertools.product(CLASSES, DATAS):
+    for cls, data in itertools.product(CLASSES, DATAS):
         roundtrip(cls, data)

@@ -48,7 +48,10 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
         size: Tuple[int, int] = (640, 480),
         framerate: int = 30,
         expected_format: V4L2_PIX_FMT = V4L2_PIX_FMT.RGB24,
-        fallback_formats: Iterable[V4L2_PIX_FMT] = (V4L2_PIX_FMT.YUYV, V4L2_PIX_FMT.MJPEG),
+        fallback_formats: Iterable[V4L2_PIX_FMT] = (
+            V4L2_PIX_FMT.YUYV,
+            V4L2_PIX_FMT.MJPEG,
+        ),
         format_selector: FormatSelector = FormatSelector.DEFAULT,
     ) -> None:
         """
@@ -100,7 +103,6 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
             pass
 
         if cap == VideoPort.CSI:
-
             # workaround for bcm2835-v4l2 format pixsize & bytesperline bug
             width = (width + 31) // 32 * 32
             height = (height + 15) // 16 * 16
@@ -109,7 +111,10 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
             candidates = self.video.lookup_config(64, 64, 5, V4L2_PIX_FMT.RGB24, V4L2_PIX_FMT.RGB24)
             self.video.set_format(candidates[0], 64, 64, V4L2_PIX_FMT.RGB24)
 
-        if format_selector in [V4LCameraCapture.FormatSelector.PROPER, V4LCameraCapture.FormatSelector.MAXIMUM]:
+        if format_selector in [
+            V4LCameraCapture.FormatSelector.PROPER,
+            V4LCameraCapture.FormatSelector.MAXIMUM,
+        ]:
 
             def cmp(config):  # type: ignore
                 return (

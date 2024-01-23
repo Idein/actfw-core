@@ -102,10 +102,26 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         if self.sensor_name not in ["imx219", "ov5647"]:
             raise RuntimeError(f"not supported sensor: {self.sensor_name}")
 
-        self.unicam = RawVideo(unicam, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
-        self.unicam_subdev = RawVideo(unicam_subdev, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
-        self.isp_in = RawVideo(isp_in, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_OUTPUT, init_controls=init_controls)
-        self.isp_out_high = RawVideo(isp_out_high, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE, init_controls=init_controls)
+        self.unicam = RawVideo(
+            unicam,
+            v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE,
+            init_controls=init_controls,
+        )
+        self.unicam_subdev = RawVideo(
+            unicam_subdev,
+            v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE,
+            init_controls=init_controls,
+        )
+        self.isp_in = RawVideo(
+            isp_in,
+            v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_OUTPUT,
+            init_controls=init_controls,
+        )
+        self.isp_out_high = RawVideo(
+            isp_out_high,
+            v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE,
+            init_controls=init_controls,
+        )
         self.isp_out_metadata = RawVideo(
             isp_out_metadata,
             v4l2_buf_type=V4L2_BUF_TYPE.META_CAPTURE,
@@ -311,9 +327,11 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         # TODO: Ensure that the value of bytesperline is equal to width or handle padding appropriately.
         # One possible solution is to use only width of multiples of 32.
-        (isp_out_width, isp_out_height, isp_out_format) = self.isp_out_high.set_pix_format(
-            self.expected_width, self.expected_height, self.expected_pix_format
-        )
+        (
+            isp_out_width,
+            isp_out_height,
+            isp_out_format,
+        ) = self.isp_out_high.set_pix_format(self.expected_width, self.expected_height, self.expected_pix_format)
 
         self.output_fmt = self.converter.try_convert(
             self.isp_out_high.fmt,
@@ -841,7 +859,17 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 gamma_curve = self.compose_gamma_curve(self.compute_stretch_curve(histogram), gamma_curve)
         if self.brightness != 0 or self.contrast != 1.0:
             gamma_curve = [
-                (x, max(0.0, min(65535.0, (y - 32768) * self.contrast + 32768 + self.brightness))) for (x, y) in gamma_curve
+                (
+                    x,
+                    max(
+                        0.0,
+                        min(
+                            65535.0,
+                            (y - 32768) * self.contrast + 32768 + self.brightness,
+                        ),
+                    ),
+                )
+                for (x, y) in gamma_curve
             ]
         gm = bcm2835_isp_gamma()
         self.fill_in_contrast_status(gm, gamma_curve)

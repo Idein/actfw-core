@@ -86,7 +86,11 @@ class _libv4lconvert(object):
             self.lib.v4lconvert_convert.restype = c_void_p  # struct v4lconvert_data *
 
             # try_format
-            self.lib.v4lconvert_try_format.argtypes = [c_void_p, POINTER(format), POINTER(format)]
+            self.lib.v4lconvert_try_format.argtypes = [
+                c_void_p,
+                POINTER(format),
+                POINTER(format),
+            ]
             self.lib.v4lconvert_try_format.restype = c_int
 
     def create(self, *args, **kwargs):
@@ -399,7 +403,13 @@ class V4L2_SEL_FLAG(enum.IntEnum):
 
 
 class RawVideo(object):
-    def __init__(self, device, blocking=False, init_controls=[], v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE):
+    def __init__(
+        self,
+        device,
+        blocking=False,
+        init_controls=[],
+        v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE,
+    ):
         self.device = device
         self.v4l2_buf_type = v4l2_buf_type
         flags = os.O_RDWR
@@ -429,7 +439,6 @@ class RawVideo(object):
         return result
 
     def set_pix_format(self, expected_width, expected_height, expected_format: V4L2_PIX_FMT):
-
         fmt = format()
         fmt.type = self.v4l2_buf_type
         fmt.fmt.pix.width = expected_width
@@ -529,7 +538,11 @@ class RawVideo(object):
         ctrl.reserved2 = (c_uint32 * 1)()
         ctrl.reserved2[0] = 0
 
-        if query.type in [V4L2_CTRL_TYPE.INTEGER, V4L2_CTRL_TYPE.BOOLEAN, V4L2_CTRL_TYPE.MENU]:
+        if query.type in [
+            V4L2_CTRL_TYPE.INTEGER,
+            V4L2_CTRL_TYPE.BOOLEAN,
+            V4L2_CTRL_TYPE.MENU,
+        ]:
             ctrl.value = query.default_value
         elif query.type == V4L2_CTRL_TYPE.INTEGER64:
             ctrl.value64 = query.default_value
@@ -547,7 +560,7 @@ class RawVideo(object):
     def get_ext_controls(self, ids: List[V4L2_CID]) -> List[v4l2_ext_control]:
         ctrls = v4l2_ext_controls()
         ctr_arr = (v4l2_ext_control * len(ids))()
-        for (i, ctrl_id) in enumerate(ids):
+        for i, ctrl_id in enumerate(ids):
             ctr_arr[i].id = ctrl_id
 
         ctrls.which = V4L2_CTRL_WHICH_CUR_VAL
@@ -564,7 +577,7 @@ class RawVideo(object):
     def set_ext_controls(self, ctr_list: List[v4l2_ext_controls]):
         ctrls = v4l2_ext_controls()
         ctr_arr = (v4l2_ext_control * len(ctr_list))()
-        for (i, ctrl) in enumerate(ctr_list):
+        for i, ctrl in enumerate(ctr_list):
             ctr_arr[i] = ctrl
 
         ctrls.which = V4L2_CTRL_WHICH_CUR_VAL
@@ -578,7 +591,6 @@ class RawVideo(object):
         return ctr_arr
 
     def set_framerate(self, conf):
-
         parm = streamparm()
         parm.type = self.v4l2_buf_type
         parm.parm.capture.timeperframe = conf.interval
@@ -713,7 +725,6 @@ class RawVideo(object):
         return True
 
     def request_buffers(self, n, v4l2_memory: V4L2_MEMORY = V4L2_MEMORY.MMAP, dma_fds=[]) -> int:
-
         req = requestbuffers()
         req.count = n
         req.type = self.v4l2_buf_type
@@ -766,14 +777,12 @@ class RawVideo(object):
             raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
 
     def start_streaming(self):
-
         cap = c_int(self.v4l2_buf_type)
         result = self._ioctl(_VIDIOC.STREAMON, byref(cap))
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_STREAMON): {}".format(errno.errorcode[get_errno()]))
 
     def stop_streaming(self):
-
         cap = c_int(self.v4l2_buf_type)
         result = self._ioctl(_VIDIOC.STREAMOFF, byref(cap))
         if -1 == result:
@@ -809,7 +818,6 @@ class RawVideo(object):
         return self.buffers[buf.index]
 
     def requeue_buffer(self, video_buf):
-
         result = self._ioctl(_VIDIOC.QBUF, byref(video_buf.buf))
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
@@ -885,7 +893,6 @@ class Video(object):
             raise RuntimeError("unknown driver '{}'".format(driver))
 
     def lookup_config(self, width, height, framerate, pixel_format, expected_format):
-
         results = []
 
         candidate = VideoConfig()
@@ -897,7 +904,6 @@ class Video(object):
                 i += 1
 
         for i in infinite_range():
-
             fmt = fmtdesc()
             fmt.index = i
             fmt.type = V4L2_BUF_TYPE.VIDEO_CAPTURE
@@ -1032,7 +1038,6 @@ class Video(object):
         return results
 
     def try_convert(self, conf, expected_width, expected_height, expected_format):
-
         fmt = format()
         fmt.type = V4L2_BUF_TYPE.VIDEO_CAPTURE
         fmt.fmt.pix.width = conf.width
@@ -1064,7 +1069,6 @@ class Video(object):
             return None
 
     def set_format(self, conf, expected_width=None, expected_height=None, expected_format=None):
-
         if expected_width is None:
             expected_width = conf.width
         if expected_height is None:
@@ -1090,7 +1094,6 @@ class Video(object):
         )
 
     def set_framerate(self, conf):
-
         parm = streamparm()
         parm.type = V4L2_BUF_TYPE.VIDEO_CAPTURE
         parm.parm.capture.timeperframe = conf.interval
@@ -1255,7 +1258,6 @@ class Video(object):
         return True
 
     def request_buffers(self, n):
-
         req = requestbuffers()
         req.count = n
         req.type = V4L2_BUF_TYPE.VIDEO_CAPTURE
@@ -1274,7 +1276,6 @@ class Video(object):
                 raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
 
     def start_streaming(self):
-
         cap = c_int(V4L2_BUF_TYPE.VIDEO_CAPTURE)
         result = self._ioctl(_VIDIOC.STREAMON, byref(cap))
         if -1 == result:
@@ -1283,7 +1284,6 @@ class Video(object):
         return VideoStream(self)
 
     def stop_streaming(self):
-
         cap = c_int(V4L2_BUF_TYPE.VIDEO_CAPTURE)
         result = self._ioctl(_VIDIOC.STREAMOFF, byref(cap))
         if -1 == result:
@@ -1306,7 +1306,6 @@ class Video(object):
         return self.buffers[buf.index]
 
     def requeue_buffer(self, video_buf):
-
         result = self._ioctl(_VIDIOC.QBUF, byref(video_buf.buf))
         if -1 == result:
             raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
@@ -1325,7 +1324,6 @@ class VideoStream(object):
         self.video.stop_streaming()
 
     def capture(self, timeout=1, in_expected_format=True):
-
         buf = self.video.dequeue_buffer(timeout=timeout)
         dst = bytes(self.video.expected_fmt.fmt.pix.sizeimage)
         if in_expected_format:
@@ -1349,9 +1347,13 @@ class VideoStream(object):
 
 class VideoBuffer(object):
     def __init__(
-        self, video, index, v4l2_memory: V4L2_MEMORY = V4L2_MEMORY.MMAP, dma_fd=None, v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE
+        self,
+        video,
+        index,
+        v4l2_memory: V4L2_MEMORY = V4L2_MEMORY.MMAP,
+        dma_fd=None,
+        v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE,
     ):
-
         buf = buffer()
         buf.type = v4l2_buf_type
         buf.memory = v4l2_memory
