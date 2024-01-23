@@ -414,11 +414,22 @@ class mbus_framefmt(Structure):
 
 
 class subdev_format(Structure):
-    _fields_ = [("which", c_uint32), ("pad", c_uint32), ("format", mbus_framefmt), ("reserved", c_uint32 * 8)]
+    _fields_ = [
+        ("which", c_uint32),
+        ("pad", c_uint32),
+        ("format", mbus_framefmt),
+        ("reserved", c_uint32 * 8),
+    ]
 
 
 class selection(Structure):
-    _fields_ = [("type", c_uint32), ("target", c_uint32), ("flags", c_uint32), ("r", rect), ("reserved", c_uint32 * 9)]
+    _fields_ = [
+        ("type", c_uint32),
+        ("target", c_uint32),
+        ("flags", c_uint32),
+        ("r", rect),
+        ("reserved", c_uint32 * 9),
+    ]
 
 
 class _value_for_ext_control(Union):
@@ -436,7 +447,12 @@ class _value_for_ext_control(Union):
 class v4l2_ext_control(Structure):
     _pack_ = 1
     _anonymous_ = ("_value",)
-    _fields_ = [("id", c_uint32), ("size", c_uint32), ("reserved2", c_uint32 * 1), ("_value", _value_for_ext_control)]
+    _fields_ = [
+        ("id", c_uint32),
+        ("size", c_uint32),
+        ("reserved2", c_uint32 * 1),
+        ("_value", _value_for_ext_control),
+    ]
 
 
 class _class_or_which_for_ext_controls(Union):

@@ -3,7 +3,7 @@ import copy
 import os
 import socket
 from pathlib import Path
-from typing import Optional, cast
+from typing import Optional
 
 from ._private.util.result import ResultTuple
 from .schema.agent_app_protocol import RequestId, ServiceKind, ServiceRequest, ServiceResponse, Status
@@ -42,6 +42,8 @@ class ServiceClient:
         response, err = ServiceResponse.parse(sock)
         if err:
             return None, RuntimeError("couldn't parse a response from actcast agent: `ServiceResponse.parse()` failed")
+        if response is None:
+            return None, RuntimeError(f"service request failed: request = {request}, response = {response}")
         if response.status != Status.OK:
             return None, RuntimeError(f"service request failed: request = {request}, response = {response}")
 
@@ -73,8 +75,9 @@ class ServiceClient:
         response, err = self._sendrecv(request)
         if err:
             raise err
-        # IIUC, bytes.decode() returns `Any`: https://github.com/python/typeshed/blob/92aecad/stdlib/%40python2/_codecs.pyi#L22
-        return cast(str, response.data.decode())
+        if response is None:
+            raise RuntimeError(f"service request failed: request = {request}, response = {response}")
+        return response.data.decode()
 
 
 if __name__ == "__main__":

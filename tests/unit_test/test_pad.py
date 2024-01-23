@@ -13,7 +13,7 @@ def listify(pad: _PadDiscardingOld[T]) -> List[T]:
 
 
 def test_pad_has_the_last_one_element() -> None:
-    pad = _PadDiscardingOld()
+    pad: _PadDiscardingOld = _PadDiscardingOld()
     pad.put(0)
     pad.put(1)
     assert listify(pad) == [1]

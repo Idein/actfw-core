@@ -80,7 +80,7 @@ poetry install
 ### Running tests
 
 ```console
-poetry run nose2 -v
+poetry run pytest -v
 ```
 
 ### Releasing package & API doc

@@ -8,7 +8,7 @@ from typing import Optional
 
 from PIL.Image import Image as PIL_Image
 
-from .schema.agent_app_protocol import CommandKind, CommandRequest, CommandResponse, Status
+from .schema.agent_app_protocol import CommandRequest, CommandResponse, Status
 from .task import Isolated
 
 
@@ -62,10 +62,14 @@ class CommandServer(Isolated):
                 if self.img is None:
                     # this server may be terminating
                     # re-check self.running
-                    continue
+                    continue  # type: ignore[unreachable]
 
                 conn, _ = s.accept()
                 request, err = CommandRequest.parse(conn)
+
+                if request is None:
+                    raise RuntimeError("couldn't parse a request from actcast agent: `CommandRequest.parse()` failed")
+
                 if err:
                     response = CommandResponse(
                         copy.copy(request.id_),
@@ -75,20 +79,15 @@ class CommandServer(Isolated):
                     conn.sendall(response.to_bytes())
                     continue
 
-                if request.kind == CommandKind.TAKE_PHOTO:
-                    header = b"data:image/png;base64,"
-                    with self.img_lock:
-                        pngimg = io.BytesIO()
-                        self.img.save(pngimg, format="PNG")
-                        b64img = base64.b64encode(pngimg.getbuffer())
-                    data = header + b64img
-                    response = CommandResponse(copy.copy(request.id_), Status.OK, data)
-                else:
-                    response = CommandResponse(
-                        copy.copy(request.id_),
-                        Status.GENERAL_ERROR,
-                        b"",
-                    )
+                # Currently, only 'Take Photo' command is supported.
+                header = b"data:image/png;base64,"
+                with self.img_lock:
+                    pngimg = io.BytesIO()
+                    self.img.save(pngimg, format="PNG")
+                    b64img = base64.b64encode(pngimg.getbuffer())
+                data = header + b64img
+                response = CommandResponse(copy.copy(request.id_), Status.OK, data)
+
                 conn.sendall(response.to_bytes())
                 conn.shutdown(socket.SHUT_RDWR)
                 conn.close()

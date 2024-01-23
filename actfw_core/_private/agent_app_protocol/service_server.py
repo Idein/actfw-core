@@ -5,10 +5,10 @@ import socket
 from pathlib import Path
 from typing import Optional
 
-import OpenSSL
+import OpenSSL.crypto
 
 from ..compat.queue import SimpleQueue
-from ..schema.agent_app_protocol import ServiceKind, ServiceRequest, ServiceResponse, Status
+from ..schema.agent_app_protocol import ServiceRequest, ServiceResponse, Status
 from ..util.result import ResultTuple
 from ..util.thread import LoopThread
 
@@ -22,7 +22,7 @@ class AgentAppProtocolServiceServer:
     def __init__(self, path: Path, pkey: OpenSSL.crypto.PKey) -> None:
         self._path = path
         self._pkey = pkey
-        dummy_ch = SimpleQueue()
+        dummy_ch: SimpleQueue = SimpleQueue()
         self._thread = LoopThread(dummy_ch, self._loop_body)
         self._listener = None
 
@@ -57,6 +57,10 @@ class AgentAppProtocolServiceServer:
             return
 
         request, err = ServiceRequest.parse(stream)
+
+        if request is None:
+            raise RuntimeError("couldn't parse a request from actcast agent: `ServiceRequest.parse()` failed")
+
         if err is not None:
             response = ServiceResponse(
                 copy.copy(request.id_),
@@ -66,20 +70,14 @@ class AgentAppProtocolServiceServer:
             stream.sendall(response.to_bytes())
             return
 
-        if request.kind == ServiceKind.RS_256:
-            response = self._handle_rs_256(request)
-        else:
-            response = ServiceResponse(
-                copy.copy(request.id_),
-                Status.GENERAL_ERROR,
-                b"",
-            )
+        # Currently, only RS_256 is supported.
+        response = self._handle_rs_256(request)
 
         stream.sendall(response.to_bytes())
 
     def _handle_rs_256(self, request: ServiceRequest) -> ServiceResponse:
         bs, err = _base64_decode_url_safe_no_pad(request.data)
-        if err is not None:
+        if (err is not None) or (bs is None):
             return ServiceResponse(
                 copy.copy(request.id_),
                 Status.GENERAL_ERROR,

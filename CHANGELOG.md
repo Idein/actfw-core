@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- upgrade pillow version for python>=3.11 environment
 
 ## 2.3.0 (2023-09-12)
 

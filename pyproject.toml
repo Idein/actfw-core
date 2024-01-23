@@ -1,10 +1,10 @@
 [tool.poetry]
 authors = ["Idein Inc."]
 classifiers = [
-  "Development Status :: 4 - Beta",
-  "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
-  "Programming Language :: Python :: 3 :: Only",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
 ]
 description = "Core components of actfw, independent of specific devices"
 keywords = ['actcast']
@@ -15,41 +15,25 @@ repository = "https://github.com/Idein/actfw-core"
 version = "2.3.0"
 
 [tool.poetry.dependencies]
-python = "^3.6.2"
-
-# This library is intended to be used to implement [Actcast application](https://actcast.io/docs/ForVendor/ApplicationDevelopment/).
-# Dependencies should be compatible with those provided by apt in Actcast application's base image
-# to prevent installing different versions.  Notice that, IIUC, there is a possibility that
-# `actdk build` (and `pip install`) on Raspberry Pi 3 installs a binary distribution for ARMv7 in
-# spite of the application is intended to support Raspberry Pi Zero, which is ARMv6.  Using apt
-# (for non-pure python packages) mitigates the problem.
-#
-# The table of current versions provided by apt:
-#
-# |                      | Raspberry Pi (buster) | Raspberry Pi (bullseye) | Jetson Nano |
-# | -------------------- | --------------------- | ----------------------- | ----------- |
-# | pithon3-pil (Pillow) | 5.4.1                 | 8.1.2                   | 5.1.0       |
-#
-# For example, the version constraint of python package `Pillow` should be `^5` for raspberry pi buster enviroment.
-Pillow = [
-    {version = "^5", python = "< 3.8"},
-    {version = "^8", python = ">= 3.8"},
-]
-dataclasses = {version = "^0.8", python = "< 3.7"}
+python = "^3.7"
+Pillow = ">=5, <11"
 
 [tool.poetry.dev-dependencies]
 Sphinx = "^4.3.0"
 cryptography = "^3.4.7"
 pyOpenSSL = "^20.0.1"
 pyproject-indirect-import-detector = "^0.1.2"
-pysen = {version = "^0.10.1"}
+pysen = { version = "^0.10.1" }
 pytest = "^6.2.3"
 sphinx-theme = "^1.0"
-black = "21.10b0"
+black = "^23"
 flake8 = "3.9.2"
 flake8-bugbear = "21.9.2"
 isort = "5.1.4"
-mypy = "0.790"
+mypy = "^1"
+types-pillow = ">=5"
+types-pyopenssl = ">=20"
+types-setuptools = "^69"
 
 [tool.poetry.urls]
 "Repository" = "https://github.com/Idein/actfw-core"
@@ -75,7 +59,7 @@ paths = ["."]
 exclude_projects = ["dataclasses"]
 exclude_modules = [
     "dataclasses",
-    "OpenSSL", # Conditional export
+    "OpenSSL",     # Conditional export
 ]
 
 [build-system]

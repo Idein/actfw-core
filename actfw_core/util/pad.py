@@ -6,6 +6,8 @@ T = TypeVar("T")
 
 
 class _PadBase(ABC, Generic[T]):
+    _queue: "Queue[T]"
+
     @abstractmethod
     def empty(self) -> bool:
         pass

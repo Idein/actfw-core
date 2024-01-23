@@ -60,7 +60,6 @@ class Logger(Consumer[int]):
 
 
 def test_pipeline() -> None:
-
     app = actfw_core.Application()
 
     counter = Counter()
@@ -98,7 +97,6 @@ def test_pipeline() -> None:
 
 # https://github.com/Idein/actfw-core/pull/31#pullrequestreview-656173369
 def test_pipeline_slow_but_no_loss() -> None:
-
     app = actfw_core.Application()
 
     counter = Counter()
