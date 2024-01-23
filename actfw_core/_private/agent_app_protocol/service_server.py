@@ -8,7 +8,7 @@ from typing import Optional
 import OpenSSL.crypto
 
 from ..compat.queue import SimpleQueue
-from ..schema.agent_app_protocol import ServiceKind, ServiceRequest, ServiceResponse, Status
+from ..schema.agent_app_protocol import ServiceRequest, ServiceResponse, Status
 from ..util.result import ResultTuple
 from ..util.thread import LoopThread
 
@@ -70,14 +70,8 @@ class AgentAppProtocolServiceServer:
             stream.sendall(response.to_bytes())
             return
 
-        if request.kind == ServiceKind.RS_256:
-            response = self._handle_rs_256(request)
-        else:
-            response = ServiceResponse(
-                copy.copy(request.id_),
-                Status.GENERAL_ERROR,
-                b"",
-            )
+        # Currently, only RS_256 is supported.
+        response = self._handle_rs_256(request)
 
         stream.sendall(response.to_bytes())
 

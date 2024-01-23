@@ -13,10 +13,10 @@ from actfw_core.util.pad import _PadDiscardingOld
 COUNT = 10**6
 
 
-def f():
+def f() -> None:
     t_0 = time.time()
 
-    pad_out, pad_in = _PadDiscardingOld().into_pad_pair()
+    pad_out, pad_in = _PadDiscardingOld().into_pad_pair()  # type: ignore
     c = COUNT
     while c > 0:
         c -= 1
@@ -30,10 +30,10 @@ def f():
     print(f"t = {t}, fps = {fps}")
 
 
-def g():
+def g() -> None:
     t_0 = time.time()
 
-    q = Queue(1)
+    q: Queue = Queue(1)
     pad_out, pad_in = q, q
     c = COUNT
     while c > 0:
@@ -48,7 +48,7 @@ def g():
     print(f"t = {t}, fps = {fps}")
 
 
-def benchmark():
+def benchmark() -> None:
     for _ in range(10):
         f()
         # g()

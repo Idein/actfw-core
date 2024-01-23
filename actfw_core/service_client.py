@@ -3,7 +3,7 @@ import copy
 import os
 import socket
 from pathlib import Path
-from typing import Optional, cast
+from typing import Optional
 
 from ._private.util.result import ResultTuple
 from .schema.agent_app_protocol import RequestId, ServiceKind, ServiceRequest, ServiceResponse, Status
@@ -77,8 +77,7 @@ class ServiceClient:
             raise err
         if response is None:
             raise RuntimeError(f"service request failed: request = {request}, response = {response}")
-        # IIUC, bytes.decode() returns `Any`: https://github.com/python/typeshed/blob/92aecad/stdlib/%40python2/_codecs.pyi#L22
-        return cast(str, response.data.decode())
+        return response.data.decode()
 
 
 if __name__ == "__main__":
