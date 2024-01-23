@@ -2,12 +2,12 @@ version: 2.1
 
 references:
   image-tags: &image-tags
-    - "python:3.7-slim-buster"
-    - "python:3.8-slim-buster"
-    - "python:3.9-slim-bullseye"
-    - "python:3.10-slim-bullseye"
-    - "python:3.11-slim-bullseye"
-    - "python:3.12-slim-bullseye"
+    - "python:3.7-buster"
+    - "python:3.8-buster"
+    - "python:3.9-bullseye"
+    - "python:3.10-bullseye"
+    - "python:3.11-bullseye"
+    - "python:3.12-bullseye"
 
 commands:
   install-python-dev-tools:
@@ -97,14 +97,14 @@ jobs:
       - install-python-dev-tools
       - when:
           condition:
-            equal: ["python:3.7-slim-buster", << parameters.image-tag >>]
+            equal: ["python:3.7-buster", << parameters.image-tag >>]
           steps:
             - install-old-poetry:
                 poetry-version: "1.5.1"
       - when:
           condition:
             not:
-              equal: ["python:3.7-slim-buster", << parameters.image-tag >>]
+              equal: ["python:3.7-buster", << parameters.image-tag >>]
           steps:
             - install-poetry
       - poetry-install
@@ -126,14 +126,14 @@ jobs:
       - install-python-dev-tools
       - when:
           condition:
-            equal: ["python:3.7-slim-buster", << parameters.image-tag >>]
+            equal: ["python:3.7-buster", << parameters.image-tag >>]
           steps:
             - install-old-poetry:
                 poetry-version: "1.5.1"
       - when:
           condition:
             not:
-              equal: ["python:3.7-slim-buster", << parameters.image-tag >>]
+              equal: ["python:3.7-buster", << parameters.image-tag >>]
           steps:
             - install-poetry
       - poetry-install
