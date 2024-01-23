@@ -26,14 +26,19 @@ python = "^3.6.2"
 #
 # The table of current versions provided by apt:
 #
-# |                      | Raspberry Pi (buster) | Raspberry Pi (bullseye) | Jetson Nano |
-# | -------------------- | --------------------- | ----------------------- | ----------- |
-# | pithon3-pil (Pillow) | 5.4.1                 | 8.1.2                   | 5.1.0       |
+# |                      | Raspberry Pi (buster) | Raspberry Pi (bullseye) | Raspberry Pi (bookworm) | Jetson Nano |
+# | -------------------- | --------------------- | ----------------------- | ----------------------- | ----------- |
+# | python3-pil (Pillow) | 5.4.1                 | 8.1.2                   | 9.4.0                   | 5.1.0       |
+# | python3              | 3.7.3                 | 3.9.2                   | 3.11.2                  | 3.6.7       |
 #
 # For example, the version constraint of python package `Pillow` should be `^5` for raspberry pi buster enviroment.
+#
+# See also https://pillow.readthedocs.io/en/latest/installation.html#python-support
 Pillow = [
-    {version = "^5", python = "< 3.8"},
-    {version = "^8", python = ">= 3.8"},
+    {version = "^5", python = "< 3.8"},             # for Raspberry Pi (buster) and Jetson Nano
+    {version = "^8", python = ">= 3.8, < 3.11"},    # for Raspberry Pi (bullseye)
+    {version = "^9.3", python = ">= 3.11, < 3.12"}, # for Raspberry Pi (bookworm)
+    {version = "^10.1", python = ">= 3.12"},        # for Python 3.12 environment
 ]
 dataclasses = {version = "^0.8", python = "< 3.7"}
 
