@@ -18,7 +18,7 @@ version = "2.3.0"
 python = "^3.7"
 Pillow = ">=5, <11"
 
-[tool.poetry.group.dev.dependencies]
+[tool.poetry.dev-dependencies]
 Sphinx = "^4.3.0"
 cryptography = "^3.4.7"
 pyOpenSSL = "^20.0.1"
