@@ -183,5 +183,5 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
                 self._outlet(frame)
         self.video.close()
 
-    def _new_pad(self) -> _PadBase[bytes]:
+    def _new_pad(self) -> _PadBase[Frame[bytes]]:
         return _PadDiscardingOld()

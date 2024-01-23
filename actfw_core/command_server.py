@@ -66,6 +66,10 @@ class CommandServer(Isolated):
 
                 conn, _ = s.accept()
                 request, err = CommandRequest.parse(conn)
+
+                if request is None:
+                    raise RuntimeError("couldn't parse a request from actcast agent: `CommandRequest.parse()` failed")
+
                 if err:
                     response = CommandResponse(
                         copy.copy(request.id_),

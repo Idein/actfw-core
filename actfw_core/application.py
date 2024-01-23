@@ -21,7 +21,7 @@ class Application:
     ) -> None:
         self.running = True
         for sig in stop_by_signals:
-            signal.signal(sig, self._handler)
+            signal.signal(sig, self._handler) # type: ignore[arg-type]
         self.tasks = []
         self.settings = None
         env = "ACT_SETTINGS_PATH"

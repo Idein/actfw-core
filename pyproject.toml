@@ -1,10 +1,10 @@
 [tool.poetry]
 authors = ["Idein Inc."]
 classifiers = [
-  "Development Status :: 4 - Beta",
-  "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
-  "Programming Language :: Python :: 3 :: Only",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
 ]
 description = "Core components of actfw, independent of specific devices"
 keywords = ['actcast']
@@ -18,12 +18,12 @@ version = "2.3.0"
 python = "^3.7"
 Pillow = ">=5, <11"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 Sphinx = "^4.3.0"
 cryptography = "^3.4.7"
 pyOpenSSL = "^20.0.1"
 pyproject-indirect-import-detector = "^0.1.2"
-pysen = {version = "^0.10.1"}
+pysen = { version = "^0.10.1" }
 pytest = "^6.2.3"
 sphinx-theme = "^1.0"
 black = "^23"
@@ -31,6 +31,9 @@ flake8 = "3.9.2"
 flake8-bugbear = "21.9.2"
 isort = "5.1.4"
 mypy = "^1"
+types-pillow = ">=5"
+types-pyopenssl = ">=20"
+types-setuptools = "^69"
 
 [tool.poetry.urls]
 "Repository" = "https://github.com/Idein/actfw-core"
@@ -56,7 +59,7 @@ paths = ["."]
 exclude_projects = ["dataclasses"]
 exclude_modules = [
     "dataclasses",
-    "OpenSSL", # Conditional export
+    "OpenSSL",     # Conditional export
 ]
 
 [build-system]

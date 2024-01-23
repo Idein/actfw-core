@@ -1,7 +1,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-import OpenSSL
+import OpenSSL.crypto
 from actfw_core._private.agent_app_protocol.service_server import AgentAppProtocolServiceServer
 from actfw_core.service_client import ServiceClient
 from cryptography.hazmat.backends import default_backend
@@ -45,8 +45,8 @@ def test_service_server() -> None:
     pkey = load_private_key()
 
     with TemporaryDirectory() as dir_:
-        dir_ = Path(dir_)
-        path = dir_ / SOCKET_NAME
+        path = Path(dir_)
+        path = path / SOCKET_NAME
 
         try:
             server = AgentAppProtocolServiceServer(path, pkey)

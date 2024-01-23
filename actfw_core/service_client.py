@@ -42,6 +42,8 @@ class ServiceClient:
         response, err = ServiceResponse.parse(sock)
         if err:
             return None, RuntimeError("couldn't parse a response from actcast agent: `ServiceResponse.parse()` failed")
+        if response is None:
+            return None, RuntimeError(f"service request failed: request = {request}, response = {response}")
         if response.status != Status.OK:
             return None, RuntimeError(f"service request failed: request = {request}, response = {response}")
 
@@ -73,6 +75,8 @@ class ServiceClient:
         response, err = self._sendrecv(request)
         if err:
             raise err
+        if response is None:
+            raise RuntimeError(f"service request failed: request = {request}, response = {response}")
         # IIUC, bytes.decode() returns `Any`: https://github.com/python/typeshed/blob/92aecad/stdlib/%40python2/_codecs.pyi#L22
         return cast(str, response.data.decode())
 

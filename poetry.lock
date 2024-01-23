@@ -1304,6 +1304,53 @@ files = [
 ]
 
 [[package]]
+name = "types-cryptography"
+version = "3.3.23.2"
+description = "Typing stubs for cryptography"
+optional = false
+python-versions = "*"
+files = [
+    {file = "types-cryptography-3.3.23.2.tar.gz", hash = "sha256:09cc53f273dd4d8c29fa7ad11fefd9b734126d467960162397bc5e3e604dea75"},
+    {file = "types_cryptography-3.3.23.2-py3-none-any.whl", hash = "sha256:b965d548f148f8e87f353ccf2b7bd92719fdf6c845ff7cedf2abb393a0643e4f"},
+]
+
+[[package]]
+name = "types-pillow"
+version = "10.1.0.2"
+description = "Typing stubs for Pillow"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "types-Pillow-10.1.0.2.tar.gz", hash = "sha256:525c1c5ee67b0ac1721c40d2bc618226ef2123c347e527e14e05b920721a13b9"},
+    {file = "types_Pillow-10.1.0.2-py3-none-any.whl", hash = "sha256:131078ffa547bf9a201d39ffcdc65633e108148085f4f1b07d4647fcfec6e923"},
+]
+
+[[package]]
+name = "types-pyopenssl"
+version = "23.0.0.0"
+description = "Typing stubs for pyOpenSSL"
+optional = false
+python-versions = "*"
+files = [
+    {file = "types-pyOpenSSL-23.0.0.0.tar.gz", hash = "sha256:16932c73ff4afe0daa5c7fb6c6ad93f342a7f1cbbdb87bd75ddd97c33dba3a9e"},
+    {file = "types_pyOpenSSL-23.0.0.0-py3-none-any.whl", hash = "sha256:c621d70ea3c0392b3c225afffb21277b65eef578388f88d543600b412cc703c3"},
+]
+
+[package.dependencies]
+types-cryptography = "*"
+
+[[package]]
+name = "types-setuptools"
+version = "69.0.0.0"
+description = "Typing stubs for setuptools"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "types-setuptools-69.0.0.0.tar.gz", hash = "sha256:b0a06219f628c6527b2f8ce770a4f47550e00d3e8c3ad83e2dc31bc6e6eda95d"},
+    {file = "types_setuptools-69.0.0.0-py3-none-any.whl", hash = "sha256:8c86195bae2ad81e6dea900a570fe9d64a59dbce2b11cc63c046b03246ea77bf"},
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.7.1"
 description = "Backported and Experimental Type Hints for Python 3.7+"
@@ -1360,4 +1407,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7"
-content-hash = "705c0e33391083771d33cddda7bd146b1b55f16c26eb1f9724bda8b35f5c9f73"
+content-hash = "041295d73f11d81dc69067c2896d26066fe888ae70f1bef22d7e84f88a75d81e"
