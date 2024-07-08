@@ -51,7 +51,7 @@ class SettingSchema:
 
 class AppSettings:
 
-    def __init__(self, settings: Dict[str, Any], schema: Dict[str, SettingSchema] = {}):
+    def __init__(self, settings: Dict[str, Any], schema: Dict[str, SettingSchema]):
         self.settings = settings
         self.schema = schema
 
@@ -94,6 +94,7 @@ class Application:
     running: bool
     tasks: List[Task]
     settings: Optional[Dict[str, Any]]
+
     """Actcast Application"""
 
     def __init__(
