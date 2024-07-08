@@ -1,11 +1,89 @@
 import json
 import os
 import signal
+import sys
 import time
 from types import FrameType
 from typing import Any, Dict, Iterable, List, Optional
 
 from actfw_core.task import Task
+
+
+class SettingSchema:
+    def __init__(
+        self,
+        title: str,
+        description: str,
+        type_: type,
+        default: Any = None,
+        ui_type: Optional[str] = None,
+    ):
+        self.title = title
+        self.description = description
+        self.type = type_
+        self.default = default
+        self.ui_type = ui_type
+
+    @staticmethod
+    def decoder(obj: Any) -> Any:
+        if "title" in obj and "description" in obj and "type" in obj:
+            return SettingSchema(
+                obj["title"],
+                obj["description"],
+                SettingSchema.infertype(obj["type"]),
+                obj.get("default", None),
+                obj.get("x-ui-type"),
+            )
+        return obj
+
+    @staticmethod
+    def infertype(typestring: str) -> type:
+        if typestring == "number":
+            return float
+        elif typestring == "integer":
+            return int
+        elif typestring == "boolean":
+            return bool
+        else:
+            return str
+
+
+class AppSettings:
+    def __init__(self, settings: Dict[str, Any], schema: Dict[str, SettingSchema]):
+        self.settings = settings
+        self.schema = schema
+
+    def __getattr__(self, name: str) -> Any:
+        if name in self.settings:
+            if isinstance(self.settings[name], self.schema[name].type):
+                return self.settings[name]
+            elif self.schema[name].default is not None:
+                print(
+                    f"Invalid type for setting:{name}. Using schema default value.",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                return self.schema[name].default
+            else:
+                print(f"Invalid type of {name}: {type(name)}", file=sys.stderr, flush=True)
+        elif name in self.schema:
+            print(
+                f"Setting:{name} not found. Using schema default value.",
+                file=sys.stderr,
+                flush=True,
+            )
+            return self.schema[name].default
+        else:
+            raise AttributeError(f"{name} is not found in settings.")
+
+    def __repr__(self) -> str:
+        values = []
+        for key, schema in self.schema.items():
+            if schema.ui_type == "password":
+                values.append(f"{key}=***")
+            else:
+                values.append(f"{key}={getattr(self, key)}")
+        return f"AppSettings({', '.join(values)})"
 
 
 class Application:
@@ -56,6 +134,18 @@ class Application:
         if self.settings is not None:
             settings.update(self.settings)
         return settings
+
+    def get_app_settings(self, path: str = "setting_schema.json") -> AppSettings:
+        """
+        Get application settings from schema.
+        Args:
+            path (str): path to schema file
+        Returns:
+            AppSettings: application settings
+        """
+        with open(path) as f:
+            self.schema = json.load(f, object_hook=SettingSchema.decoder)["properties"]
+        return AppSettings(self.get_settings({}), self.schema)
 
     def register_task(self, task: Task) -> None:
         """

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `AppSettings` class and `SettingSchema` class to `actfw_core.application`.
+
 ## 2.4.0 (2024-01-23)
 
 - upgrade pillow version for python>=3.11 environment
