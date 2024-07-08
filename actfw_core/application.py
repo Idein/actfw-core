@@ -16,7 +16,7 @@ class SettingSchema:
                  description: str,
                  type_: type,
                  default: Any = None,
-                 ui_type: str = None):
+                 ui_type: Optional[str] = None):
         self.title = title
         self.description = description
         self.type = type_
