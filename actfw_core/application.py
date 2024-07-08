@@ -10,7 +10,6 @@ from actfw_core.task import Task
 
 
 class SettingSchema:
-
     def __init__(
         self,
         title: str,
@@ -50,7 +49,6 @@ class SettingSchema:
 
 
 class AppSettings:
-
     def __init__(self, settings: Dict[str, Any], schema: Dict[str, SettingSchema]):
         self.settings = settings
         self.schema = schema
@@ -67,9 +65,7 @@ class AppSettings:
                 )
                 return self.schema[name].default
             else:
-                print(
-                    f"Invalid type of {name}: {type(name)}", file=sys.stderr, flush=True
-                )
+                print(f"Invalid type of {name}: {type(name)}", file=sys.stderr, flush=True)
         elif name in self.schema:
             print(
                 f"Setting:{name} not found. Using schema default value.",
