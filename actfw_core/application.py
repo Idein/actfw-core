@@ -11,12 +11,14 @@ from actfw_core.task import Task
 
 class SettingSchema:
 
-    def __init__(self,
-                 title: str,
-                 description: str,
-                 type_: type,
-                 default: Any = None,
-                 ui_type: Optional[str] = None):
+    def __init__(
+        self,
+        title: str,
+        description: str,
+        type_: type,
+        default: Any = None,
+        ui_type: Optional[str] = None,
+    ):
         self.title = title
         self.description = description
         self.type = type_
@@ -26,17 +28,25 @@ class SettingSchema:
     @staticmethod
     def decoder(obj: Any) -> Any:
         if "title" in obj and "description" in obj and "type" in obj:
-            return SettingSchema(obj["title"], obj["description"],
-                                 SettingSchema.infertype(obj["type"]), obj.get("default", None),
-                                 obj.get("x-ui-type"))
+            return SettingSchema(
+                obj["title"],
+                obj["description"],
+                SettingSchema.infertype(obj["type"]),
+                obj.get("default", None),
+                obj.get("x-ui-type"),
+            )
         return obj
 
     @staticmethod
     def infertype(typestring: str) -> type:
-        if typestring == "number": return float
-        elif typestring == "integer": return int
-        elif typestring == "boolean": return bool
-        else: return str
+        if typestring == "number":
+            return float
+        elif typestring == "integer":
+            return int
+        elif typestring == "boolean":
+            return bool
+        else:
+            return str
 
 
 class AppSettings:
@@ -50,16 +60,22 @@ class AppSettings:
             if isinstance(self.settings[name], self.schema[name].type):
                 return self.settings[name]
             elif self.schema[name].default is not None:
-                print(f"Invalid type for setting:{name}. Using schema default value.",
-                      file=sys.stderr,
-                      flush=True)
+                print(
+                    f"Invalid type for setting:{name}. Using schema default value.",
+                    file=sys.stderr,
+                    flush=True,
+                )
                 return self.schema[name].default
             else:
-                print(f"Invalid type of {name}: {type(name)}", file=sys.stderr, flush=True)
+                print(
+                    f"Invalid type of {name}: {type(name)}", file=sys.stderr, flush=True
+                )
         elif name in self.schema:
-            print(f"Setting:{name} not found. Using schema default value.",
-                  file=sys.stderr,
-                  flush=True)
+            print(
+                f"Setting:{name} not found. Using schema default value.",
+                file=sys.stderr,
+                flush=True,
+            )
             return self.schema[name].default
         else:
             raise AttributeError(f"{name} is not found in settings.")
@@ -81,8 +97,8 @@ class Application:
     """Actcast Application"""
 
     def __init__(
-            self,
-            stop_by_signals: Iterable[signal.Signals] = (signal.SIGINT, signal.SIGTERM),
+        self,
+        stop_by_signals: Iterable[signal.Signals] = (signal.SIGINT, signal.SIGTERM),
     ) -> None:
         self.running = True
         for sig in stop_by_signals:
