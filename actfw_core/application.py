@@ -24,7 +24,7 @@ class SettingSchema:
         self.ui_type = ui_type
 
     @staticmethod
-    def decoder(obj):
+    def decoder(obj: Any) -> Any:
         if "title" in obj and "description" in obj and "type" in obj:
             return SettingSchema(obj["title"], obj["description"],
                                  SettingSchema.infertype(obj["type"]), obj.get("default", None),
@@ -32,7 +32,7 @@ class SettingSchema:
         return obj
 
     @staticmethod
-    def infertype(typestring):
+    def infertype(typestring: str) -> type:
         if typestring == "number": return float
         elif typestring == "integer": return int
         elif typestring == "boolean": return bool
@@ -78,12 +78,11 @@ class Application:
     running: bool
     tasks: List[Task]
     settings: Optional[Dict[str, Any]]
-
     """Actcast Application"""
 
     def __init__(
-        self,
-        stop_by_signals: Iterable[signal.Signals] = (signal.SIGINT, signal.SIGTERM),
+            self,
+            stop_by_signals: Iterable[signal.Signals] = (signal.SIGINT, signal.SIGTERM),
     ) -> None:
         self.running = True
         for sig in stop_by_signals:
