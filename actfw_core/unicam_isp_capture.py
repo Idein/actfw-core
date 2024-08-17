@@ -67,6 +67,13 @@ V2_UNICAM_MODES: List[CameraMode] = [
     CameraMode(size=(640, 480), scale=(2.0, 2.0), crop=(1000, 752)),
 ]
 
+V3_SENSOR_SIZE = (4608, 2592)
+V3_UNICAM_MODES: List[CameraMode] = [
+    CameraMode(size=(4608, 2592), scale=(1.0, 1.0), crop=(0, 0)),
+    CameraMode(size=(2304, 1296), scale=(2.0, 2.0), crop=(0, 0)),
+    CameraMode(size=(1536, 864), scale=(2.0, 2.0), crop=(768, 432)),
+]
+
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
@@ -99,7 +106,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_out_metadata_buffer_num = 2
         self.shared_dma_fds: List[int] = []
         self.sensor_name = self.get_sensor_name(unicam_subdev)
-        if self.sensor_name not in ["imx219", "ov5647"]:
+        if self.sensor_name not in ["imx708", "imx219", "ov5647"]:
             raise RuntimeError(f"not supported sensor: {self.sensor_name}")
 
         self.unicam = RawVideo(
@@ -146,14 +153,20 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             # Auto selection of unicam_size and crop_size.
             if self.sensor_name == "imx219":
                 self.auto_size_selection_for_imx219()
+            elif self.sensor_name == "imx708":
+                self.auto_size_selection_for_imx708()
             else:
                 self.auto_size_selection_for_ov5647()
         else:
             raise RuntimeError("Both unicam_size and crop_size must be None or tuples.")
 
         # control values
+        if self.sensor_name == "imx708":
+            config_file = self.get_subdevice_name(unicam_subdev) + ".json"
+        else:
+            config_file = self.sensor_name + ".json"
         # config precedence: default < sensor specific < user given
-        with open(path.join(path.dirname(__file__), "data", self.sensor_name + ".json"), "r") as f:
+        with open(path.join(path.dirname(__file__), "data", config_file), "r") as f:
             sensor_config = json.load(f)
         sensor_config.update(config or {})
 
@@ -174,6 +187,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.gain_b: float = 1.6
         # - update by agc
         _ag = sensor_config.get("rpi.agc", {})
+        _ag = _ag["channels"][0] if "channels" in _ag else _ag
         self.shutters = _ag.get("exposure_modes", {}).get("normal", {}).get("shutter")
         self.gains = _ag.get("exposure_modes", {}).get("normal", {}).get("gain")
         self.gain: float = 1.0
@@ -240,9 +254,14 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             sensor_name = f.read()
         return sensor_name.rstrip()
 
+    def get_subdevice_name(self, subdev: str) -> str:
+        with open(f"/sys/class/video4linux/{subdev[5:]}/device/video4linux/{subdev[5:]}/name") as f:
+            subdevice_name = f.read()
+        return subdevice_name.rstrip()
+
     def setup_pipeline(self) -> None:
         # setup unicam
-        if self.sensor_name == "imx219":
+        if self.sensor_name in ["imx219", "imx708"]:
             # imx219 is flipped by default
             if not (
                 self.unicam_subdev.set_vertical_flip(not self.vflip) and self.unicam_subdev.set_horizontal_flip(not self.hflip)
@@ -382,6 +401,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             return 256 - (
                 256 / analogue_gain
             )  # https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67 # noqa: E501, B950
+        elif self.sensor_name == "imx708":
+            return 1024 - (
+                1024 / analogue_gain
+            )  # https://github.com/raspberrypi/libcamera/blob/6ddd79b5bdbedc1f61007aed35391f1559f9e29a/src/ipa/rpi/cam_helper/cam_helper_imx708.cpp#L103-L106 # noqa: E501, B950
         elif self.sensor_name == "ov5647":
             return (
                 analogue_gain * 16.0
@@ -404,6 +427,16 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         left = int((unicam_width - w) / 2)
         top = int((unicam_height - h) / 2)
         return (left, top, w, h)
+
+    def auto_size_selection_for_imx708(self) -> None:
+        if self.expected_width <= 1920 and self.expected_height <= 1080:
+            if self.expected_fps <= 50:
+                self.camera_mode = V3_UNICAM_MODES[1]
+            else:
+                self.camera_mode = V3_UNICAM_MODES[2]
+        else:
+            self.camera_mode = V3_UNICAM_MODES[0]
+        self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
 
     def auto_size_selection_for_imx219(self) -> None:
         # Support only v2 camera module.
@@ -536,14 +569,20 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
     # correspond to [resampleCalTable](https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/controller/rpi/alsc.cpp#L463) # noqa: E501, B950
     def resample_cal_table(self, src: List[float], camera_mode: CameraMode) -> List[float]:
+        if self.sensor_name == "imx708":
+            _sensor_size = V3_SENSOR_SIZE
+        elif self.sensor_name == "imx219":
+            _sensor_size = V2_SENSOR_SIZE
+        else:
+            _sensor_size = V1_SENSOR_SIZE
         assert len(src) == LS_TABLE_W * LS_TABLE_H
         new_table: List[float] = []
 
         x_lo: List[int] = [0] * LS_TABLE_W
         x_hi: List[int] = [0] * LS_TABLE_W
         xf: List[float] = [0] * LS_TABLE_W
-        scale_x = V2_SENSOR_SIZE[0] / (camera_mode.size[0] * camera_mode.scale[0])
-        offset_x = (camera_mode.crop[0] / V2_SENSOR_SIZE[0]) * LS_TABLE_W
+        scale_x = _sensor_size[0] / (camera_mode.size[0] * camera_mode.scale[0])
+        offset_x = (camera_mode.crop[0] / _sensor_size[0]) * LS_TABLE_W
         x = (0.5 / scale_x) + offset_x - 0.5
         x_inc = 1 / scale_x
         for i in range(0, LS_TABLE_W):
@@ -553,8 +592,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             x_lo[i] = max(x_lo[i], 0)
             x += x_inc
 
-        scale_y = V2_SENSOR_SIZE[1] / (camera_mode.size[1] * camera_mode.scale[1])
-        offset_y = (camera_mode.crop[1] / V2_SENSOR_SIZE[1]) * LS_TABLE_H
+        scale_y = _sensor_size[1] / (camera_mode.size[1] * camera_mode.scale[1])
+        offset_y = (camera_mode.crop[1] / _sensor_size[1]) * LS_TABLE_H
         y = (0.5 / scale_y) + offset_y - 0.5
         y_inc = 1 / scale_y
         for _ in range(0, LS_TABLE_H):
