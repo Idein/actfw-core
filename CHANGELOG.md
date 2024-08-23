@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.5.0 (2024-08-23)
+
 - Add support for the `imx708_wide` sensor to `UnicamIspCapture`. Note: Autofocus is not supported.
 - Add `AppSettings` class and `SettingSchema` class to `actfw_core.application`.
 
