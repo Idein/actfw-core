@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.6.0 (2024-09-05)
+
 - Fix a bug: query non image_source devices for capabilities.
 
 ## 2.5.0 (2024-08-23)
