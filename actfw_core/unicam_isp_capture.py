@@ -98,6 +98,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         config: Optional[Dict[str, Any]] = None,
         vflip: bool = False,
         hflip: bool = False,
+        timeout: float = 1.0,
     ) -> None:
         super().__init__()
 
@@ -106,6 +107,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_out_metadata_buffer_num = 2
         self.shared_dma_fds: List[int] = []
         self.sensor_name = self.get_sensor_name(unicam_subdev)
+        self.timeout = timeout
         if self.sensor_name not in ["imx708", "imx219", "ov5647"]:
             raise RuntimeError(f"not supported sensor: {self.sensor_name}")
 
@@ -951,7 +953,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_out_metadata.start_streaming()
 
         while self._is_running():
-            timeout = 1
             rlist, wlist, _ = select.select(
                 [
                     self.unicam.device_fd,
@@ -960,7 +961,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 ],
                 [self.isp_in.device_fd],
                 [],
-                timeout,
+                self.timeout,
             )
 
             if len(rlist) == 0 and len(wlist) == 0:
