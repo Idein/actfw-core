@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix a bug: query non image_source devices for capabilities.
+
 ## 2.5.0 (2024-08-23)
 
 - Add support for the `imx708_wide` sensor to `UnicamIspCapture`. Note: Autofocus is not supported.
