@@ -81,6 +81,23 @@ class Auto(Enum):
     AUTO = auto()
 
 
+@dataclass(init=True)
+class DeviceStatus:
+    # - update by awb
+    gain_r: float = 1.6
+    gain_b: float = 1.6
+    # - update by agc
+    gain: float = 1.0
+    shutter_speed: float = 1000.0
+    # some device status cache (set by set_unicam_fps)
+    vblank: int = 0
+    hblank: int = 0
+    pixel_late: int = 0
+    # vflip & hflip
+    vflip: bool = False
+    hflip: bool = False
+
+
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
         self,
@@ -196,16 +213,12 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.reference_lux: float = _lx.get("reference_lux", 998.0)
         self.reference_Y: float = _lx.get("reference_Y", 12744.0)
         self.aperture: float = 1.0
-        # - update by awb
-        self.gain_r: float = 1.6
-        self.gain_b: float = 1.6
         # - update by agc
         _ag = sensor_config.get("rpi.agc", {})
         _ag = _ag["channels"][0] if "channels" in _ag else _ag
         self.shutters = _ag.get("exposure_modes", {}).get("normal", {}).get("shutter")
         self.gains = _ag.get("exposure_modes", {}).get("normal", {}).get("gain")
-        self.gain: float = 1.0
-        self.shutter_speed: float = 1000.0
+        self.device_status = DeviceStatus(vflip=vflip, hflip=hflip)
         self.exposure: float = 100  # `shutter speed(us)` * `analogue gain`
         self.degital_gain: float = 1.0  # Currently, this value is constant.
         self.agc_interval_count: int = 0
@@ -242,15 +255,6 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.luminace_lut: List[float] = _alsc["luminance_lut"]
         self.luminace_strength: float = _alsc["luminance_strength"]
 
-        # some device status cache (set by set_unicam_fps)
-        self.vblank: int = 0
-        self.hblank: int = 0
-        self.pixel_late: int = 0
-
-        # vflip & hflip
-        self.vflip = vflip
-        self.hflip = hflip
-
         # setup
         self.converter = V4LConverter(self.isp_out_high.device_fd)
         self.setup_pipeline()
@@ -285,32 +289,36 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         if self.sensor_name in ["imx219", "imx708"]:
             # imx219 is flipped by default
             if not (
-                self.unicam_subdev.set_vertical_flip(not self.vflip) and self.unicam_subdev.set_horizontal_flip(not self.hflip)
+                self.unicam_subdev.set_vertical_flip(not self.device_status.vflip)
+                and self.unicam_subdev.set_horizontal_flip(not self.device_status.hflip)
             ):
                 raise RuntimeError("fail to setup unicam subdevice node")
             # https://www.kernel.org/doc/html/v5.15/userspace-api/media/v4l/subdev-formats.html?highlight=media_bus_fmt
-            if self.vflip and self.hflip:
+            if self.device_status.vflip and self.device_status.hflip:
                 bus_fmt = MEDIA_BUS_FMT.SRGGB10_1X10
                 self.unicam_format = V4L2_PIX_FMT.SRGGB10P
-            elif self.vflip and not self.hflip:
+            elif self.device_status.vflip and not self.device_status.hflip:
                 bus_fmt = MEDIA_BUS_FMT.SGRBG10_1X10
                 self.unicam_format = V4L2_PIX_FMT.SGRBG10P
-            elif not self.vflip and self.hflip:
+            elif not self.device_status.vflip and self.device_status.hflip:
                 bus_fmt = MEDIA_BUS_FMT.SGBRG10_1X10
                 self.unicam_format = V4L2_PIX_FMT.SGBRG10P
             else:
                 bus_fmt = MEDIA_BUS_FMT.SBGGR10_1X10
                 self.unicam_format = V4L2_PIX_FMT.SBGGR10P
         else:
-            if not (self.unicam_subdev.set_vertical_flip(self.vflip) and self.unicam_subdev.set_horizontal_flip(self.hflip)):
+            if not (
+                self.unicam_subdev.set_vertical_flip(self.device_status.vflip)
+                and self.unicam_subdev.set_horizontal_flip(self.device_status.hflip)
+            ):
                 raise RuntimeError("fail to setup unicam subdevice node")
-            if self.vflip and self.hflip:
+            if self.device_status.vflip and self.device_status.hflip:
                 bus_fmt = MEDIA_BUS_FMT.SGRBG10_1X10
                 self.unicam_format = V4L2_PIX_FMT.SGRBG10P
-            elif self.vflip and not self.hflip:
+            elif self.device_status.vflip and not self.device_status.hflip:
                 bus_fmt = MEDIA_BUS_FMT.SRGGB10_1X10
                 self.unicam_format = V4L2_PIX_FMT.SRGGB10P
-            elif not self.vflip and self.hflip:
+            elif not self.device_status.vflip and self.device_status.hflip:
                 bus_fmt = MEDIA_BUS_FMT.SBGGR10_1X10
                 self.unicam_format = V4L2_PIX_FMT.SBGGR10P
             else:
@@ -397,16 +405,16 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         vblank_ctrl.value = expected_vblank
         ctrls = self.unicam_subdev.set_ext_controls([vblank_ctrl])
 
-        self.hblank = hblank
-        self.vblank = expected_vblank
-        self.pixel_late = pixel_late
+        self.device_status.hblank = hblank
+        self.device_status.vblank = expected_vblank
+        self.device_status.pixel_late = pixel_late
 
     def set_unicam_exposure(self, analogue_gain: float, shutter_time: float) -> None:
         # convert analogue_gain to V4L2_CID.ANALOGUE_GAIN
         unicam_subdev_analogue_gain = self.v4l2_control_value_for_analogue_gain(analogue_gain)
 
         # convert shutter time to V4L2_CID.EXPOSURE
-        time_per_line = (self.unicam_width + self.hblank) * (1.0 / self.pixel_late) * 1e6
+        time_per_line = (self.unicam_width + self.device_status.hblank) * (1.0 / self.device_status.pixel_late) * 1e6
         unicam_subdev_exposure = shutter_time / time_per_line
 
         exposure_ctrl = v4l2_ext_control()
@@ -524,8 +532,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
     def calc_lux(self, isp_stats: bcm2835_isp_stats) -> None:
         current_aperture = self.aperture
-        current_gain = self.gain
-        current_shutter_speed = self.shutter_speed
+        current_gain = self.device_status.gain
+        current_shutter_speed = self.device_status.shutter_speed
 
         hist_sum = 0
         hist_num = 0
@@ -728,7 +736,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         if pixel_sum == 0:
             return 0
 
-        y_sum = r_sum * self.gain_r * 0.299 + b_sum * self.gain_b * 0.144 + g_sum * 0.587
+        y_sum = r_sum * self.device_status.gain_r * 0.299 + b_sum * self.device_status.gain_b * 0.144 + g_sum * 0.587
 
         return y_sum / pixel_sum / (1 << PIPELINE_BITS)
 
@@ -770,8 +778,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                     analogue_gain = max_analogue_gain
 
         # may need flicker avoidance here. ref. https://github.com/kbingham/libcamera/blob/d7415bc4e46fe8aa25a495c79516d9882a35a5aa/src/ipa/raspberrypi/controller/rpi/agc.cpp#L724 # noqa: E501, B950
-        self.shutter_speed = shutter_time
-        self.gain = analogue_gain  # TODO: 変数名整理 (self.analogu_gain, self.shutter_time との兼ね合い)
+        self.device_status.shutter_speed = shutter_time
+        self.device_status.gain = analogue_gain  # TODO: 変数名整理 (self.analogu_gain, self.shutter_time との兼ね合い)
         self.exposure = shutter_time * analogue_gain
         self.set_unicam_exposure(analogue_gain, shutter_time)
 
@@ -784,14 +792,14 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             sum_r += region.r_sum
             sum_b += region.b_sum
             sum_g += region.g_sum
-        self.gain_r = sum_g / (sum_r + 1)
-        self.gain_b = sum_g / (sum_b + 1)
+        self.device_status.gain_r = sum_g / (sum_r + 1)
+        self.device_status.gain_b = sum_g / (sum_b + 1)
         red_balance_ctrl = v4l2_ext_control()
         red_balance_ctrl.id = V4L2_CID.RED_BALANCE
-        red_balance_ctrl.value64 = int(self.gain_r * 1000)
+        red_balance_ctrl.value64 = int(self.device_status.gain_r * 1000)
         blue_balance_ctrl = v4l2_ext_control()
         blue_balance_ctrl.id = V4L2_CID.BLUE_BALANCE
-        blue_balance_ctrl.value64 = int(self.gain_b * 1000)
+        blue_balance_ctrl.value64 = int(self.device_status.gain_b * 1000)
         self.isp_in.set_ext_controls([red_balance_ctrl, blue_balance_ctrl])
 
     # linearly find appropriate range, this might be inefficient
