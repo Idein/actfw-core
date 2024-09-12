@@ -3,9 +3,10 @@ import mmap
 import select
 from ctypes import POINTER, c_int16, c_void_p, cast, pointer, sizeof
 from dataclasses import dataclass
+from enum import Enum, auto
 from math import floor
 from os import path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from actfw_core.capture import Frame
 from actfw_core.linux.dma_heap import DMAHeap  # type: ignore
@@ -74,6 +75,10 @@ V3_UNICAM_MODES: List[CameraMode] = [
     CameraMode(size=(1536, 864), scale=(2.0, 2.0), crop=(768, 432)),
 ]
 
+# 設定値を自動制御に任せる場合に仕様
+class Auto(Enum):
+    AUTO = auto()
+
 
 class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
@@ -98,6 +103,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         config: Optional[Dict[str, Any]] = None,
         vflip: bool = False,
         hflip: bool = False,
+        shutter_time: Union[float, Auto] = Auto.AUTO,
+        analogue_gain: Union[float, Auto] = Auto.AUTO,
     ) -> None:
         super().__init__()
 
@@ -142,6 +149,12 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         (self.expected_width, self.expected_height) = size
         self.expected_pix_format = expected_format
         self.expected_fps = framerate
+
+        self.shutter_time = shutter_time
+        self.analogue_gain = analogue_gain
+
+        if not agc and (shutter_time == Auto.AUTO or analogue_gain == Auto.AUTO):
+            raise RuntimeError("shutter_time and analogue_gain cannot be AUTO when agc is disabled")
 
         if unicam_size is not None and crop_size is not None:
             matched_modes = list(filter(lambda mode: mode.size == unicam_size, V2_UNICAM_MODES))
@@ -248,6 +261,13 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
 
         self.request_buffer()
+
+    # shutter_timeとanalogue_gainを設定する
+    def set_exposure_settings(self, shutter_time: Union[float, Auto], analogue_gain: Union[float, Auto]) -> None:
+        if not self.do_agc and (shutter_time == Auto.AUTO or analogue_gain == Auto.AUTO):
+            raise RuntimeError("shutter_time and analogue_gain cannot be AUTO when agc is disabled")
+        self.shutter_time = shutter_time
+        self.analogue_gain = analogue_gain
 
     def get_sensor_name(self, subdev: str) -> str:
         with open(f"/sys/class/video4linux/{subdev[5:]}/device/name") as f:
@@ -727,28 +747,30 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         # decompose target_exposure to analogue_gain and shutter_time
         # TODO: Also decompose to digital gain.
-        analogue_gain = self.gains[0]
-        shutter_time = self.shutters[0]
+        # analog_gain==AUTOの場合のみ,analog_gainを動かす
+        analogue_gain = self.gains[0] if self.analogue_gain == Auto.AUTO else self.analogue_gain
+        shutter_time = self.shutters[0] if self.shutter_time == Auto.AUTO else self.shutter_time
         if shutter_time * analogue_gain < target_exposure:
             for stage in range(1, len(self.gains)):
-                max_analogue_gain = self.gains[stage]
-                max_shutter_time = self.shutters[stage]
                 # fix gain, increase shutter time
-                if max_shutter_time * analogue_gain >= target_exposure:
-                    shutter_time = target_exposure / analogue_gain
-                    break
-                shutter_time = max_shutter_time
+                if self.shutter_time == Auto.AUTO:
+                    max_shutter_time = self.shutters[stage]
+                    if max_shutter_time * analogue_gain >= target_exposure:
+                        shutter_time = target_exposure / analogue_gain
+                        break
+                    shutter_time = max_shutter_time
 
                 # fix shutter time, increase gain
-                if shutter_time * max_analogue_gain >= target_exposure:
-                    analogue_gain = target_exposure / shutter_time
-                    break
-                analogue_gain = max_analogue_gain
+                if self.analogue_gain == Auto.AUTO:
+                    max_analogue_gain = self.gains[stage]
+                    if shutter_time * max_analogue_gain >= target_exposure:
+                        analogue_gain = target_exposure / shutter_time
+                        break
+                    analogue_gain = max_analogue_gain
 
         # may need flicker avoidance here. ref. https://github.com/kbingham/libcamera/blob/d7415bc4e46fe8aa25a495c79516d9882a35a5aa/src/ipa/raspberrypi/controller/rpi/agc.cpp#L724 # noqa: E501, B950
-
         self.shutter_speed = shutter_time
-        self.gain = analogue_gain
+        self.gain = analogue_gain  # TODO: 変数名整理 (self.analogu_gain, self.shutter_time との兼ね合い)
         self.exposure = shutter_time * analogue_gain
         self.set_unicam_exposure(analogue_gain, shutter_time)
 
