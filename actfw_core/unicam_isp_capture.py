@@ -130,7 +130,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_out_buffer_num = 4
         self.isp_out_metadata_buffer_num = 2
         self.shared_dma_fds: List[int] = []
-        self.sensor_name = self.get_sensor_name(unicam_subdev)
+        self.sensor_name = self.__get_sensor_name(unicam_subdev)
         if self.sensor_name not in ["imx708", "imx219", "ov5647"]:
             raise RuntimeError(f"not supported sensor: {self.sensor_name}")
 
@@ -183,17 +183,17 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         elif unicam_size is None and crop_size is None:
             # Auto selection of unicam_size and crop_size.
             if self.sensor_name == "imx219":
-                self.auto_size_selection_for_imx219()
+                self.__auto_size_selection_for_imx219()
             elif self.sensor_name == "imx708":
-                self.auto_size_selection_for_imx708()
+                self.__auto_size_selection_for_imx708()
             else:
-                self.auto_size_selection_for_ov5647()
+                self.__auto_size_selection_for_ov5647()
         else:
             raise RuntimeError("Both unicam_size and crop_size must be None or tuples.")
 
         # control values
         if self.sensor_name == "imx708":
-            config_file = self.get_subdevice_name(unicam_subdev) + ".json"
+            config_file = self.__get_subdevice_name(unicam_subdev) + ".json"
         else:
             config_file = self.sensor_name + ".json"
         # config precedence: default < sensor specific < user given
@@ -257,7 +257,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         # setup
         self.converter = V4LConverter(self.isp_out_high.device_fd)
-        self.setup_pipeline()
+        self.__setup_pipeline()
         self.output_fmt = self.converter.try_convert(
             self.isp_out_high.fmt,
             self.expected_width,
@@ -265,7 +265,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             self.expected_pix_format,
         )
 
-        self.request_buffer()
+        self.__request_buffer()
 
     # shutter_timeとanalogue_gainを設定する
     def set_exposure_settings(self, shutter_time: Union[float, Auto], analogue_gain: Union[float, Auto]) -> None:
@@ -274,17 +274,17 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.shutter_time = shutter_time
         self.analogue_gain = analogue_gain
 
-    def get_sensor_name(self, subdev: str) -> str:
+    def __get_sensor_name(self, subdev: str) -> str:
         with open(f"/sys/class/video4linux/{subdev[5:]}/device/name") as f:
             sensor_name = f.read()
         return sensor_name.rstrip()
 
-    def get_subdevice_name(self, subdev: str) -> str:
+    def __get_subdevice_name(self, subdev: str) -> str:
         with open(f"/sys/class/video4linux/{subdev[5:]}/device/video4linux/{subdev[5:]}/name") as f:
             subdevice_name = f.read()
         return subdevice_name.rstrip()
 
-    def setup_pipeline(self) -> None:
+    def __setup_pipeline(self) -> None:
         # setup unicam
         if self.sensor_name in ["imx219", "imx708"]:
             # imx219 is flipped by default
@@ -340,16 +340,16 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         if unicam_width != self.unicam_width or unicam_height != self.unicam_height or unicam_format != self.unicam_format:
             raise RuntimeError("fail to setup unicam device node")
 
-        self.set_unicam_fps()
+        self.__set_unicam_fps()
         if self.do_agc:
             init_shutter_time = self.shutters[len(self.shutters) // 2]  # (us)
             init_analogue_gain = self.gains[len(self.gains) // 2]
-            self.set_unicam_exposure(init_analogue_gain, init_shutter_time)
+            self.__set_unicam_exposure(init_analogue_gain, init_shutter_time)
             self.exposure = init_shutter_time * init_analogue_gain
 
         # current alsc implementation does not change lens_shading table dynamically
         if self.do_alsc:
-            self.alsc()
+            self.__alsc()
 
         # sutup isp_in
         bl = bcm2835_isp_black_level()
@@ -391,7 +391,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         # setup isp_out_metadata
         self.isp_out_metadata.set_meta_format(V4L2_META_FMT.BCM2835_ISP_STATS, sizeof(bcm2835_isp_stats))
 
-    def set_unicam_fps(self) -> None:
+    def __set_unicam_fps(self) -> None:
         ctrls = self.unicam_subdev.get_ext_controls([V4L2_CID.HBLANK, V4L2_CID.PIXEL_RATE])
         hblank = ctrls[0].value
         pixel_late = ctrls[1].value64
@@ -409,9 +409,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.device_status.vblank = expected_vblank
         self.device_status.pixel_late = pixel_late
 
-    def set_unicam_exposure(self, analogue_gain: float, shutter_time: float) -> None:
+    def __set_unicam_exposure(self, analogue_gain: float, shutter_time: float) -> None:
         # convert analogue_gain to V4L2_CID.ANALOGUE_GAIN
-        unicam_subdev_analogue_gain = self.v4l2_control_value_for_analogue_gain(analogue_gain)
+        unicam_subdev_analogue_gain = self.__v4l2_control_value_for_analogue_gain(analogue_gain)
 
         # convert shutter time to V4L2_CID.EXPOSURE
         time_per_line = (self.unicam_width + self.device_status.hblank) * (1.0 / self.device_status.pixel_late) * 1e6
@@ -425,7 +425,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         gain_ctrl.value = int(unicam_subdev_analogue_gain)
         self.unicam_subdev.set_ext_controls([exposure_ctrl, gain_ctrl])
 
-    def v4l2_control_value_for_analogue_gain(self, analogue_gain: float) -> float:
+    def __v4l2_control_value_for_analogue_gain(self, analogue_gain: float) -> float:
         if self.sensor_name == "imx219":
             return 256 - (
                 256 / analogue_gain
@@ -441,7 +441,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         else:
             raise RuntimeError(f"not supported sensor: {self.sensor_name}")
 
-    def calc_crop_size(
+    def __calc_crop_size(
         self,
         isp_out_width: int,
         isp_out_height: int,
@@ -457,7 +457,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         top = int((unicam_height - h) / 2)
         return (left, top, w, h)
 
-    def auto_size_selection_for_imx708(self) -> None:
+    def __auto_size_selection_for_imx708(self) -> None:
         if self.expected_width <= 1920 and self.expected_height <= 1080:
             if self.expected_fps <= 50:
                 self.camera_mode = V3_UNICAM_MODES[1]
@@ -465,38 +465,38 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 self.camera_mode = V3_UNICAM_MODES[2]
         else:
             self.camera_mode = V3_UNICAM_MODES[0]
-        self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
+        self.crop_size = self.__calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
 
-    def auto_size_selection_for_imx219(self) -> None:
+    def __auto_size_selection_for_imx219(self) -> None:
         # Support only v2 camera module.
         if self.expected_width <= 1280 and self.expected_height <= 720:
             if self.expected_fps <= 40:
                 self.camera_mode = V2_UNICAM_MODES[2]
-                self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
+                self.crop_size = self.__calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
             else:
                 if abs(self.expected_width / self.expected_height - 16 / 9) < 0.05:
                     self.camera_mode = V2_UNICAM_MODES[2]
                     self.crop_size = (180, 256, 1280, 720)
                 else:
                     self.camera_mode = V2_UNICAM_MODES[3]
-                    self.crop_size = self.calc_crop_size(
+                    self.crop_size = self.__calc_crop_size(
                         self.expected_width,
                         self.expected_height,
                         *self.camera_mode.size,
                     )
         else:
             self.camera_mode = V2_UNICAM_MODES[0]
-            self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
+            self.crop_size = self.__calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
 
-    def auto_size_selection_for_ov5647(self) -> None:
+    def __auto_size_selection_for_ov5647(self) -> None:
         # TODO: fix to make compatiblity with buster
         self.camera_mode = V1_UNICAM_MODES[0]
-        self.crop_size = self.calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
+        self.crop_size = self.__calc_crop_size(self.expected_width, self.expected_height, *self.camera_mode.size)
 
     def capture_size(self) -> Tuple[int, int]:
         return (self.output_fmt.fmt.pix.width, self.output_fmt.fmt.pix.height)
 
-    def request_buffer(self) -> None:
+    def __request_buffer(self) -> None:
         self.dma_buffer_num = self.unicam.request_buffers(self.dma_buffer_num, V4L2_MEMORY.MMAP)
         self.dma_fds = self.unicam.export_buffers()
         if self.unicam.request_buffers(self.dma_buffer_num, V4L2_MEMORY.DMABUF, self.dma_fds) != self.dma_buffer_num:
@@ -508,19 +508,19 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             self.isp_out_metadata_buffer_num, V4L2_MEMORY.MMAP
         )
 
-    def unicam2isp(self) -> None:
+    def __unicam2isp(self) -> None:
         buffer = self.unicam.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.DMABUF)
         if buffer is None:
             return
         self.isp_in.queue_buffer(buffer.buf.index)
 
-    def isp2unicam(self) -> None:
+    def __isp2unicam(self) -> None:
         buffer = self.isp_in.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.DMABUF)
         if buffer is None:
             return
         self.unicam.queue_buffer(buffer.buf.index)
 
-    def produce_image_from_isp(self) -> None:
+    def __produce_image_from_isp(self) -> None:
         buffer = self.isp_out_high.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.MMAP)
         if buffer is None:
             return
@@ -530,7 +530,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self._outlet(frame)
         self.isp_out_high.queue_buffer(buffer.buf.index)
 
-    def calc_lux(self, isp_stats: bcm2835_isp_stats) -> None:
+    def __calc_lux(self, isp_stats: bcm2835_isp_stats) -> None:
         current_aperture = self.aperture
         current_gain = self.device_status.gain
         current_shutter_speed = self.device_status.shutter_speed
@@ -550,7 +550,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         self.lux = estimated_lux
 
-    def get_cal_table(self, ct: float, calibrations: List[Dict[str, Any]]) -> List[float]:
+    def __get_cal_table(self, ct: float, calibrations: List[Dict[str, Any]]) -> List[float]:
         if len(calibrations) == 0:
             return [1.0] * AWB_REGIONS
         elif ct <= calibrations[0]["ct"]:
@@ -572,19 +572,19 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
     # with the following omitted
     #  - dynamic lens shading table calculation based on estimated colour templature
     #  - "Adaptive ALSC Algorithm"
-    def alsc(self) -> None:
+    def __alsc(self) -> None:
         ct = self.color_temperature
 
-        cal_table_r = self.get_cal_table(ct, self.calibrations_Cr)
-        cal_table_b = self.get_cal_table(ct, self.calibrations_Cb)
+        cal_table_r = self.__get_cal_table(ct, self.calibrations_Cr)
+        cal_table_b = self.__get_cal_table(ct, self.calibrations_Cb)
 
         def normalize(table: List[float]) -> List[float]:
             m = min(table)
             return [x / m for x in table]
 
-        cal_table_r = self.resample_cal_table(cal_table_r, self.camera_mode)
-        cal_table_b = self.resample_cal_table(cal_table_b, self.camera_mode)
-        luminace_table = self.resample_cal_table(self.luminace_lut, self.camera_mode)
+        cal_table_r = self.__resample_cal_table(cal_table_r, self.camera_mode)
+        cal_table_b = self.__resample_cal_table(cal_table_b, self.camera_mode)
+        luminace_table = self.__resample_cal_table(self.luminace_lut, self.camera_mode)
 
         self.ls_table_r = normalize(
             [r * ((lut - 1) * self.luminace_strength + 1) for (r, lut) in zip(cal_table_r, luminace_table)]
@@ -594,10 +594,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             [b * ((lut - 1) * self.luminace_strength + 1) for (b, lut) in zip(cal_table_b, luminace_table)]
         )
 
-        self.apply_ls_tables()
+        self.__apply_ls_tables()
 
     # correspond to [resampleCalTable](https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/controller/rpi/alsc.cpp#L463) # noqa: E501, B950
-    def resample_cal_table(self, src: List[float], camera_mode: CameraMode) -> List[float]:
+    def __resample_cal_table(self, src: List[float], camera_mode: CameraMode) -> List[float]:
         if self.sensor_name == "imx708":
             _sensor_size = V3_SENSOR_SIZE
         elif self.sensor_name == "imx219":
@@ -643,7 +643,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         return new_table
 
     # correspond to [applyLS](https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1343) # noqa: E501, B950
-    def apply_ls_tables(self) -> None:
+    def __apply_ls_tables(self) -> None:
         assert len(self.ls_table_b) == LS_TABLE_W * LS_TABLE_H
         assert len(self.ls_table_r) == LS_TABLE_W * LS_TABLE_H
         assert len(self.ls_table_g) == LS_TABLE_W * LS_TABLE_H
@@ -658,10 +658,10 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         w += 1
         h += 1
 
-        self.populate_ls_table(self.ls_table_r, w, h, self.ls_table_mm, 0)
-        self.populate_ls_table(self.ls_table_g, w, h, self.ls_table_mm, 1 * (2 * w * h))
+        self.__populate_ls_table(self.ls_table_r, w, h, self.ls_table_mm, 0)
+        self.__populate_ls_table(self.ls_table_g, w, h, self.ls_table_mm, 1 * (2 * w * h))
         self.ls_table_mm[2 * (2 * w * h) : 3 * (2 * w * h)] = memoryview(self.ls_table_mm)[1 * (2 * w * h) : 2 * (2 * w * h)]
-        self.populate_ls_table(self.ls_table_b, w, h, self.ls_table_mm, 3 * (2 * w * h))
+        self.__populate_ls_table(self.ls_table_b, w, h, self.ls_table_mm, 3 * (2 * w * h))
 
         ls = bcm2835_isp_lens_shading()
         ls.enabled = 1
@@ -681,7 +681,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_in.set_ext_controls([ls_ctrl])
 
     # correspond to [resampleTable](https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/raspberrypi.cpp#L1403) # noqa: E501, B950
-    def populate_ls_table(self, src: List[float], dst_w: int, dst_h: int, ls_table: mmap.mmap, offset: int) -> None:
+    def __populate_ls_table(self, src: List[float], dst_w: int, dst_h: int, ls_table: mmap.mmap, offset: int) -> None:
         assert len(src) == LS_TABLE_W * LS_TABLE_H
         x_lo: List[int] = [0] * dst_w
         xf: List[float] = [0.0] * dst_w
@@ -720,7 +720,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         assert ls_table_idx == offset + (2 * dst_w * dst_h)
 
-    def calculate_y(self, stats: bcm2835_isp_stats, additional_gain: float) -> float:
+    def __calculate_y(self, stats: bcm2835_isp_stats, additional_gain: float) -> float:
         PIPELINE_BITS = 13  # https://github.com/kbingham/libcamera/blob/f995ff25a3326db90513d1fa936815653f7cade0/src/ipa/raspberrypi/controller/rpi/agc.cpp#L31 # noqa: E501, B950
         r_sum = 0
         g_sum = 0
@@ -740,12 +740,12 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         return y_sum / pixel_sum / (1 << PIPELINE_BITS)
 
-    def agc(self, stats: bcm2835_isp_stats) -> None:
+    def __agc(self, stats: bcm2835_isp_stats) -> None:
         # compute addtional gain to acheive target_Y
         # https://github.com/raspberrypi/libcamera/blob/1c4c323e5d684b57898c083ed2f1af313bf6a98d/src/ipa/raspberrypi/controller/rpi/agc.cpp#L572-L582 # noqa: E501, B950
         gain = 1.0
         for _ in range(8):
-            initial_Y = self.calculate_y(stats, gain)
+            initial_Y = self.__calculate_y(stats, gain)
             extra_gain = min(10.0, self.target_Y / (initial_Y + 0.001))
             gain *= extra_gain
             if extra_gain < 1.01:
@@ -781,9 +781,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.device_status.shutter_speed = shutter_time
         self.device_status.gain = analogue_gain  # TODO: 変数名整理 (self.analogu_gain, self.shutter_time との兼ね合い)
         self.exposure = shutter_time * analogue_gain
-        self.set_unicam_exposure(analogue_gain, shutter_time)
+        self.__set_unicam_exposure(analogue_gain, shutter_time)
 
-    def awb(self, stats: bcm2835_isp_stats) -> None:
+    def __awb(self, stats: bcm2835_isp_stats) -> None:
         sum_r = 0
         sum_b = 0
         sum_g = 0
@@ -803,21 +803,21 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_in.set_ext_controls([red_balance_ctrl, blue_balance_ctrl])
 
     # linearly find appropriate range, this might be inefficient
-    def find_span(self, gamma_curve: List[Tuple[float, float]], x: float) -> int:
+    def __find_span(self, gamma_curve: List[Tuple[float, float]], x: float) -> int:
         last_span = len(gamma_curve) - 2
         for i in range(0, last_span + 1):
             if gamma_curve[i][0] <= x < gamma_curve[i + 1][0]:
                 return i
         return last_span
 
-    def eval_gamma_curve(self, gamma_curve: List[Tuple[float, float]], x: float) -> float:
-        span = self.find_span(gamma_curve, x)
+    def __eval_gamma_curve(self, gamma_curve: List[Tuple[float, float]], x: float) -> float:
+        span = self.__find_span(gamma_curve, x)
         return gamma_curve[span][1] + (x - gamma_curve[span][0]) * (gamma_curve[span + 1][1] - gamma_curve[span][1]) / (
             gamma_curve[span + 1][0] - gamma_curve[span][0]
         )
 
     # gamma2(gamma1(x)) with care of boundary values
-    def compose_gamma_curve(
+    def __compose_gamma_curve(
         self,
         one: List[Tuple[float, float]],
         other: List[Tuple[float, float]],
@@ -826,8 +826,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         this_x = one[0][0]
         this_y = one[0][1]
         this_span = 0
-        other_span = self.find_span(other, this_y)
-        result = [(this_y, self.eval_gamma_curve(other, this_y))]
+        other_span = self.__find_span(other, this_y)
+        result = [(this_y, self.__eval_gamma_curve(other, this_y))]
         while this_span != len(one) - 1:
             dx = one[this_span + 1][0] - one[this_span][0]
             dy = one[this_span + 1][1] - one[this_span][1]
@@ -846,16 +846,16 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 this_x = one[this_span][0]
                 this_y = one[this_span][1]
             if result[-1][0] + eps < this_x:
-                result.append((this_x, self.eval_gamma_curve(other, this_y)))
+                result.append((this_x, self.__eval_gamma_curve(other, this_y)))
         return result
 
-    def histogram_cumulative(self, histogram: List[int]) -> List[int]:
+    def __histogram_cumulative(self, histogram: List[int]) -> List[int]:
         cumulative = [0]
         for i in range(0, len(histogram)):
             cumulative.append(cumulative[-1] + histogram[i])
         return cumulative
 
-    def cumulative_quantile(self, cumulative: List[int], q: float, first: int = -1, last: int = -1) -> float:
+    def __cumulative_quantile(self, cumulative: List[int], q: float, first: int = -1, last: int = -1) -> float:
         if first == -1:
             first = 0
         if last == -1:
@@ -876,14 +876,14 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         )
         return first + frac
 
-    def compute_stretch_curve(self, histogram: List[int]) -> List[Tuple[float, float]]:
+    def __compute_stretch_curve(self, histogram: List[int]) -> List[Tuple[float, float]]:
         enhance = [(0.0, 0.0)]
         eps = 1e-6
 
         # If the start of the histogram is rather empty, try to pull it down a
         # bit.
-        cumulative = self.histogram_cumulative(histogram)
-        hist_lo = self.cumulative_quantile(cumulative, self.lo_histogram) * (65536 / NUM_HISTOGRAM_BINS)
+        cumulative = self.__histogram_cumulative(histogram)
+        hist_lo = self.__cumulative_quantile(cumulative, self.lo_histogram) * (65536 / NUM_HISTOGRAM_BINS)
         level_lo = self.lo_level * 65536
         hist_lo = max(level_lo, min(65535, min(hist_lo, level_lo + self.lo_max)))
         if enhance[-1][0] + eps < hist_lo:
@@ -891,13 +891,13 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         # Keep the mid-point (median) in the same place, though, to limit the
         # apparent amount of global brightness shift.
-        mid = self.cumulative_quantile(cumulative, 0.5) * (65536 / NUM_HISTOGRAM_BINS)
+        mid = self.__cumulative_quantile(cumulative, 0.5) * (65536 / NUM_HISTOGRAM_BINS)
         if enhance[-1][0] + eps < mid:
             enhance.append((mid, mid))
 
         # If the top to the histogram is empty, try to pull the pixel values
         # there up.
-        hist_hi = self.cumulative_quantile(cumulative, self.hi_histogram) * (65536 / NUM_HISTOGRAM_BINS)
+        hist_hi = self.__cumulative_quantile(cumulative, self.hi_histogram) * (65536 / NUM_HISTOGRAM_BINS)
         level_hi = self.hi_level * 65536
         hist_hi = min(level_hi, max(0.0, max(hist_hi, level_hi - self.hi_max)))
         if enhance[-1][0] + eps < hist_hi:
@@ -906,7 +906,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             enhance.append((65535, 65535))
         return enhance
 
-    def fill_in_contrast_status(self, gm: bcm2835_isp_gamma, gamma_curve: List[Tuple[float, float]]) -> None:
+    def __fill_in_contrast_status(self, gm: bcm2835_isp_gamma, gamma_curve: List[Tuple[float, float]]) -> None:
         gm.enabled = 1
         for i in range(0, CONTRAST_NUM_POINTS - 1):
             if i < 16:
@@ -916,17 +916,17 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             else:
                 x = (i - 24) * 4096 + 32768
             gm.x[i] = x
-            gm.y[i] = int(min(65535.0, self.eval_gamma_curve(gamma_curve, x)))
+            gm.y[i] = int(min(65535.0, self.__eval_gamma_curve(gamma_curve, x)))
 
         gm.x[CONTRAST_NUM_POINTS - 1] = 65535
         gm.y[CONTRAST_NUM_POINTS - 1] = 65535
 
-    def contrast_control(self, isp_stats: bcm2835_isp_stats) -> None:
+    def __contrast_control(self, isp_stats: bcm2835_isp_stats) -> None:
         histogram = isp_stats.hist[0].g_hist
         gamma_curve = self.gamma_curve
         if self.ce_enable:
             if self.lo_max != 0 or self.hi_max != 0:
-                gamma_curve = self.compose_gamma_curve(self.compute_stretch_curve(histogram), gamma_curve)
+                gamma_curve = self.__compose_gamma_curve(self.__compute_stretch_curve(histogram), gamma_curve)
         if self.brightness != 0 or self.contrast != 1.0:
             gamma_curve = [
                 (
@@ -942,32 +942,32 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                 for (x, y) in gamma_curve
             ]
         gm = bcm2835_isp_gamma()
-        self.fill_in_contrast_status(gm, gamma_curve)
+        self.__fill_in_contrast_status(gm, gamma_curve)
         gamma = v4l2_ext_control()
         gamma.id = V4L2_CID.USER_BCM2835_ISP_GAMMA
         gamma.size = sizeof(bcm2835_isp_gamma)
         gamma.ptr = cast(pointer(gm), c_void_p)
         self.isp_in.set_ext_controls([gamma])
 
-    def adjust_setting_from_isp(self) -> None:
+    def __adjust_setting_from_isp(self) -> None:
         buffer = self.isp_out_metadata.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.MMAP)
         if buffer is None:
             return
 
         stats: bcm2835_isp_stats = cast(buffer.mapped_buf, POINTER(bcm2835_isp_stats)).contents
-        self.calc_lux(stats)
+        self.__calc_lux(stats)
         if self.do_agc:
             if self.agc_interval_count < AGC_INTERVAL:
                 self.agc_interval_count += 1
             else:
                 self.agc_interval_count = 0
-                self.agc(stats)
+                self.__agc(stats)
 
         if self.do_awb:
-            self.awb(stats)
+            self.__awb(stats)
 
         if self.do_contrast:
-            self.contrast_control(stats)
+            self.__contrast_control(stats)
 
         self.isp_out_metadata.queue_buffer(buffer.buf.index)
 
@@ -999,11 +999,11 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
             for r in rlist:
                 if r == self.unicam.device_fd:
-                    self.unicam2isp()
+                    self.__unicam2isp()
                 elif r == self.isp_out_high.device_fd:
-                    self.produce_image_from_isp()
+                    self.__produce_image_from_isp()
                 elif r == self.isp_out_metadata.device_fd:
-                    self.adjust_setting_from_isp()
+                    self.__adjust_setting_from_isp()
             for w in wlist:
                 if w == self.isp_in.device_fd:
-                    self.isp2unicam()
+                    self.__isp2unicam()
