@@ -75,6 +75,7 @@ V3_UNICAM_MODES: List[CameraMode] = [
     CameraMode(size=(1536, 864), scale=(2.0, 2.0), crop=(768, 432)),
 ]
 
+
 # 設定値を自動制御に任せる場合に仕様
 class Auto(Enum):
     AUTO = auto()
