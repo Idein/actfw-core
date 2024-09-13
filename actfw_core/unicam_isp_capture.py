@@ -82,7 +82,7 @@ class Auto(Enum):
 
 
 @dataclass(init=True)
-class DeviceStatus:
+class _DeviceStatus:
     # - update by awb
     gain_r: float = 1.6
     gain_b: float = 1.6
@@ -218,7 +218,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         _ag = _ag["channels"][0] if "channels" in _ag else _ag
         self.shutters = _ag.get("exposure_modes", {}).get("normal", {}).get("shutter")
         self.gains = _ag.get("exposure_modes", {}).get("normal", {}).get("gain")
-        self.device_status = DeviceStatus(vflip=vflip, hflip=hflip)
+        self.device_status = _DeviceStatus(vflip=vflip, hflip=hflip)
         self.exposure: float = 100  # `shutter speed(us)` * `analogue gain`
         self.degital_gain: float = 1.0  # Currently, this value is constant.
         self.agc_interval_count: int = 0
