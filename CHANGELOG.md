@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.7.0 (2024-09-17)
+
 - Add `set_exposure_settings` to `UnicamIspCapture`.
 
 ## 2.6.0 (2024-09-05)
