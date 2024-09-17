@@ -12,7 +12,7 @@ license = "MIT"
 name = "actfw-core"
 readme = "README.md"
 repository = "https://github.com/Idein/actfw-core"
-version = "2.6.0"
+version = "2.7.0"
 
 [tool.poetry.dependencies]
 python = "^3.7"
