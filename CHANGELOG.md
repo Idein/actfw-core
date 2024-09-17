@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `set_exposure_settings` to `UnicamIspCapture`.
+
 ## 2.6.0 (2024-09-05)
 
 - Fix a bug: query non image_source devices for capabilities.
