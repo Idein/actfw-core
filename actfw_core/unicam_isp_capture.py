@@ -279,7 +279,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.shutter_time = shutter_time
         self.analogue_gain = analogue_gain
 
-    def set_exposure_time(self, ms: Optional[Int] = None) -> bool:
+    def set_exposure_time(self, ms: Optional[int] = None) -> bool:
         """Set exposure time.
 
         This function is no longer supported. Use set_exposure_settings instead.
