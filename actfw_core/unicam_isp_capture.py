@@ -267,12 +267,27 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         self.__request_buffer()
 
-    # shutter_timeとanalogue_gainを設定する
     def set_exposure_settings(self, shutter_time: Union[float, Auto], analogue_gain: Union[float, Auto]) -> None:
+        """Set shutter_time and analogue_gain.
+
+        Args:
+            shutter_time (float or Auto): [μsec] (e.g. 60000). If set to Auto, shutter_time is set with agc algorithm .
+            analogue_gain (float or Auto): (>=0) (e.g. 2.5). If set to Auto, analogue_gain is set with agc algorithm .
+        """
         if not self.do_agc and (shutter_time == Auto.AUTO or analogue_gain == Auto.AUTO):
             raise RuntimeError("shutter_time and analogue_gain cannot be AUTO when agc is disabled")
         self.shutter_time = shutter_time
         self.analogue_gain = analogue_gain
+
+    def set_exposure_time(self, ms: Optional[Int] = None) -> bool:
+        """Set exposure time.
+
+        This function is no longer supported. Use set_exposure_settings instead.
+
+        Returns:
+            False
+        """
+        return False
 
     def __get_sensor_name(self, subdev: str) -> str:
         with open(f"/sys/class/video4linux/{subdev[5:]}/device/name") as f:
