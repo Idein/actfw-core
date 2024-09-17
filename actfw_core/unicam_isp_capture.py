@@ -76,7 +76,7 @@ V3_UNICAM_MODES: List[CameraMode] = [
 ]
 
 
-# 設定値を自動制御に任せる場合に仕様
+# Used when set values are left to automatic control
 class Auto(Enum):
     AUTO = auto()
 
