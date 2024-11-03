@@ -8,6 +8,7 @@ from math import floor
 from os import path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from actfw_core.autofocus import AutoFocuserBase
 from actfw_core.capture import Frame
 from actfw_core.linux.dma_heap import DMAHeap  # type: ignore
 from actfw_core.task import Producer
@@ -32,6 +33,8 @@ from actfw_core.v4l2.video import (  # type: ignore
     RawVideo,
     V4LConverter,
 )
+
+from .util.pad import _PadBase, _PadDiscardingOld
 
 _EMPTY_LIST: List[str] = []
 
@@ -75,6 +78,8 @@ V3_UNICAM_MODES: List[CameraMode] = [
     CameraMode(size=(1536, 864), scale=(2.0, 2.0), crop=(768, 432)),
 ]
 
+SENSOR_SIZE_MAP = {"ov5647": V1_SENSOR_SIZE, "imx219": V2_SENSOR_SIZE, "imx708": V3_SENSOR_SIZE}
+
 
 # Used when set values are left to automatic control
 class Auto(Enum):
@@ -102,7 +107,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
     def __init__(
         self,
         unicam: str = "/dev/video0",
+        unicam_meta: str = "/dev/video1",
         unicam_subdev: str = "/dev/v4l-subdev0",
+        unicam_subdev_meta: str = "/dev/v4l-subdev1",
         isp_in: str = "/dev/video13",
         isp_out_high: str = "/dev/video14",
         isp_out_metadata: str = "/dev/video16",
@@ -123,26 +130,47 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         hflip: bool = False,
         shutter_time: Union[float, Auto] = Auto.AUTO,
         analogue_gain: Union[float, Auto] = Auto.AUTO,
+        auto_focuser: Optional[AutoFocuserBase] = None,
     ) -> None:
         super().__init__()
 
         self.dma_buffer_num = 4
+        self.unicam_meta_buffer_num = 12
         self.isp_out_buffer_num = 4
         self.isp_out_metadata_buffer_num = 2
         self.shared_dma_fds: List[int] = []
         self.sensor_name = self.__get_sensor_name(unicam_subdev)
+        self.auto_focuser = auto_focuser
         if self.sensor_name not in ["imx708", "imx219", "ov5647"]:
             raise RuntimeError(f"not supported sensor: {self.sensor_name}")
-
         self.unicam = RawVideo(
             unicam,
             v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE,
             init_controls=init_controls,
         )
+        self.unicam_meta = (
+            RawVideo(
+                unicam_meta,
+                v4l2_buf_type=V4L2_BUF_TYPE.META_CAPTURE,
+                init_controls=init_controls,
+            )
+            if self.auto_focuser is not None
+            else None
+        )
+        self.unicam_meta_bufidx = -1
         self.unicam_subdev = RawVideo(
             unicam_subdev,
             v4l2_buf_type=V4L2_BUF_TYPE.VIDEO_CAPTURE,
             init_controls=init_controls,
+        )
+        self.unicam_subdev_meta = (
+            RawVideo(
+                unicam_subdev_meta,
+                v4l2_buf_type=V4L2_BUF_TYPE.META_CAPTURE,
+                init_controls=init_controls,
+            )
+            if self.auto_focuser is not None
+            else None
         )
         self.isp_in = RawVideo(
             isp_in,
@@ -258,6 +286,17 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         # setup
         self.converter = V4LConverter(self.isp_out_high.device_fd)
         self.__setup_pipeline()
+        # autofocus
+        if self.auto_focuser is not None:
+            self.auto_focuser.set_unicam_config(
+                sensor_config,
+                unicam_width=self.unicam_width,
+                sensor_size=SENSOR_SIZE_MAP[self.sensor_name],
+                post_crop_size=self.crop_size,
+                camera_mode_scale=self.camera_mode.scale,
+                camera_mode_crop_size=self.camera_mode.crop,
+                callback_fn=self.__set_focus_absolute,
+            )
         self.output_fmt = self.converter.try_convert(
             self.isp_out_high.fmt,
             self.expected_width,
@@ -440,6 +479,13 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         gain_ctrl.value = int(unicam_subdev_analogue_gain)
         self.unicam_subdev.set_ext_controls([exposure_ctrl, gain_ctrl])
 
+    def __set_focus_absolute(self, focus_val: int) -> None:
+        assert self.unicam_subdev_meta is not None
+        focus_control = v4l2_ext_control()
+        focus_control.id = V4L2_CID.FOCUS_ABSOLUTE
+        focus_control.value = focus_val
+        self.unicam_subdev_meta.set_ext_controls([focus_control])
+
     def __v4l2_control_value_for_analogue_gain(self, analogue_gain: float) -> float:
         if self.sensor_name == "imx219":
             return 256 - (
@@ -522,6 +568,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.isp_out_metadata_buffer_num = self.isp_out_metadata.request_buffers(
             self.isp_out_metadata_buffer_num, V4L2_MEMORY.MMAP
         )
+        if self.unicam_meta is not None:
+            self.unicam_meta_buffer_num = self.unicam_meta.request_buffers(self.unicam_meta_buffer_num, V4L2_MEMORY.MMAP)
 
     def __unicam2isp(self) -> None:
         buffer = self.unicam.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.DMABUF)
@@ -534,6 +582,14 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         if buffer is None:
             return
         self.unicam.queue_buffer(buffer.buf.index)
+
+    def __receive_unicam_meta(self) -> None:
+        if self.unicam_meta is not None:
+            meta_buffer = self.unicam_meta.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.MMAP)
+            self.unicam_meta_bufidx = meta_buffer.buf.index
+            if self.auto_focuser is not None:
+                self.auto_focuser.parse_pdaf_and_update_focus(meta_buffer)
+            self.unicam_meta.queue_buffer(meta_buffer.buf.index)
 
     def __produce_image_from_isp(self) -> None:
         buffer = self.isp_out_high.dequeue_buffer_nonblocking(v4l2_memory=V4L2_MEMORY.MMAP)
@@ -613,12 +669,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
     # correspond to [resampleCalTable](https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/controller/rpi/alsc.cpp#L463) # noqa: E501, B950
     def __resample_cal_table(self, src: List[float], camera_mode: CameraMode) -> List[float]:
-        if self.sensor_name == "imx708":
-            _sensor_size = V3_SENSOR_SIZE
-        elif self.sensor_name == "imx219":
-            _sensor_size = V2_SENSOR_SIZE
-        else:
-            _sensor_size = V1_SENSOR_SIZE
+        _sensor_size = SENSOR_SIZE_MAP[self.sensor_name]
         assert len(src) == LS_TABLE_W * LS_TABLE_H
         new_table: List[float] = []
 
@@ -983,15 +1034,21 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
         if self.do_contrast:
             self.__contrast_control(stats)
+        if self.auto_focuser is not None:
+            self.auto_focuser.process_contrast_metadata(stats)
 
         self.isp_out_metadata.queue_buffer(buffer.buf.index)
 
     def run(self) -> None:
         self.unicam.queue_all_buffers()
+        if self.unicam_meta is not None:
+            self.unicam_meta.queue_all_buffers()
         self.isp_out_high.queue_all_buffers()
         self.isp_out_metadata.queue_all_buffers()
 
         self.unicam.start_streaming()
+        if self.unicam_meta is not None:
+            self.unicam_meta.start_streaming()
         self.isp_in.start_streaming()
         self.isp_out_high.start_streaming()
         self.isp_out_metadata.start_streaming()
@@ -1003,7 +1060,8 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
                     self.unicam.device_fd,
                     self.isp_out_high.device_fd,
                     self.isp_out_metadata.device_fd,
-                ],
+                ]
+                + ([] if self.unicam_meta is None else [self.unicam_meta.device_fd]),
                 [self.isp_in.device_fd],
                 [],
                 timeout,
@@ -1015,10 +1073,16 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             for r in rlist:
                 if r == self.unicam.device_fd:
                     self.__unicam2isp()
+                elif self.unicam_meta is not None and r == self.unicam_meta.device_fd:
+                    self.__receive_unicam_meta()
                 elif r == self.isp_out_high.device_fd:
                     self.__produce_image_from_isp()
                 elif r == self.isp_out_metadata.device_fd:
                     self.__adjust_setting_from_isp()
+
             for w in wlist:
                 if w == self.isp_in.device_fd:
                     self.__isp2unicam()
+
+    def _new_pad(self) -> _PadBase[Frame[bytes]]:
+        return _PadDiscardingOld()
