@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2.8.0
+
+- Add support for the `imx708` sensor to `UnicamIspCapture`. Note: Autofocus is not supported.
+
 ## 2.7.0 (2024-09-17)
 
 - Add `set_exposure_settings` to `UnicamIspCapture`.
