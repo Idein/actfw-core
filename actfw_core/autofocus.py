@@ -638,7 +638,7 @@ class AutoFocuserBase(metaclass=ABCMeta):
         """
         return self.afstatus
 
-    def trigget_scan(self) -> None:
+    def trigger_scan(self) -> None:
         if self.afmode == AfMode.AfModeAuto and self.scan_state == ScanState.Idle:
             self.scan_state = ScanState.Trigger
 
