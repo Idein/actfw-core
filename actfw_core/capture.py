@@ -98,7 +98,7 @@ class V4LCameraCapture(Producer[Frame[bytes]]):
         try:
             firmware_type = get_actcast_firmware_type()
             if firmware_type == "raspberrypi-bullseye" and cap == VideoPort.CSI:
-                raise RuntimeError("CSI camera is not supported in bullseye yet.")
+                raise RuntimeError("CSI camera is not supported in this module. Use UnicamIspCapture instead")
         except EnvironmentVariableNotSet:
             pass
 

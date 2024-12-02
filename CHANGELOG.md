@@ -2,8 +2,11 @@
 
 ## Unreleased
 
-- Add support for the `imx708` sensor to `UnicamIspCapture`. Note: Autofocus is not supported.
 - Add support autofocus function for `imx708` sensor.
+
+## 2.8.0 (2024-11-18)
+
+- Add support for the `imx708` sensor to `UnicamIspCapture`. Note: Autofocus is not supported.
 
 ## 2.7.0 (2024-09-17)
 
