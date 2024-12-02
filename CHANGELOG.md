@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.9.0 (2024-12-02)
+
 - Add support autofocus function for `imx708` sensor.
 
 ## 2.8.0 (2024-11-18)
