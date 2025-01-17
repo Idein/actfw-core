@@ -78,8 +78,8 @@ class LocalVideoServer(Isolated):
         super().__init__()
         self.image = ObservableValue()
 
-        def handler(*args: Any) -> None:
-            LocalVideoStreamHandler(self.image, quality, *args)
+        def handler(*args: Any) -> LocalVideoStreamHandler:
+            return LocalVideoStreamHandler(self.image, quality, *args)
 
         self.server = LocalVideoStreamServer(("", PORT), handler)
 
