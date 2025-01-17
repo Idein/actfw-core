@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add support localvideocast which can cast mjpeg streaming over http.
+
 ## 2.9.0 (2024-12-02)
 
 - Add support autofocus function for `imx708` sensor.
