@@ -22,7 +22,7 @@ commands:
       - run:
           name: Install poetry
           command: |
-            curl -sSL https://install.python-poetry.org | python -
+            curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.8.4 python -
             echo 'export PATH=$HOME/.local/bin:$PATH' >> $BASH_ENV
             source $BASH_ENV
   install-old-poetry:
