@@ -16,7 +16,7 @@ class ObservableValue:
         self.value = None
         self.condition = threading.Condition()
 
-    def wait_new_value(self, timeout: Optional[float] = None) -> PIL_Image:
+    def wait_new_value(self, timeout: Optional[float] = None) -> Optional[PIL_Image]:
         with self.condition:
             self.condition.wait(timeout=timeout)
             return self.value
@@ -52,11 +52,14 @@ class LocalVideoStreamHandler(http.server.BaseHTTPRequestHandler):
                     continue
                 else:
                     jpgimg = io.BytesIO()
-                    frame.save(
-                        jpgimg,
-                        format="JPEG",
-                        quality=self.quality,
-                    )
+                    if frame is not None:
+                        frame.save(
+                            jpgimg,
+                            format="JPEG",
+                            quality=self.quality,
+                        )
+                    else:
+                        continue
                     self.wfile.write(b"--FRAME\r\n")
                     self.wfile.write(b"Content-Type: image/jpeg\r\n\r\n")
                     self.wfile.write(jpgimg.getvalue())
