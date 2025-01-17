@@ -6,7 +6,7 @@ import pytest
     [
         ("actfw_core", "Application"),
         ("actfw_core", "CommandServer"),
-        ("actfw_core", "LocalVideoCast"),
+        ("actfw_core", "LocalVideoServer"),
         ("actfw_core.capture", "V4LCameraCapture"),
         ("actfw_core.task", "Consumer, Isolated, Join, Pipe, Producer, Task, Tee"),
     ],

@@ -2,7 +2,7 @@ import http.server
 import io
 import socketserver
 import threading
-from typing import Optional
+from typing import Any, Optional
 
 from PIL.Image import Image as PIL_Image
 
@@ -16,19 +16,19 @@ class ObservableValue:
         self.value = None
         self.condition = threading.Condition()
 
-    def wait_new_value(self, timeout: Optional[float] = None) -> object:
+    def wait_new_value(self, timeout: Optional[float] = None) -> PIL_Image:
         with self.condition:
             self.condition.wait(timeout=timeout)
             return self.value
 
-    def set(self, new_value: object) -> None:
+    def set(self, new_value: Optional[Any]) -> None:
         with self.condition:
             self.value = new_value
             self.condition.notify_all()
 
 
-class LocalVideoCastHandler(http.server.BaseHTTPRequestHandler):
-    def __init__(self, image, quality, *args) -> None:
+class LocalVideoStreamHandler(http.server.BaseHTTPRequestHandler):
+    def __init__(self, image: ObservableValue, quality: int, *args: Any) -> None:
         self.image = image
         self.quality = quality
         super().__init__(*args)
@@ -39,7 +39,7 @@ class LocalVideoCastHandler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         self.send_response(200)
-        self.send_header("Age", 0)
+        self.send_header("Age", str(0))
         self.send_header("Cache-Control", "no-cache, private")
         self.send_header("Pragma", "no-cache")
         self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=FRAME")
@@ -65,20 +65,20 @@ class LocalVideoCastHandler(http.server.BaseHTTPRequestHandler):
             pass
 
 
-class LocalVideoCastServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+class LocalVideoStreamServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
 
-class LocalVideoCast(Isolated):
+class LocalVideoServer(Isolated):
     def __init__(self, quality: int = 75) -> None:  # 75 is the default value for PIL JPEG quality
         super().__init__()
         self.image = ObservableValue()
 
         def handler(*args: Any) -> None:
-            LocalVideoCastHandler(self.image, quality, *args)
+            LocalVideoStreamHandler(self.image, quality, *args)
 
-        self.server = LocalVideoCastServer(("", PORT), handler)
+        self.server = LocalVideoStreamServer(("", PORT), handler)
 
     def update_image(self, image: PIL_Image) -> None:
         try:

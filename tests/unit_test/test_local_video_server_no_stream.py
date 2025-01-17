@@ -6,7 +6,7 @@ from typing import Any
 import actfw_core
 
 
-def test_localvideocast_terminate() -> None:
+def test_local_video_server_terminate() -> None:
     # try to catch assert error
     exception = None
 
@@ -19,14 +19,14 @@ def test_localvideocast_terminate() -> None:
     # Actcast application
     app = actfw_core.Application()
 
-    # LocalVideoCast (for mjpeg streaming over http)
-    cmd = actfw_core.LocalVideoCast(quality=75)
+    # LocalVideoServer (for mjpeg streaming over http)
+    cmd = actfw_core.LocalVideoServer(quality=75)
     app.register_task(cmd)
 
     # Start application
     th = threading.Thread(target=lambda: app.run())
     th.start()
-    # terminate LocalVideoCast task without calling `update_image`
+    # terminate LocalVideoServer task without calling `update_image`
     time.sleep(0.1)
     app.stop()
     th.join()
