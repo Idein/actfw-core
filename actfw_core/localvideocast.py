@@ -1,6 +1,5 @@
 import http.server
 import io
-import logging
 import socketserver
 import threading
 
@@ -27,8 +26,9 @@ class ObservableValue:
 
 class LocalVideoCastHandler(http.server.BaseHTTPRequestHandler):
 
-    def __init__(self, image, *args):
+    def __init__(self, image, quality, *args):
         self.image = image
+        self.quality = quality
         super().__init__(*args)
 
     def log_message(*args):
@@ -46,18 +46,21 @@ class LocalVideoCastHandler(http.server.BaseHTTPRequestHandler):
             while True:
                 try:
                     frame = self.image.wait_new_value()
-                except Exception as e:
-                    logging.error(f"Error fetching frame from queue: {e}")
+                except Exception:
                     continue
                 else:
                     jpgimg = io.BytesIO()
-                    frame.save(jpgimg, format="JPEG")
+                    frame.save(
+                        jpgimg,
+                        format="JPEG",
+                        quality=self.quality,
+                    )
                     self.wfile.write(b"--FRAME\r\n")
                     self.wfile.write(b"Content-Type: image/jpeg\r\n\r\n")
                     self.wfile.write(jpgimg.getvalue())
                     self.wfile.write(b"\r\n")
-        except Exception as e:
-            logging.error(f"Removed streaming client {self.client_address}: {e}")
+        except Exception:
+            pass
 
 
 class LocalVideoCastServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
@@ -66,18 +69,12 @@ class LocalVideoCastServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 class LocalVideoCast(Isolated):
-    """Local Video Cast Server
-
-    This server handles the streaming of mjpeg to a client over HTTP.
-    
-    """
-    
-    def __init__(self):
+    def __init__(self, quality=75):  # 75 is the default value for PIL JPEG quality
         super().__init__()
         self.image = ObservableValue()
 
         def handler(*args):
-            LocalVideoCastHandler(self.image, *args)
+            LocalVideoCastHandler(self.image, quality, *args)
 
         self.server = LocalVideoCastServer(("", PORT), handler)
 
