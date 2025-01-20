@@ -2,7 +2,7 @@ import http.server
 import io
 import socketserver
 import threading
-from typing import Any, Optional
+from typing import Any, Generic, Optional, TypeVar
 
 from PIL.Image import Image as PIL_Image
 
@@ -10,25 +10,34 @@ from .task import Isolated
 
 PORT = 5100
 
+T = TypeVar("T")
 
-class ObservableValue:
+
+class _ObservableValue(Generic[T]):
     def __init__(self) -> None:
-        self.value = None
+        self.value: Optional[T] = None
         self.condition = threading.Condition()
 
-    def wait_new_value(self, timeout: Optional[float] = None) -> Optional[PIL_Image]:
+    def wait_new_value(self) -> T:
         with self.condition:
-            self.condition.wait(timeout=timeout)
+            self.condition.wait()
+            if self.value is None:
+                raise RuntimeError("No value has been set")
             return self.value
 
-    def set(self, new_value: Optional[Any]) -> None:
+    def set(self, new_value: T) -> None:
         with self.condition:
             self.value = new_value
             self.condition.notify_all()
 
 
-class LocalVideoStreamHandler(http.server.BaseHTTPRequestHandler):
-    def __init__(self, image: ObservableValue, quality: int, *args: Any) -> None:
+class _LocalVideoStreamHandler(http.server.BaseHTTPRequestHandler):
+    def __init__(
+        self,
+        image: _ObservableValue[PIL_Image],
+        quality: int,
+        *args: Any,
+    ) -> None:
         self.image = image
         self.quality = quality
         super().__init__(*args)
@@ -52,14 +61,11 @@ class LocalVideoStreamHandler(http.server.BaseHTTPRequestHandler):
                     continue
                 else:
                     jpgimg = io.BytesIO()
-                    if frame is not None:
-                        frame.save(
-                            jpgimg,
-                            format="JPEG",
-                            quality=self.quality,
-                        )
-                    else:
-                        continue
+                    frame.save(
+                        jpgimg,
+                        format="JPEG",
+                        quality=self.quality,
+                    )
                     self.wfile.write(b"--FRAME\r\n")
                     self.wfile.write(b"Content-Type: image/jpeg\r\n\r\n")
                     self.wfile.write(jpgimg.getvalue())
@@ -68,24 +74,35 @@ class LocalVideoStreamHandler(http.server.BaseHTTPRequestHandler):
             pass
 
 
-class LocalVideoStreamServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+class _LocalVideoStreamServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
 
 class LocalVideoServer(Isolated):
-    def __init__(self, quality: int = 75) -> None:  # 75 is the default value for PIL JPEG quality
+    image: _ObservableValue[PIL_Image]
+    server: _LocalVideoStreamServer
+
+    """Local Video Server
+
+    This server provides a local video stream on port 5100.
+    """
+
+    def __init__(
+        self,
+        quality: int = 75,  # 75 is the default value of PIL JPEG quality
+    ) -> None:
         super().__init__()
-        self.image = ObservableValue()
+        self.image = _ObservableValue()
 
-        def handler(*args: Any) -> LocalVideoStreamHandler:
-            return LocalVideoStreamHandler(self.image, quality, *args)
+        def handler(*args: Any) -> _LocalVideoStreamHandler:
+            return _LocalVideoStreamHandler(self.image, quality, *args)
 
-        self.server = LocalVideoStreamServer(("", PORT), handler)
+        self.server = _LocalVideoStreamServer(("", PORT), handler)
 
     def update_image(self, image: PIL_Image) -> None:
         try:
-            self.image.set(image)
+            self.image.set(image.copy())
         except Exception:
             pass
 
