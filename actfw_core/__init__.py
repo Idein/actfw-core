@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List
 from . import autofocus, capture, linux, system, task, unicam_isp_capture  # noqa: F401
 from .application import Application  # noqa: F401
 from .command_server import CommandServer  # noqa: F401
+from .local_video_server import LocalVideoServer  # noqa: F401
 from .service_client import ServiceClient  # noqa: F401
 
 
