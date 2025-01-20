@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add support localvideocast which can cast mjpeg streaming over http.
+- Add `LocalVideoServer` which can cast mjpeg streaming over http.
 
 ## 2.9.0 (2024-12-02)
 
