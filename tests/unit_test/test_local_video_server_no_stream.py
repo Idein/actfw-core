@@ -20,8 +20,8 @@ def test_local_video_server_terminate() -> None:
     app = actfw_core.Application()
 
     # LocalVideoServer (for mjpeg streaming over http)
-    cmd = actfw_core.LocalVideoServer(quality=75)
-    app.register_task(cmd)
+    local_video_server = actfw_core.LocalVideoServer(quality=75)
+    app.register_task(local_video_server)
 
     # Start application
     th = threading.Thread(target=lambda: app.run())
