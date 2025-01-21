@@ -1,0 +1,87 @@
+actfw\_core package
+===================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   actfw_core.linux
+   actfw_core.task
+   actfw_core.v4l2
+
+Submodules
+----------
+
+actfw\_core.application module
+------------------------------
+
+.. automodule:: actfw_core.application
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.autofocus module
+----------------------------
+
+.. automodule:: actfw_core.autofocus
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.capture module
+--------------------------
+
+.. automodule:: actfw_core.capture
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.command\_server module
+----------------------------------
+
+.. automodule:: actfw_core.command_server
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.local\_video\_server module
+---------------------------------------
+
+.. automodule:: actfw_core.local_video_server
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.service\_client module
+----------------------------------
+
+.. automodule:: actfw_core.service_client
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.system module
+-------------------------
+
+.. automodule:: actfw_core.system
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.unicam\_isp\_capture module
+---------------------------------------
+
+.. automodule:: actfw_core.unicam_isp_capture
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: actfw_core
+   :members:
+   :undoc-members:
+   :show-inheritance:
