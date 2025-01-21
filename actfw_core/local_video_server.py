@@ -86,12 +86,29 @@ class LocalVideoServer(Isolated):
     """Local Video Server
 
     This server provides a local video stream on port 5100.
+
     """
 
     def __init__(
         self,
         quality: int = 75,  # 75 is the default value of PIL JPEG quality
     ) -> None:
+        """
+
+        Initialize a LocalVideoServer instance.
+
+        Args:
+            quality (int, optional):
+                The image quality setting. Acceptable values range from 0 to 100.
+
+                - 0: Lowest quality
+                - 95: Highest quality
+                - 100: JPEG lossless (no compression)
+
+                The `quality` parameter corresponds to the `quality` parameter in PIL's `Image.save` method.
+                Defaults to `75`.
+
+        """
         super().__init__()
         self.image = _ObservableValue()
 
@@ -101,6 +118,15 @@ class LocalVideoServer(Isolated):
         self.server = _LocalVideoStreamServer(("", PORT), handler)
 
     def update_image(self, image: PIL_Image) -> None:
+        """
+
+        Update the video image.
+
+        Args:
+            image (:class:`~PIL.Image`): image
+
+        """
+
         try:
             self.image.set(image.copy())
         except Exception:
