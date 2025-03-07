@@ -180,7 +180,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
                 if events == []:
                     raise CaptureTimeoutError(timeout)
 
-                for key, mask in events:
+                for key, _mask in events:
                     callback = key.data
                     callback()
         finally:
