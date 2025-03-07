@@ -60,6 +60,7 @@ exclude_projects = ["dataclasses"]
 exclude_modules = [
     "dataclasses",
     "OpenSSL",     # Conditional export
+    "libcamera",
 ]
 
 [build-system]
