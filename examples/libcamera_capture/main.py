@@ -1,7 +1,6 @@
-#!/usr/bin/python3
+# type: ignore
 import os
-from typing import Optional
-
+from typing import Tuple
 import actfw_core
 import libcamera as libcam
 import numpy as np
@@ -21,7 +20,7 @@ from PIL import Image
 
 
 class Converter(Pipe):
-    def __init__(self, capture_size: tuple[int, int]) -> None:
+    def __init__(self, capture_size: Tuple[int, int]) -> None:
         super(Converter, self).__init__()
         self.capture_size = capture_size
 
@@ -31,7 +30,7 @@ class Converter(Pipe):
 
 
 class Presenter(Consumer):
-    def __init__(self, preview_window, cmd: CommandServer):
+    def __init__(self, preview_window, cmd: CommandServer) -> None:
         super(Presenter, self).__init__()
         self.preview_window = preview_window
         self.cmd = cmd
