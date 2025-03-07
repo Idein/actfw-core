@@ -1,6 +1,7 @@
 # type: ignore
 import os
 from typing import Tuple
+
 import actfw_core
 import libcamera as libcam
 import numpy as np
