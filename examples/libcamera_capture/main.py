@@ -1,19 +1,17 @@
 #!/usr/bin/python3
 import os
 from typing import Optional
+
 import actfw_core
-import numpy as np
-
-from actfw_core.libcamera_capture import LibcameraCapture
 import libcamera as libcam
-
+import numpy as np
 from actfw_core.application import Application
 from actfw_core.capture import Frame
 from actfw_core.command_server import CommandServer
+from actfw_core.libcamera_capture import LibcameraCapture
 from actfw_core.task import Consumer, Pipe
 from actfw_raspberrypi.vc4 import Display
 from PIL import Image
-
 
 # capture image size
 (CAPTURE_WIDTH, CAPTURE_HEIGHT) = (640, 480)
@@ -28,9 +26,7 @@ class Converter(Pipe):
         self.capture_size = capture_size
 
     def proc(self, frame: Frame) -> Image.Image:
-        rgb_image = Image.frombuffer(
-            "RGB", self.capture_size, frame.getvalue(), "raw", "RGB"
-        )
+        rgb_image = Image.frombuffer("RGB", self.capture_size, frame.getvalue(), "raw", "RGB")
         return rgb_image
 
 
@@ -48,12 +44,12 @@ class Presenter(Consumer):
             self.preview_window.update()
 
 
-def run(app: Application, preview_window = None) -> None:
+def run(app: Application, preview_window=None) -> None:
     print("run start...")
 
     print("initializing tasks...")
     cmd = actfw_core.CommandServer()
-    cap = LibcameraCapture((CAPTURE_WIDTH, CAPTURE_HEIGHT), libcam.PixelFormat('BGR888'))
+    cap = LibcameraCapture((CAPTURE_WIDTH, CAPTURE_HEIGHT), libcam.PixelFormat("BGR888"))
 
     conv = Converter((CAPTURE_WIDTH, CAPTURE_HEIGHT))
     pres = Presenter(preview_window, cmd)
@@ -102,9 +98,7 @@ def main() -> None:
             capture_size = (CAPTURE_WIDTH, CAPTURE_HEIGHT)
             layer = 16
             print("opening window...")
-            with display.open_window(
-                preview_area, capture_size, layer
-            ) as preview_window:
+            with display.open_window(preview_area, capture_size, layer) as preview_window:
                 print("run with display")
                 run(app, preview_window)
     else:
