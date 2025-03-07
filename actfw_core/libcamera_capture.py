@@ -86,11 +86,6 @@ class CaptureTimeoutError(Exception):
         return f'{self._msg}: {self._timeout}'
 
 
-def print_methods(obj):
-    methods = [name for name in dir(obj) if callable(getattr(obj, name)) and not name.startswith("__")]
-    print(f"obj: {obj}, methods: {methods}")
-
-
 class LibcameraCapture(Producer[Frame[bytes]]):
     _cm: libcam.CameraManager
     _size: Optional[Tuple[int, int]]
@@ -122,18 +117,14 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         self._camera_config: libcam.CameraConfiguration = self._camera.generate_configuration([libcam.StreamRole.Viewfinder])
 
         stream_config: libcam.StreamConfiguration = self._camera_config.at(0)
-        print(f"stream_config: {stream_config} (initial value)")
         stream_config.size = libcam.Size(*self._size)
         stream_config.pixel_format = self._pixel_format
-        print(f"stream_config: {stream_config} (after setting)")
 
         res = self._camera_config.validate()
-        print(f"validate: {res}")
         if res == libcam.CameraConfiguration.Status.Invalid:
             raise CameraConfigurationInvalidError(self._camera_config)
 
         res = self._camera.configure(self._camera_config)
-        print(f"configure: {res}")
         if res is not None and res < 0:
             raise CameraConfigureError(res)
 
@@ -157,10 +148,6 @@ class LibcameraCapture(Producer[Frame[bytes]]):
                     ) as mm:
                 dst = mm[:]
 
-            # 00 01 02 03 ... 0F
-            hexstr = ' '.join(f'{byte:02X}' for byte in dst[:16])
-            print(hexstr)
-
             frame = Frame(dst)
             self._outlet(frame)
 
@@ -180,18 +167,15 @@ class LibcameraCapture(Producer[Frame[bytes]]):
             for buffer in buffers:
                 request = self._camera.create_request()
                 res = request.add_buffer(stream, buffer)
-                print(f"add_buffer: {res}")
                 assert res is None or res == 0
                 self._requests.append(request)
 
             res = self._camera.start()
-            print(f"start: {res}")
             if res is not None and res < 0:
                 raise CameraStartError(res)
 
             for request in self._requests:
                 res = self._camera.queue_request(request)
-                print(f"queue_request: {res}")
                 if res is not None and res < 0:
                     raise QueueRequestError(res)
 
