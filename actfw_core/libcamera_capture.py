@@ -1,89 +1,89 @@
-import libcamera as libcam
-import selectors
 import mmap
-from typing import Tuple, List, Optional
+import selectors
+from typing import List, Optional, Tuple
 
+import libcamera as libcam
 from actfw_core.capture import Frame
 from actfw_core.task import Producer
 from actfw_core.util.pad import _PadBase, _PadDiscardingOld
+
 
 class CameraConfigurationInvalidError(Exception):
     _config: libcam.CameraConfiguration
     _msg: str
 
-    def __init__(self, config: libcam.CameraConfiguration, msg:str = "Invalid CameraConfiguration"):
+    def __init__(self, config: libcam.CameraConfiguration, msg: str = "Invalid CameraConfiguration"):
         super().__init__(msg)
         self._config = config
         self._msg = msg
 
     def __str__(self) -> str:
-        return f'{self._msg}: {self._config}'
+        return f"{self._msg}: {self._config}"
 
 
 class CameraConfigureError(Exception):
     _errno: int
     _msg: str
 
-    def __init__(self, errno: int, msg:str = "Camera configure failed"):
+    def __init__(self, errno: int, msg: str = "Camera configure failed"):
         super().__init__(msg)
         self._errno = errno
         self._msg = msg
 
     def __str__(self) -> str:
-        return f'{self._msg}: {self._errno}'
+        return f"{self._msg}: {self._errno}"
 
 
 class FrameBufferAllocateError(Exception):
     _errno: int
     _msg: str
 
-    def __init__(self, errno: int, msg:str = "FrameBuffer allocation error"):
+    def __init__(self, errno: int, msg: str = "FrameBuffer allocation error"):
         super().__init__(msg)
         self._errno = errno
         self._msg = msg
 
     def __str__(self) -> str:
-        return f'{self._msg}: {self._errno}'
+        return f"{self._msg}: {self._errno}"
 
 
 class CameraStartError(Exception):
     _errno: int
     _msg: str
 
-    def __init__(self, errno: int, msg:str = "CameraStart error"):
+    def __init__(self, errno: int, msg: str = "CameraStart error"):
         super().__init__(msg)
         self._errno = errno
         self._msg = msg
 
     def __str__(self) -> str:
-        return f'{self._msg}: {self._errno}'
-
+        return f"{self._msg}: {self._errno}"
 
 
 class QueueRequestError(Exception):
     _errno: int
     _msg: str
 
-    def __init__(self, errno: int, msg:str = "QueueRequest error"):
+    def __init__(self, errno: int, msg: str = "QueueRequest error"):
         super().__init__(msg)
         self._errno = errno
         self._msg = msg
 
     def __str__(self) -> str:
-        return f'{self._msg}: {self._errno}'
+        return f"{self._msg}: {self._errno}"
 
 
 class CaptureTimeoutError(Exception):
     _timeout: int
     _msg: str
 
-    def __init__(self, timeout: int, msg:str = "Capture timeout"):
+    def __init__(self, timeout: int, msg: str = "Capture timeout"):
         super().__init__(msg)
         self._timeout = timeout
         self._msg = msg
 
     def __str__(self) -> str:
-        return f'{self._msg}: {self._timeout}'
+        return f"{self._msg}: {self._timeout}"
 
 
 class LibcameraCapture(Producer[Frame[bytes]]):
@@ -107,7 +107,9 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         """
         NOTE: BGR を指定すると実際には RGB で取得される
         """
-        assert pixel_format == libcam.PixelFormat('RGB888') or pixel_format == libcam.PixelFormat('BGR888'), 'Only RGB888 or BGR888 are supported'
+        assert pixel_format == libcam.PixelFormat("RGB888") or pixel_format == libcam.PixelFormat(
+            "BGR888"
+        ), "Only RGB888 or BGR888 are supported"
 
         self._camera = camera
         self._size = size
@@ -128,7 +130,6 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         if res is not None and res < 0:
             raise CameraConfigureError(res)
 
-
     def cameras(self) -> List[libcam.Camera]:
         return self._cm.cameras
 
@@ -145,11 +146,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
             assert len(frame_buffer.planes) == 1
             plane = next(iter(frame_buffer.planes))
 
-            with mmap.mmap(
-                    plane.fd,
-                    plane.length,
-                    offset=plane.offset
-                    ) as mm:
+            with mmap.mmap(plane.fd, plane.length, offset=plane.offset) as mm:
                 dst = mm[:]
 
             frame = Frame(dst)
@@ -201,7 +198,6 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         finally:
             self._camera.stop()
             self._camera.release()
-
 
     def _new_pad(self) -> _PadBase[Frame[bytes]]:
         return _PadDiscardingOld()
