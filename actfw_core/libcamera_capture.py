@@ -1,0 +1,219 @@
+import libcamera as libcam
+import selectors
+import mmap
+from typing import Tuple, List, Optional
+
+from actfw_core.capture import Frame
+from actfw_core.task import Producer
+from actfw_core.util.pad import _PadBase, _PadDiscardingOld
+
+class CameraConfigurationInvalidError(Exception):
+    _config: libcam.CameraConfiguration
+    _msg: str
+
+    def __init__(self, config: libcam.CameraConfiguration, msg:str = "Invalid CameraConfiguration"):
+        super().__init__(msg)
+        self._config = config
+        self._msg = msg
+
+    def __str__(self) -> str:
+        return f'{self._msg}: {self._config}'
+
+
+class CameraConfigureError(Exception):
+    _errno: int
+    _msg: str
+
+    def __init__(self, errno: int, msg:str = "Camera configure failed"):
+        super().__init__(msg)
+        self._errno = errno
+        self._msg = msg
+
+    def __str__(self) -> str:
+        return f'{self._msg}: {self._errno}'
+
+
+class FrameBufferAllocateError(Exception):
+    _errno: int
+    _msg: str
+
+    def __init__(self, errno: int, msg:str = "FrameBuffer allocation error"):
+        super().__init__(msg)
+        self._errno = errno
+        self._msg = msg
+
+    def __str__(self) -> str:
+        return f'{self._msg}: {self._errno}'
+
+
+class CameraStartError(Exception):
+    _errno: int
+    _msg: str
+
+    def __init__(self, errno: int, msg:str = "CameraStart error"):
+        super().__init__(msg)
+        self._errno = errno
+        self._msg = msg
+
+    def __str__(self) -> str:
+        return f'{self._msg}: {self._errno}'
+
+
+
+class QueueRequestError(Exception):
+    _errno: int
+    _msg: str
+
+    def __init__(self, errno: int, msg:str = "QueueRequest error"):
+        super().__init__(msg)
+        self._errno = errno
+        self._msg = msg
+
+    def __str__(self) -> str:
+        return f'{self._msg}: {self._errno}'
+
+
+class CaptureTimeoutError(Exception):
+    _timeout: int
+    _msg: str
+
+    def __init__(self, timeout: int, msg:str = "Capture timeout"):
+        super().__init__(msg)
+        self._timeout = timeout
+        self._msg = msg
+
+    def __str__(self) -> str:
+        return f'{self._msg}: {self._timeout}'
+
+
+def print_methods(obj):
+    methods = [name for name in dir(obj) if callable(getattr(obj, name)) and not name.startswith("__")]
+    print(f"obj: {obj}, methods: {methods}")
+
+
+class LibcameraCapture(Producer[Frame[bytes]]):
+    _cm: libcam.CameraManager
+    _size: Optional[Tuple[int, int]]
+    _pixel_format: Optional[libcam.PixelFormat]
+    _camera: Optional[libcam.Camera]
+    _requests: Optional[List[libcam.Request]]
+    _camera_config: Optional[libcam.CameraConfiguration]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._cm = libcam.CameraManager.singleton()
+        self._size = None
+        self._pixel_format = None
+        self._camera = None
+        self._requests = None
+        self._camera_config = None
+
+    def set_config(self, camera: libcam.Camera, size: Tuple[int, int], pixel_format: libcam.PixelFormat) -> None:
+        """
+        NOTE: BGR を指定すると実際には RGB で取得される
+        """
+        assert pixel_format == libcam.PixelFormat('RGB888') or pixel_format == libcam.PixelFormat('BGR888'), 'Only RGB888 or BGR888 are supported'
+
+        self._camera = camera
+        self._size = size
+        self._pixel_format = pixel_format
+        self._camera.acquire()
+
+        self._camera_config: libcam.CameraConfiguration = self._camera.generate_configuration([libcam.StreamRole.Viewfinder])
+
+        stream_config: libcam.StreamConfiguration = self._camera_config.at(0)
+        print(f"stream_config: {stream_config} (initial value)")
+        stream_config.size = libcam.Size(*self._size)
+        stream_config.pixel_format = self._pixel_format
+        print(f"stream_config: {stream_config} (after setting)")
+
+        res = self._camera_config.validate()
+        print(f"validate: {res}")
+        if res == libcam.CameraConfiguration.Status.Invalid:
+            raise CameraConfigurationInvalidError(self._camera_config)
+
+        res = self._camera.configure(self._camera_config)
+        print(f"configure: {res}")
+        if res is not None and res < 0:
+            raise CameraConfigureError(res)
+
+
+    def cameras(self) -> List[libcam.Camera]:
+        return self._cm.cameras
+
+    def _handle_camera_event(self) -> None:
+        reqs = self._cm.get_ready_requests()
+        for req in reqs:
+            buffers = req.buffers
+            assert len(buffers) == 1
+            stream, frame_buffer = next(iter(buffers.items()))
+            assert len(frame_buffer.planes) == 1
+            plane = next(iter(frame_buffer.planes))
+
+            with mmap.mmap(
+                    plane.fd,
+                    plane.length,
+                    offset=plane.offset
+                    ) as mm:
+                dst = mm[:]
+
+            # 00 01 02 03 ... 0F
+            hexstr = ' '.join(f'{byte:02X}' for byte in dst[:16])
+            print(hexstr)
+
+            frame = Frame(dst)
+            self._outlet(frame)
+
+            req.reuse()
+            self._camera.queue_request(req)
+
+    def run(self) -> None:
+        try:
+            allocator = libcam.FrameBufferAllocator(self._camera)
+            stream = self._camera_config.at(0).stream
+            res = allocator.allocate(stream)
+            if res < 0:
+                raise FrameBufferAllocateError(res)
+
+            buffers = allocator.buffers(stream)
+            self._requests = []
+            for buffer in buffers:
+                request = self._camera.create_request()
+                res = request.add_buffer(stream, buffer)
+                print(f"add_buffer: {res}")
+                assert res is None or res == 0
+                self._requests.append(request)
+
+            res = self._camera.start()
+            print(f"start: {res}")
+            if res is not None and res < 0:
+                raise CameraStartError(res)
+
+            for request in self._requests:
+                res = self._camera.queue_request(request)
+                print(f"queue_request: {res}")
+                if res is not None and res < 0:
+                    raise QueueRequestError(res)
+
+            sel = selectors.DefaultSelector()
+            sel.register(
+                self._cm.event_fd,
+                selectors.EVENT_READ,
+                lambda: self._handle_camera_event(),
+            )
+            timeout = 1
+            while self._is_running():
+                events = sel.select(timeout)
+                if events == []:
+                    raise CaptureTimeoutError(timeout)
+
+                for key, mask in events:
+                    callback = key.data
+                    callback()
+        finally:
+            self._camera.stop()
+            self._camera.release()
+
+
+    def _new_pad(self) -> _PadBase[Frame[bytes]]:
+        return _PadDiscardingOld()
