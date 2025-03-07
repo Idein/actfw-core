@@ -23,7 +23,7 @@ Sphinx = "^4.3.0"
 cryptography = "^3.4.7"
 pyOpenSSL = "^20.0.1"
 pyproject-indirect-import-detector = "^0.1.2"
-pysen = { version = "^0.10.1" }
+pysen = { version = "^0.11" }
 pytest = "^6.2.3"
 sphinx-theme = "^1.0"
 black = "^23"
@@ -41,7 +41,7 @@ types-setuptools = "^69"
 "Changelog" = "https://github.com/Idein/actfw-core/blob/master/CHANGELOG.md"
 
 [tool.pysen]
-version = "0.10"
+version = "0.11"
 
 [tool.pysen.lint]
 enable_black = true
