@@ -132,6 +132,10 @@ class LibcameraCapture(Producer[Frame[bytes]]):
     def cameras(self) -> List[libcam.Camera]:
         return self._cm.cameras
 
+    def capture_size(self) -> Tuple[int, int]:
+        stream_config: libcam.StreamConfiguration = self._camera_config.at(0)
+        return (stream_config.size.width, stream_config.size.height)
+
     def _handle_camera_event(self) -> None:
         reqs = self._cm.get_ready_requests()
         for req in reqs:
