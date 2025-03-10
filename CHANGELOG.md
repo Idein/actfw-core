@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+
+## 2.11.0 (2025-03-10)
+
 - Add `LibcameraCapture` which wraps libcamera.
 
 ## 2.10.0 (2025-01-21)
