@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add HDR support for `imx708` sensor to `UnicamIspCapture`.
 
 ## 2.11.0 (2025-03-10)
 

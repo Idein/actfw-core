@@ -131,6 +131,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         shutter_time: Union[float, Auto] = Auto.AUTO,
         analogue_gain: Union[float, Auto] = Auto.AUTO,
         auto_focuser: Optional[AutoFocuserBase] = None,
+        hdr: bool = False,
     ) -> None:
         super().__init__()
 
@@ -141,6 +142,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         self.shared_dma_fds: List[int] = []
         self.sensor_name = self.__get_sensor_name(unicam_subdev)
         self.auto_focuser = auto_focuser
+        self.hdr = hdr
         if self.sensor_name not in ["imx708", "imx219", "ov5647"]:
             raise RuntimeError(f"not supported sensor: {self.sensor_name}")
         self.unicam = RawVideo(
@@ -303,7 +305,7 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
             self.expected_height,
             self.expected_pix_format,
         )
-
+        self.__set_hdr_mode()
         self.__request_buffer()
 
     def set_exposure_settings(self, shutter_time: Union[float, Auto], analogue_gain: Union[float, Auto]) -> None:
@@ -486,6 +488,14 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         focus_control.value = focus_val
         self.unicam_subdev_meta.set_ext_controls([focus_control])
 
+    def __set_hdr_mode(self) -> None:
+        if self.hdr and self.sensor_name != "imx708":
+            raise RuntimeError(f"HDR mode is not supported sensor: {self.sensor_name}")
+        focus_control = v4l2_ext_control()
+        focus_control.id = V4L2_CID.WIDE_DYNAMIC_RANGE
+        focus_control.value = int(self.hdr)
+        self.unicam_subdev.set_ext_controls([focus_control])
+
     def __v4l2_control_value_for_analogue_gain(self, analogue_gain: float) -> float:
         if self.sensor_name == "imx219":
             return 256 - (
@@ -519,7 +529,9 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
         return (left, top, w, h)
 
     def __auto_size_selection_for_imx708(self) -> None:
-        if self.expected_width <= 1920 and self.expected_height <= 1080:
+        if self.hdr:
+            self.camera_mode = V3_UNICAM_MODES[1]
+        elif self.expected_width <= 1920 and self.expected_height <= 1080:
             if self.expected_fps <= 50:
                 self.camera_mode = V3_UNICAM_MODES[1]
             else:
