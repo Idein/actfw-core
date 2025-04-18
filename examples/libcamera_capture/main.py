@@ -1,5 +1,4 @@
 # type: ignore
-import os
 from typing import Tuple
 
 import actfw_core
@@ -10,7 +9,7 @@ from actfw_core.capture import Frame
 from actfw_core.command_server import CommandServer
 from actfw_core.libcamera_capture import LibcameraCapture
 from actfw_core.task import Consumer, Pipe
-from actfw_raspberrypi.vc4 import Display
+from actfw_raspberrypi.vc4.drm import Display
 from PIL import Image
 
 # capture image size
@@ -83,11 +82,6 @@ def main() -> None:
         except FileNotFoundError:
             display_connected = False
     print("checked display connection.")
-
-    # これがないと buster と判定されてしまいディスプレイに表示されなくなる
-    # https://github.com/Idein/actfw-raspberrypi/blob/54504f1477b80878d891d7bdbaa852eb14a7a7b2/actfw_raspberrypi/vc4/display.py#L20-L23
-    # とりあえず bullseye と判定させておけば動くため raspberrypi-bullseye にしておく
-    os.environ["ACTCAST_FIRMWARE_TYPE"] = "raspberrypi-bullseye"
 
     app = actfw_core.Application()
     if display_connected:
