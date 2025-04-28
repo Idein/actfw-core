@@ -94,7 +94,13 @@ class LibcameraCapture(Producer[Frame[bytes]]):
     _requests: Optional[List[libcam.Request]]
     _camera_config: libcam.CameraConfiguration
 
-    def __init__(self, size: Tuple[int, int], pixel_format: libcam.PixelFormat, camera_index: int = 0, orientation: libcam.Orientation = libcam.Orientation.Rotate0) -> None:
+    def __init__(
+        self,
+        size: Tuple[int, int],
+        pixel_format: libcam.PixelFormat,
+        camera_index: int = 0,
+        orientation: libcam.Orientation = libcam.Orientation.Rotate0,
+    ) -> None:
         """
         NOTE: BGR を指定すると実際には RGB で取得される
         """
