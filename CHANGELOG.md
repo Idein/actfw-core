@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add `orientation: libcamera.Orientation` to `LibcameraCapture`.
 
 ## 2.11.0 (2025-03-10)
 
