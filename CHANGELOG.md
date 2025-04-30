@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.12.0 (2025-04-30)
+
 - Add `orientation: libcamera.Orientation` to `LibcameraCapture`.
 - Add `framerate: Optional[int]` to `LibcameraCapture`.
 
