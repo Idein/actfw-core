@@ -170,7 +170,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
                 requests.append(request)
 
             controls = {}
-            if self._framerate:
+            if self._framerate is not None:
                 frame_duration_limit = int(1_000_000 / self._framerate)
                 controls[libcam.controls.FrameDurationLimits] = (frame_duration_limit, frame_duration_limit)
             res = self._camera.start(controls=controls)
