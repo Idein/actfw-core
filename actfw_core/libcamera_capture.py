@@ -93,6 +93,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
     _camera: libcam.Camera
     _requests: Optional[List[libcam.Request]]
     _camera_config: libcam.CameraConfiguration
+    _framerate: Optional[int]
 
     def __init__(
         self,
@@ -100,6 +101,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         pixel_format: libcam.PixelFormat,
         camera_index: int = 0,
         orientation: libcam.Orientation = libcam.Orientation.Rotate0,
+        framerate: Optional[int] = None,
     ) -> None:
         """
         NOTE: BGR を指定すると実際には RGB で取得される
@@ -111,6 +113,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         self._cm = libcam.CameraManager.singleton()
         self._size = size
         self._pixel_format = pixel_format
+        self._framerate = framerate
         self._camera = self._cm.cameras[camera_index]
         self._camera.acquire()
         self._camera_config = self._camera.generate_configuration([libcam.StreamRole.Viewfinder])
@@ -166,7 +169,11 @@ class LibcameraCapture(Producer[Frame[bytes]]):
                 assert res is None or res == 0
                 requests.append(request)
 
-            res = self._camera.start()
+            controls = {}
+            if self._framerate:
+                frame_duration_limit = int(1_000_000 / self._framerate)
+                controls[libcam.controls.FrameDurationLimits] = (frame_duration_limit, frame_duration_limit)
+            res = self._camera.start(controls=controls)
             if res is not None and res < 0:
                 raise CameraStartError(res)
 
