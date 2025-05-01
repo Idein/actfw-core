@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix CI to generate docs of `LibcameraCapture`.
+
 ## 2.12.1 (2025-05-01)
 
 - Add docstring to `LibcameraCapture`.
