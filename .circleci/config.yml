@@ -155,6 +155,9 @@ jobs:
             apt-get update
             apt-get install -y --no-install-recommends python-is-python3 curl
       - install-poetry
+      - run:
+          command: |
+            poetry config virtualenvs.options.system-site-packages true
       - poetry-install
       - run:
           name: sphinx-build
