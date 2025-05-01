@@ -143,12 +143,21 @@ jobs:
 
   build-api-doc:
     docker:
-      - image: python:3.10-bullseye
+      - image: idein/actcast-rpi-app-base:bookworm-1
         auth: *docker-hub-auth
+    resource_class: arm.medium
     steps:
       - checkout
       - install-python-dev-tools
+      - run:
+          name: Install python
+          command: |
+            apt-get update
+            apt-get install -y --no-install-recommends python-is-python3 curl
       - install-poetry
+      - run:
+          command: |
+            poetry config virtualenvs.options.system-site-packages true
       - poetry-install
       - run:
           name: sphinx-build
