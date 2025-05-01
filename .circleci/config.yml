@@ -143,8 +143,9 @@ jobs:
 
   build-api-doc:
     docker:
-      - image: python:3.10-bullseye
+      - image: idein/actcast-rpi-app-base:bookworm-1
         auth: *docker-hub-auth
+    resource_class: arm.medium
     steps:
       - checkout
       - install-python-dev-tools
