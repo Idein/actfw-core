@@ -16,7 +16,7 @@ commands:
           name: Install python dev tools and dependencies
           command: |
             apt-get update
-            apt-get install -y --no-install-recommends python3-pip
+            apt-get install -y --no-install-recommends python3-pip python-is-python3 curl
   install-poetry:
     steps:
       - run:
