@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2.12.1 (2025-05-01)
+
+- Add docstring to `LibcameraCapture`.
+
 ## 2.12.0 (2025-04-30)
 
 - Add `orientation: libcamera.Orientation` to `LibcameraCapture`.
