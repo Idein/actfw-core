@@ -104,7 +104,25 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         framerate: Optional[int] = None,
     ) -> None:
         """
-        NOTE: BGR を指定すると実際には RGB で取得される
+        Initialization method for the LibcameraCapture class.
+
+        Args:
+            size: The size of the captured image (width, height).
+            pixel_format: The pixel format. Only RGB888 or BGR888 are supported.
+                cf. https://libcamera.org/api-html/classlibcamera_1_1PixelFormat.html
+            camera_index: The index of the camera to use. Defaults to 0.
+            orientation: The orientation of the camera. Defaults to Rotate0.
+                cf. https://libcamera.org/api-html/namespacelibcamera.html#a80ea01625b93ecfe879249ac60c79384.
+            framerate: The framerate (fps). If not specified, the default setting of the libcamera is used.
+
+        Note:
+            As for pixel_format, if RGB888 is specified, BGR888 is actually obtained,
+                and if BGR888 is specified, RGB888 is actually obtained.
+
+        Raises:
+            AssertionError: Raised if an unsupported pixel format is specified.
+            CameraConfigurationInvalidError: Raised if the camera configuration is invalid.
+            CameraConfigureError: Raised if the camera configuration fails.
         """
         assert pixel_format == libcam.PixelFormat("RGB888") or pixel_format == libcam.PixelFormat(
             "BGR888"
