@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add module comment and assertion to `LibcameraCapture`.
+
 ## 2.12.2 (2025-05-01)
 
 - Fix CI to generate docs of `LibcameraCapture`.

@@ -1,9 +1,16 @@
+"""
+LibcameraCapture module.
+
+Note:
+    This module is only available in ActcastOS4 or later.
+"""
 import mmap
 import selectors
 from typing import List, Optional, Tuple
 
 import libcamera as libcam
 from actfw_core.capture import Frame
+from actfw_core.system import EnvironmentVariableNotSet, get_actcast_firmware_type
 from actfw_core.task import Producer
 from actfw_core.util.pad import _PadBase, _PadDiscardingOld
 
@@ -124,6 +131,13 @@ class LibcameraCapture(Producer[Frame[bytes]]):
             CameraConfigurationInvalidError: Raised if the camera configuration is invalid.
             CameraConfigureError: Raised if the camera configuration fails.
         """
+        try:
+            firmware_type = get_actcast_firmware_type()
+            if firmware_type != "raspberrypi-bookworm":
+                raise RuntimeError("LibcameraCapture is only available in ActcastOS4 or later.")
+        except EnvironmentVariableNotSet:
+            # No error for when running on Raspberry Pi OS
+            pass
         assert pixel_format == libcam.PixelFormat("RGB888") or pixel_format == libcam.PixelFormat(
             "BGR888"
         ), "Only RGB888 or BGR888 are supported"
