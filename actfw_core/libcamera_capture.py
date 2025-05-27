@@ -91,6 +91,7 @@ class CaptureTimeoutError(Exception):
     def __str__(self) -> str:
         return f"{self._msg}: {self._timeout}"
 
+
 class LibcameraCapture(Producer[Frame[bytes]]):
     _cm: libcam.CameraManager
     _size: Tuple[int, int]
