@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.13.0 (2025-06-04)
+
 - Change default value of framerate in `LibcameraCapture` to 30 from None.
 
 ## 2.12.3 (2025-05-27)
