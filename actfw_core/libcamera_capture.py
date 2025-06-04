@@ -100,7 +100,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
     _camera: libcam.Camera
     _requests: Optional[List[libcam.Request]]
     _camera_config: libcam.CameraConfiguration
-    _framerate: Optional[int]
+    _framerate: int
 
     def __init__(
         self,
