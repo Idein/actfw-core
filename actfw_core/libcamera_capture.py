@@ -100,7 +100,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
     _camera: libcam.Camera
     _requests: Optional[List[libcam.Request]]
     _camera_config: libcam.CameraConfiguration
-    _framerate: Optional[int]
+    _framerate: int
 
     def __init__(
         self,
@@ -108,7 +108,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         pixel_format: libcam.PixelFormat,
         camera_index: int = 0,
         orientation: libcam.Orientation = libcam.Orientation.Rotate0,
-        framerate: Optional[int] = None,
+        framerate: int = 30,
     ) -> None:
         """
         Initialization method for the LibcameraCapture class.
@@ -202,9 +202,8 @@ class LibcameraCapture(Producer[Frame[bytes]]):
                 requests.append(request)
 
             controls = {}
-            if self._framerate is not None:
-                frame_duration_limit = int(1_000_000 / self._framerate)
-                controls[libcam.controls.FrameDurationLimits] = (frame_duration_limit, frame_duration_limit)
+            frame_duration_limit = int(1_000_000 / self._framerate)
+            controls[libcam.controls.FrameDurationLimits] = (frame_duration_limit, frame_duration_limit)
             res = self._camera.start(controls=controls)
             if res is not None and res < 0:
                 raise CameraStartError(res)
