@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Change default value of framerate in `LibcameraCapture` to 30 from None.
+
 ## 2.12.3 (2025-05-27)
 
 - Add module comment and assertion to `LibcameraCapture`.
