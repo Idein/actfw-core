@@ -2,12 +2,8 @@ version: 2.1
 
 references:
   image-tags: &image-tags
-    - "python:3.7-buster"
-    - "python:3.8-buster"
     - "python:3.9-bullseye"
-    - "python:3.10-bullseye"
-    - "python:3.11-bullseye"
-    - "python:3.12-bullseye"
+    - "python:3.11-bookworm"
 
 commands:
   install-python-dev-tools:
@@ -25,19 +21,6 @@ commands:
             curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.8.4 python -
             echo 'export PATH=$HOME/.local/bin:$PATH' >> $BASH_ENV
             source $BASH_ENV
-  install-old-poetry:
-    parameters:
-      poetry-version:
-        type: string
-    steps:
-      - run:
-          name: Install poetry << parameters.poetry-version >>
-          command: |
-            python3 -m pip install --user pipx
-            python3 -m pipx ensurepath
-            echo 'export PATH=$HOME/.local/bin:$PATH' >> $BASH_ENV
-            source $BASH_ENV
-            pipx install poetry==<< parameters.poetry-version >>
   poetry-install:
     steps:
       # See: https://circleci.com/docs/2.0/language-python/#cache-dependencies
@@ -67,7 +50,7 @@ commands:
 jobs:
   lint:
     docker:
-      - image: python:3.10-bullseye
+      - image: python:3.11-bookworm
         auth: &docker-hub-auth
           username: $DOCKER_USER
           password: $DOCKER_PASS
@@ -95,18 +78,7 @@ jobs:
     steps:
       - checkout
       - install-python-dev-tools
-      - when:
-          condition:
-            equal: ["python:3.7-buster", << parameters.image-tag >>]
-          steps:
-            - install-old-poetry:
-                poetry-version: "1.5.1"
-      - when:
-          condition:
-            not:
-              equal: ["python:3.7-buster", << parameters.image-tag >>]
-          steps:
-            - install-poetry
+      - install-poetry
       - poetry-install
       - run:
           name: Test
@@ -124,18 +96,7 @@ jobs:
           name: remove lock file to get up-to-date dependencies
           command: rm poetry.lock
       - install-python-dev-tools
-      - when:
-          condition:
-            equal: ["python:3.7-buster", << parameters.image-tag >>]
-          steps:
-            - install-old-poetry:
-                poetry-version: "1.5.1"
-      - when:
-          condition:
-            not:
-              equal: ["python:3.7-buster", << parameters.image-tag >>]
-          steps:
-            - install-poetry
+      - install-poetry
       - poetry-install
       - run:
           name: Test
@@ -173,7 +134,7 @@ jobs:
 
   build-package:
     docker:
-      - image: python:3.10-bullseye
+      - image: python:3.11-bookworm
         auth: *docker-hub-auth
     steps:
       - checkout
@@ -191,7 +152,7 @@ jobs:
 
   validate-version-with-tag:
     docker:
-      - image: python:3.10-bullseye
+      - image: python:3.11-bookworm
         auth: *docker-hub-auth
     steps:
       - checkout
@@ -236,7 +197,7 @@ jobs:
 
   deploy-package:
     docker:
-      - image: python:3.10-bullseye
+      - image: python:3.11-bookworm
         auth: *docker-hub-auth
     steps:
       - checkout
