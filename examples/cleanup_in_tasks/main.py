@@ -1,13 +1,15 @@
-import time
 import sys
+import time
 
 import actfw_core
-from actfw_core.task import Producer, Pipe, Consumer
+from actfw_core.task import Consumer, Pipe, Producer
+
 
 def debug_log(msg, *args, **kwargs):
     kwargs["flush"] = True
     kwargs["file"] = sys.stderr
     print(f"debug_log| {msg}", *args, **kwargs)
+
 
 class Counter(Producer):
     def __init__(self) -> None:
@@ -22,6 +24,7 @@ class Counter(Producer):
         time.sleep(1)
         self.count += 1
         return self.count
+
 
 class FizzBuzz(Pipe):
     def __init__(self) -> None:
@@ -41,6 +44,7 @@ class FizzBuzz(Pipe):
         else:
             return f"{count}"
 
+
 class Logger(Consumer):
     def __init__(self) -> None:
         super().__init__()
@@ -52,6 +56,7 @@ class Logger(Consumer):
     def proc(self, x: str) -> None:
         actfw_core.heartbeat()
         actfw_core.notify([{"msg": x}])
+
 
 def main() -> None:
     debug_log("main start")
@@ -71,6 +76,7 @@ def main() -> None:
 
     app.run()
     debug_log("main end")
+
 
 if __name__ == "__main__":
     main()
