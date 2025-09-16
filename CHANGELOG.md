@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `cleanup` method to Producer, Pipe and Consumer
+
 ## 2.13.0 (2025-06-04)
 
 - Change default value of framerate in `LibcameraCapture` to 30 from None.
