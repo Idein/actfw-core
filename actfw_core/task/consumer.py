@@ -37,12 +37,24 @@ class Consumer(Generic[T_IN], Task, _ConsumerMixin[T_IN]):
         Task.__init__(self)
         _ConsumerMixin.__init__(self)
 
+    def cleanup(self) -> None:
+        """
+        Perform cleanup before exiting.
+
+        This method is executed at the end of `run`. It must complete
+        within 10 seconds; otherwise, the process may be terminated
+        with SIGKILL.
+        """
+        pass
+
     def run(self) -> None:
         """Run and start the activity"""
         for i in self._inlet():
             self.proc(i)
             if not self._is_running():
                 break
+
+        self.cleanup()
 
     def proc(self, i: T_IN) -> None:
         """

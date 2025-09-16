@@ -17,6 +17,16 @@ class Pipe(Generic[T_OUT, T_IN], Task, _ProducerMixin[T_OUT], _ConsumerMixin[T_I
         _ProducerMixin.__init__(self)
         _ConsumerMixin.__init__(self)
 
+    def cleanup(self) -> None:
+        """
+        Perform cleanup before exiting.
+
+        This method is executed at the end of `run`. It must complete
+        within 10 seconds; otherwise, the process may be terminated
+        with SIGKILL.
+        """
+        pass
+
     def run(self) -> None:
         """Run and start the activity"""
         for i in self._inlet():
@@ -24,6 +34,8 @@ class Pipe(Generic[T_OUT, T_IN], Task, _ProducerMixin[T_OUT], _ConsumerMixin[T_I
             self._outlet(o)
             if not self._is_running():
                 break
+
+        self.cleanup()
 
     def proc(self, i: T_IN) -> T_OUT:
         """
