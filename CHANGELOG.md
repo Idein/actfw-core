@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.14.0 (2025-09-17)
+
 - Add `cleanup` method to Producer, Pipe and Consumer
 
 ## 2.13.0 (2025-06-04)
