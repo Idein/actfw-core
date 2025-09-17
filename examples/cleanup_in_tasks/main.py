@@ -17,7 +17,7 @@ class Counter(Producer):
         self.count = 0
 
     def cleanup(self) -> None:
-        # 10秒以内に完了しなければSIGKILLで中断されうるので注意
+        # 十分すばやく完了しなければプロセス全体がSIGKILLで終了されうるので注意
         debug_log(f"Counter.cleanup: {self.count}")
 
     def proc(self) -> int:
@@ -31,7 +31,7 @@ class FizzBuzz(Pipe):
         super().__init__()
 
     def cleanup(self) -> None:
-        # 10秒以内に完了しなければSIGKILLで中断されうるので注意
+        # 十分すばやく完了しなければプロセス全体がSIGKILLで終了されうるので注意
         debug_log("FizzBuzz.cleanup")
 
     def proc(self, count: int) -> str:
@@ -50,7 +50,7 @@ class Logger(Consumer):
         super().__init__()
 
     def cleanup(self) -> None:
-        # 10秒以内に完了しなければSIGKILLで中断されうるので注意
+        # 十分すばやく完了しなければプロセス全体がSIGKILLで終了されうるので注意
         debug_log("Logger.cleanup")
 
     def proc(self, x: str) -> None:

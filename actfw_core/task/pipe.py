@@ -21,9 +21,9 @@ class Pipe(Generic[T_OUT, T_IN], Task, _ProducerMixin[T_OUT], _ConsumerMixin[T_I
         """
         Perform cleanup before exiting.
 
-        This method is executed at the end of `run`. It must complete
-        within 10 seconds; otherwise, the process may be terminated
-        with SIGKILL.
+        This method is executed at the end of `run`, even if an exception is raised.
+        Since a long-running cleanup may cause the entire process to be terminated with SIGKILL,
+        it must be implemented to complete quickly.
         """
         pass
 
