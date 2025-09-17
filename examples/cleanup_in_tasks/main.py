@@ -54,7 +54,7 @@ class Logger(Consumer):
         debug_log("Logger.cleanup")
 
     def proc(self, x: str) -> None:
-        actfw_core.heartbeat()
+        # actfw_core.heartbeat()
         actfw_core.notify([{"msg": x}])
 
 
