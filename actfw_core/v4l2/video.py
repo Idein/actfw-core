@@ -823,7 +823,7 @@ class RawVideo(object):
             raise RuntimeError("ioctl(VIDIOC_QBUF): {}".format(errno.errorcode[get_errno()]))
 
 
-VideoPort = enum.Enum("VideoPort", "CSI USB")
+VideoPort = enum.Enum("VideoPort", "CSI USB DUMMY")
 
 
 class VideoConfig(object):
@@ -889,6 +889,8 @@ class Video(object):
             return VideoPort.CSI
         elif driver[: len("uvcvideo")] == "uvcvideo":
             return VideoPort.USB
+        elif driver == "v4l2 loopback":
+            return VideoPort.DUMMY
         else:
             raise RuntimeError("unknown driver '{}'".format(driver))
 
