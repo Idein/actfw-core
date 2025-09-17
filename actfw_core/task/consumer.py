@@ -49,12 +49,13 @@ class Consumer(Generic[T_IN], Task, _ConsumerMixin[T_IN]):
 
     def run(self) -> None:
         """Run and start the activity"""
-        for i in self._inlet():
-            self.proc(i)
-            if not self._is_running():
-                break
-
-        self.cleanup()
+        try:
+            for i in self._inlet():
+                self.proc(i)
+                if not self._is_running():
+                    break
+        finally:
+            self.cleanup()
 
     def proc(self, i: T_IN) -> None:
         """

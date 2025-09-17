@@ -29,13 +29,14 @@ class Pipe(Generic[T_OUT, T_IN], Task, _ProducerMixin[T_OUT], _ConsumerMixin[T_I
 
     def run(self) -> None:
         """Run and start the activity"""
-        for i in self._inlet():
-            o = self.proc(i)
-            self._outlet(o)
-            if not self._is_running():
-                break
-
-        self.cleanup()
+        try:
+            for i in self._inlet():
+                o = self.proc(i)
+                self._outlet(o)
+                if not self._is_running():
+                    break
+        finally:
+            self.cleanup()
 
     def proc(self, i: T_IN) -> T_OUT:
         """

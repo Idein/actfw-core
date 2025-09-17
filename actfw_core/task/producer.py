@@ -65,13 +65,15 @@ class Producer(Generic[T_OUT], Task, _ProducerMixin[T_OUT]):
 
     def run(self) -> None:
         """Run and start the activity"""
-        while True:
-            o = self.proc()
-            self._outlet(o)
-            if not self._is_running():
-                break
+        try:
+            while True:
+                o = self.proc()
+                self._outlet(o)
+                if not self._is_running():
+                    break
 
-        self.cleanup()
+        finally:
+            self.cleanup()
 
     def proc(self) -> T_OUT:
         """
