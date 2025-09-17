@@ -53,13 +53,27 @@ class Producer(Generic[T_OUT], Task, _ProducerMixin[T_OUT]):
         Task.__init__(self)
         _ProducerMixin.__init__(self)
 
+    def cleanup(self) -> None:
+        """
+        Perform cleanup before exiting.
+
+        This method is executed at the end of `run`, even if an exception is raised.
+        Since a long-running cleanup may cause the entire process to be terminated with SIGKILL,
+        it must be implemented to complete quickly.
+        """
+        pass
+
     def run(self) -> None:
         """Run and start the activity"""
-        while True:
-            o = self.proc()
-            self._outlet(o)
-            if not self._is_running():
-                break
+        try:
+            while True:
+                o = self.proc()
+                self._outlet(o)
+                if not self._is_running():
+                    break
+
+        finally:
+            self.cleanup()
 
     def proc(self) -> T_OUT:
         """
