@@ -6,8 +6,9 @@ import time
 from types import FrameType
 from typing import Any, Dict, Iterable, List, Optional
 
-from actfw_core.task import Task
+from actfw_core.task import Task, _act_is_down
 
+_ACT_DOWN_EXIT_CODE = 99 # TODO: 正式な値に変更する & 定義場所の移動
 
 class SettingSchema:
     def __init__(
@@ -167,6 +168,8 @@ class Application:
         try:
             while self.running:
                 time.sleep(1)
+                if _act_is_down.is_set():
+                    break
         except KeyboardInterrupt:
             pass
 
@@ -175,6 +178,14 @@ class Application:
         for task in self.tasks:
             task.join()
 
+        if _act_is_down.is_set():
+            self.down()
+
     def stop(self) -> None:
         """Stop application"""
         self.running = False
+
+    def down(self) -> None:
+        # TODO: Doc stringをまともにする
+        """Stop application and exit as error"""
+        sys.exit(_ACT_DOWN_EXIT_CODE)

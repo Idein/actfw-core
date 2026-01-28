@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
-from threading import Thread
+from threading import Thread, Event
 
+# TODO: 適切な場所に移動
+_act_is_down = Event()
 
 class _TaskI(ABC):
     @abstractmethod
@@ -25,6 +27,9 @@ class Task(Thread, _TaskI):
     def stop(self) -> None:
         """Stop the activity"""
         self.running = False
+
+    def down(self) -> None:
+        _act_is_down.set()
 
     def run(self) -> None:
         """Run and start the activity"""
