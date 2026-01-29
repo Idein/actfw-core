@@ -10,6 +10,7 @@ from actfw_core.task import Task, _act_is_down
 
 _ACT_DOWN_EXIT_CODE = 99 # TODO: 正式な値に変更する & 定義場所の移動
 
+
 class SettingSchema:
     def __init__(
         self,

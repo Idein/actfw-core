@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
-from threading import Thread, Event
+from threading import Event, Thread
 
 # TODO: 適切な場所に移動
 _act_is_down = Event()
+
 
 class _TaskI(ABC):
     @abstractmethod
