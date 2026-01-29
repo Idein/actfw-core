@@ -23,7 +23,7 @@ class Task(Thread, _TaskI):
         self.running = True
 
     def _is_running(self) -> bool:
-        return self.running
+        return self.running and not _act_is_down.is_set()
 
     def stop(self) -> None:
         """Stop the activity"""
