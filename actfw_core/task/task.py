@@ -1,8 +1,12 @@
+import sys
+import threading
 from abc import ABC, abstractmethod
 from threading import Event, Thread
 
 # TODO: 適切な場所に移動
 _act_is_down = Event()
+
+_ACT_DOWN_EXIT_CODE = 99  # TODO: 正式な値に変更する & 定義場所の移動
 
 
 class _TaskI(ABC):
@@ -30,7 +34,10 @@ class Task(Thread, _TaskI):
         self.running = False
 
     def down(self) -> None:
-        _act_is_down.set()
+        if threading.current_thread() is threading.main_thread():
+            sys.exit(_ACT_DOWN_EXIT_CODE)
+        else:
+            _act_is_down.set()
 
     def run(self) -> None:
         """Run and start the activity"""
