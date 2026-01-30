@@ -6,9 +6,7 @@ import time
 from types import FrameType
 from typing import Any, Dict, Iterable, List, Optional
 
-from actfw_core.task import Task, _act_is_down
-
-_ACT_DOWN_EXIT_CODE = 99  # TODO: 正式な値に変更する & 定義場所の移動
+from actfw_core.task import _ACT_DOWN_EXIT_CODE, Task, _act_is_down
 
 
 class SettingSchema:
@@ -187,6 +185,5 @@ class Application:
         self.running = False
 
     def down(self) -> None:
-        # TODO: Doc stringをまともにする
-        """Stop application and exit as error"""
+        """Exit the application with the Act down exit code."""
         sys.exit(_ACT_DOWN_EXIT_CODE)

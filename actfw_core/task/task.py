@@ -3,10 +3,9 @@ import threading
 from abc import ABC, abstractmethod
 from threading import Event, Thread
 
-# TODO: 適切な場所に移動
 _act_is_down = Event()
 
-_ACT_DOWN_EXIT_CODE = 99  # TODO: 正式な値に変更する & 定義場所の移動
+_ACT_DOWN_EXIT_CODE = 99
 
 
 class _TaskI(ABC):
@@ -34,6 +33,12 @@ class Task(Thread, _TaskI):
         self.running = False
 
     def down(self) -> None:
+        """Request application shutdown and mark the stop reason.
+
+        If called from the main thread, exit immediately with the Act down exit
+        code. If called from a worker thread, set the shared down flag so the
+        main loop can exit gracefully.
+        """
         if threading.current_thread() is threading.main_thread():
             sys.exit(_ACT_DOWN_EXIT_CODE)
         else:
