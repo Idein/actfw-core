@@ -8,6 +8,8 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from actfw_core.task import Task
 
+from ._private.act_down import _act_is_down, _exit_as_down
+
 
 class SettingSchema:
     def __init__(
@@ -167,6 +169,8 @@ class Application:
         try:
             while self.running:
                 time.sleep(1)
+                if _act_is_down.is_set():
+                    break
         except KeyboardInterrupt:
             pass
 
@@ -175,6 +179,13 @@ class Application:
         for task in self.tasks:
             task.join()
 
+        if _act_is_down.is_set():
+            self.down()
+
     def stop(self) -> None:
         """Stop application"""
         self.running = False
+
+    def down(self) -> None:
+        """Exit the application with the Act down exit code."""
+        _exit_as_down()
