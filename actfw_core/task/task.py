@@ -1,14 +1,8 @@
-import sys
 import threading
 from abc import ABC, abstractmethod
-from threading import Event, Thread
+from threading import Thread
 
-_act_is_down = Event()
-
-def _exit_as_down():
-    _ACT_DOWN_EXIT_CODE = 99
-    sys.exit(_ACT_DOWN_EXIT_CODE)
-
+from _private.act_down import _act_is_down, _exit_as_down
 
 class _TaskI(ABC):
     @abstractmethod
