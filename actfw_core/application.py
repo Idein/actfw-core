@@ -6,7 +6,7 @@ import time
 from types import FrameType
 from typing import Any, Dict, Iterable, List, Optional
 
-from actfw_core.task import _ACT_DOWN_EXIT_CODE, Task, _act_is_down
+from actfw_core.task import _exit_as_down, Task, _act_is_down
 
 
 class SettingSchema:
@@ -186,4 +186,4 @@ class Application:
 
     def down(self) -> None:
         """Exit the application with the Act down exit code."""
-        sys.exit(_ACT_DOWN_EXIT_CODE)
+        _exit_as_down()

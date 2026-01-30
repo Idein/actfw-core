@@ -5,7 +5,9 @@ from threading import Event, Thread
 
 _act_is_down = Event()
 
-_ACT_DOWN_EXIT_CODE = 99
+def _exit_as_down():
+    _ACT_DOWN_EXIT_CODE = 99
+    sys.exit(_ACT_DOWN_EXIT_CODE)
 
 
 class _TaskI(ABC):
@@ -40,7 +42,7 @@ class Task(Thread, _TaskI):
         main loop can exit gracefully.
         """
         if threading.current_thread() is threading.main_thread():
-            sys.exit(_ACT_DOWN_EXIT_CODE)
+            _exit_as_down()
         else:
             _act_is_down.set()
 
