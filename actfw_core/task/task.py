@@ -2,7 +2,7 @@ import threading
 from abc import ABC, abstractmethod
 from threading import Thread
 
-from _private.act_down import _act_is_down, _exit_as_down
+from .._private.act_down import _act_is_down, _exit_as_down
 
 class _TaskI(ABC):
     @abstractmethod
