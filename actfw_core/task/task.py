@@ -4,6 +4,7 @@ from threading import Thread
 
 from .._private.act_down import _act_is_down, _exit_as_down
 
+
 class _TaskI(ABC):
     @abstractmethod
     def _is_running(self) -> bool:
