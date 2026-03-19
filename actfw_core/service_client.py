@@ -19,6 +19,8 @@ class ServiceClient:
 
     * 'RS256'
         * sign a message with an actcast device specific secret key.
+    * 'Stop Act'
+        * request actcast agent to stop the act.
 
     """
 
@@ -78,6 +80,25 @@ class ServiceClient:
         if response is None:
             raise RuntimeError(f"service request failed: request = {request}, response = {response}")
         return response.data.decode()
+
+    def stop_act(self) -> None:
+        """
+
+        Request actcast agent to stop the act.
+
+        Exceptions:
+            RuntimeError
+        """
+        request = ServiceRequest(
+            self._get_request_id(),
+            ServiceKind.STOP_ACT,
+            b"",
+        )
+        response, err = self._sendrecv(request)
+        if err:
+            raise err
+        if response is None:
+            raise RuntimeError(f"service request failed: request = {request}, response = {response}")
 
 
 if __name__ == "__main__":

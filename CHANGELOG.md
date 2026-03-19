@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `stop_act` method to ServiceClient for stopping a running act.
+
 ## 2.14.0 (2025-09-17)
 
 - Add `cleanup` method to Producer, Pipe and Consumer
