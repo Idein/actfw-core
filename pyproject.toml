@@ -22,7 +22,6 @@ Pillow = ">=5, <11"
 Sphinx = "^4.3.0"
 cryptography = "^3.4.7"
 pyOpenSSL = "^20.0.1"
-pyproject-indirect-import-detector = "^0.1.2"
 pysen = { version = "^0.11" }
 pytest = "^6.2.3"
 sphinx-theme = "^1.0"

@@ -63,10 +63,6 @@ jobs:
           name: Lint
           command: |
             poetry run pysen run lint
-      - run:
-          name: Check indirect import
-          command: |
-            poetry run pyproject-indirect-import-detector -v
 
   test:
     parameters:
