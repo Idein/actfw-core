@@ -15,10 +15,10 @@ repository = "https://github.com/Idein/actfw-core"
 version = "2.14.0"
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = ">=3.7, <3.12"
 Pillow = ">=5, <11"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 Sphinx = "^4.3.0"
 cryptography = "^3.4.7"
 pyOpenSSL = "^20.0.1"
