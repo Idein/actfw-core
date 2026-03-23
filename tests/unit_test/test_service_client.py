@@ -49,9 +49,11 @@ def test_service_client_stop_act_sends_request_to_agent() -> None:
         client = ServiceClient(socket_path)
 
         # Act
-        client.stop_act()
+        with pytest.raises(SystemExit) as exc_info:
+            client.stop_act()
 
         # Assert
+        assert exc_info.value.code == 0
         assert len(requests) == 1
         assert requests[0].kind == ServiceKind.STOP_ACT
         assert requests[0].data == b""
