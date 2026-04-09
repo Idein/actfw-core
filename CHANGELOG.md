@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add `stop_act` method to ServiceClient for stopping a running act on firmware version 3.70.0 or later, or 4.23.0 or later.
+- Add `stop_act` method to ServiceClient for stopping a running act on firmware version 3.70.0+ or 4.23.0+.
 
 ## 2.14.0 (2025-09-17)
 
