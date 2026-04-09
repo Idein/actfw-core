@@ -12,9 +12,9 @@
 #
 import os
 import sys
+from importlib import metadata
 from typing import Any, List
 
-import pkg_resources
 import sphinx.ext.apidoc
 import sphinx_theme  # type: ignore[import]
 
@@ -33,7 +33,7 @@ copyright = "2019-2020, Idein Inc."
 author = "Idein Inc."
 
 # The full version, including alpha/beta/rc tags
-release = pkg_resources.get_distribution(project).version
+release = metadata.version(project)
 
 
 # -- General configuration ---------------------------------------------------

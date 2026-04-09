@@ -32,7 +32,6 @@ isort = "5.1.4"
 mypy = "^1"
 types-pillow = ">=5"
 types-pyopenssl = ">=20"
-types-setuptools = "^69"
 
 [tool.poetry.urls]
 "Repository" = "https://github.com/Idein/actfw-core"
