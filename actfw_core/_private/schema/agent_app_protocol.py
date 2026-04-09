@@ -94,6 +94,7 @@ class CommandResponse:
 
 class ServiceKind(enum.Enum):
     RS_256 = 0
+    STOP_ACT = 1
 
 
 @dataclass(frozen=True, eq=False)

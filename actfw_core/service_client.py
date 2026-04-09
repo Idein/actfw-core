@@ -2,8 +2,9 @@ import base64
 import copy
 import os
 import socket
+import sys
 from pathlib import Path
-from typing import Optional
+from typing import NoReturn, Optional
 
 from ._private.util.result import ResultTuple
 from .schema.agent_app_protocol import RequestId, ServiceKind, ServiceRequest, ServiceResponse, Status
@@ -19,6 +20,8 @@ class ServiceClient:
 
     * 'RS256'
         * sign a message with an actcast device specific secret key.
+    * 'Stop Act'
+        * request actcast agent to stop the act.
 
     """
 
@@ -78,6 +81,26 @@ class ServiceClient:
         if response is None:
             raise RuntimeError(f"service request failed: request = {request}, response = {response}")
         return response.data.decode()
+
+    def stop_act(self) -> NoReturn:
+        """
+
+        Request actcast agent to stop the act.
+
+        Exceptions:
+            RuntimeError
+        """
+        request = ServiceRequest(
+            self._get_request_id(),
+            ServiceKind.STOP_ACT,
+            b"",
+        )
+        response, err = self._sendrecv(request)
+        if err:
+            raise err
+        if response is None:
+            raise RuntimeError(f"service request failed: request = {request}, response = {response}")
+        sys.exit(0)
 
 
 if __name__ == "__main__":
