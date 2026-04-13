@@ -55,6 +55,11 @@ class AfPauseState(Enum):
     Paused = 2
 
 
+class AutoFocusBackend(Enum):
+    UNICAM_ISP = "unicam_isp"
+    LIBCAMERA = "libcamera"
+
+
 class AfStatus:
     def __init__(self) -> None:
         self.state: AfState = AfState.Idle
@@ -286,6 +291,10 @@ class AutoFocuserBase(metaclass=ABCMeta):
         self.scan_data: List[ScanRecord] = []
         self.report_state = AfState.Idle
         self.afstatus = AfStatus()
+        self.backend = AutoFocusBackend.UNICAM_ISP
+        self.camera = None
+        self.callback_fn: Optional[Callable] = None
+        self.is_pending_window_update = False
 
     def __update_lens_position(self) -> None:
         if self.scan_state.value >= ScanState.Pdaf.value:
@@ -552,7 +561,7 @@ class AutoFocuserBase(metaclass=ABCMeta):
         lensSetting = self.cfg.map.eval(self.fsmooth)
         self.afstatus.lensSetting = int(lensSetting) if self.initted and lensSetting is not None else None
         try:
-            if self.afstatus.lensSetting is not None:
+            if self.afstatus.lensSetting is not None and self.callback_fn is not None:
                 self.callback_fn(self.afstatus.lensSetting)
         except Exception:
             # Occasionally, the execution may fail due to the current state of the device.
@@ -581,6 +590,7 @@ class AutoFocuserBase(metaclass=ABCMeta):
         """
         This method is called in UnicamIspCapture.__init__().
         """
+        self.backend = AutoFocusBackend.UNICAM_ISP
         if "rpi.af" not in sensor_config:
             raise RuntimeError("rpi.af is not found in sensor config")
         self.cfg = CfgParams(sensor_config["rpi.af"])
@@ -598,24 +608,59 @@ class AutoFocuserBase(metaclass=ABCMeta):
         self.camera_mode_scale = camera_mode_scale
         self.camera_mode_crop = camera_mode_crop_size
 
+    def set_libcamera_config(
+        self,
+        camera: Any,
+        sensor_config: Dict,
+        capture_size: Tuple[int, int],
+        callback_fn: Callable,
+    ) -> None:
+        """
+        Configure autofocus for libcamera backend.
+        """
+        self.backend = AutoFocusBackend.LIBCAMERA
+        self.camera = camera
+        self.callback_fn = callback_fn
+        self.libcamera_capture = camera  # Store reference for focus windows
+        if "rpi.af" not in sensor_config:
+            raise RuntimeError("rpi.af is not found in sensor config")
+        self.cfg = CfgParams(sensor_config["rpi.af"])
+        # For libcamera, set stats region to full capture size
+        self.statsRegion = Rectangle(0, 0, capture_size[0], capture_size[1])
+        # No coordinate transformation needed for libcamera
+        self.post_crop_size = (0, 0, 0, 0)
+        self.camera_mode_scale = (1.0, 1.0)
+        self.camera_mode_crop = (0, 0)
+
     def set_focus_windows(self, bboxes: List[List[float]]) -> None:
         """
         Configures the focus windows.
         bboxes: [[x1, y1, x2, y2], ...] defined in capture image coordinate system.
         """
-        self.windows.clear()
-        for bbox in bboxes[:MAX_WINDOWS]:
-            x1, y1, x2, y2 = bbox
-            self.windows.append(
-                # Transform capture image coordinates to the sensor's coordinate system
-                Rectangle(
-                    (x1 + self.post_crop_size[0]) * self.camera_mode_scale[0] + self.camera_mode_crop[0],
-                    (y1 + self.post_crop_size[1]) * self.camera_mode_scale[1] + self.camera_mode_crop[1],
-                    (x2 - x1) * self.camera_mode_scale[0],
-                    (y2 - y1) * self.camera_mode_scale[1],
+        if self.backend == AutoFocusBackend.UNICAM_ISP:
+            # Original unicam implementation
+            self.windows.clear()
+            for bbox in bboxes[:MAX_WINDOWS]:
+                x1, y1, x2, y2 = bbox
+                self.windows.append(
+                    # Transform capture image coordinates to the sensor's coordinate system
+                    Rectangle(
+                        (x1 + self.post_crop_size[0]) * self.camera_mode_scale[0] + self.camera_mode_crop[0],
+                        (y1 + self.post_crop_size[1]) * self.camera_mode_scale[1] + self.camera_mode_crop[1],
+                        (x2 - x1) * self.camera_mode_scale[0],
+                        (y2 - y1) * self.camera_mode_scale[1],
+                    )
                 )
-            )
-        self.__invalidate_weights()
+            self.__invalidate_weights()
+        elif self.backend == AutoFocusBackend.LIBCAMERA:
+            # For libcamera, store windows for processing in camera loop
+            self.windows.clear()
+            for bbox in bboxes[:MAX_WINDOWS]:
+                x1, y1, x2, y2 = bbox
+                # Store as simple Rectangle for libcamera processing
+                self.windows.append(Rectangle(x1, y1, x2 - x1, y2 - y1))
+            # Set flag for libcamera to process windows
+            self.is_pending_window_update = True
 
     def set_focus_value(self, value: int) -> None:
         if self.afmode == AfMode.AfModeManual:
@@ -624,7 +669,8 @@ class AutoFocuserBase(metaclass=ABCMeta):
                 self.afstatus.lensSetting = value
                 self.ftarget = ftarget
                 self.__update_lens_position()
-                self.callback_fn(value)
+                if self.callback_fn is not None:
+                    self.callback_fn(value)
 
     def get_focus_value(self) -> Optional[int]:
         """

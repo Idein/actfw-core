@@ -4,11 +4,14 @@ LibcameraCapture module.
 Note:
     This module is only available in ActcastOS4 or later.
 """
+import json
 import mmap
 import selectors
-from typing import List, Optional, Tuple
+from os import path
+from typing import Any, Dict, List, Optional, Tuple
 
 import libcamera as libcam
+from actfw_core.autofocus import AutoFocuserBase, Rectangle
 from actfw_core.capture import Frame
 from actfw_core.system import EnvironmentVariableNotSet, get_actcast_firmware_type
 from actfw_core.task import Producer
@@ -109,6 +112,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         camera_index: int = 0,
         orientation: libcam.Orientation = libcam.Orientation.Rotate0,
         framerate: int = 30,
+        auto_focuser: Optional[AutoFocuserBase] = None,
     ) -> None:
         """
         Initialization method for the LibcameraCapture class.
@@ -149,6 +153,12 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         self._camera = self._cm.cameras[camera_index]
         self._camera.acquire()
         self._camera_config = self._camera.generate_configuration([libcam.StreamRole.Viewfinder])
+        self.auto_focuser = auto_focuser
+        self._pending_focus_position: Optional[float] = None
+        self._pending_af_controls: Dict = {}
+        self._pending_focus_windows: Optional[List] = None
+        if self.auto_focuser is not None:
+            self._setup_autofocus()
         self._camera_config.orientation = orientation
         stream_config: libcam.StreamConfiguration = self._camera_config.at(0)
         stream_config.size = libcam.Size(*self._size)
@@ -160,6 +170,141 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         if res is not None and res < 0:
             raise CameraConfigureError(res)
 
+    def _get_sensor_name(self) -> str:
+        """
+        Get sensor name from video device (same logic as unicam implementation).
+        """
+        try:
+            # Try to find sensor name from video devices
+            # This is a temporary implementation using same logic as unicam
+            import glob
+
+            video_devices = glob.glob("/sys/class/video4linux/video*/device/name")
+            for device_path in video_devices:
+                try:
+                    with open(device_path) as f:
+                        sensor_name = f.read().rstrip()
+                        # Check if this looks like a sensor name
+                        if sensor_name.lower().startswith(("imx", "ov")):
+                            return sensor_name
+                except OSError:
+                    continue
+        except Exception:
+            pass
+        raise RuntimeError("Could not detect sensor name from video devices")
+
+    def _setup_autofocus(self) -> None:
+        """
+        Setup autofocus configuration for libcamera backend.
+        """
+        # Get sensor name and load corresponding config file (same as unicam)
+        sensor_name = self._get_sensor_name()
+        config_file = sensor_name + ".json"
+
+        # Load sensor config from JSON file
+        try:
+            with open(path.join(path.dirname(__file__), "data", config_file), "r") as f:
+                sensor_config = json.load(f)
+        except FileNotFoundError:
+            raise RuntimeError(f"not supported sensor: {sensor_name}")
+        if self.auto_focuser is not None:
+            self.auto_focuser.set_libcamera_config(self._camera, sensor_config, self._size, self._libcamera_focus_callback)
+
+        # Apply initial AfMode control
+        from actfw_core.autofocus import AfMode
+
+        afmode_map = {
+            AfMode.AfModeManual: libcam.controls.AfModeEnum.Manual,
+            AfMode.AfModeAuto: libcam.controls.AfModeEnum.Auto,
+            AfMode.AfModeContinuous: libcam.controls.AfModeEnum.Continuous,
+        }
+        if self.auto_focuser is not None and self.auto_focuser.afmode in afmode_map:
+            self._pending_af_controls[libcam.controls.AfMode] = afmode_map[self.auto_focuser.afmode]
+
+    def _convert_focus_windows_to_libcamera(self, windows: List[Rectangle]) -> List[Tuple[int, int, int, int]]:
+        """
+        Convert focus windows from Rectangle objects to libcamera format.
+        windows: List of Rectangle objects from autofocuser
+        returns: [(x, y, width, height), ...] in capture coordinates
+        """
+        libcam_windows = []
+
+        for window in windows:
+            x = int(window.x)
+            y = int(window.y)
+            width = int(window.width)
+            height = int(window.height)
+
+            # Ensure positive width/height (libcamera requirement)
+            if width > 0 and height > 0:
+                libcam_windows.append((x, y, width, height))
+
+        return libcam_windows
+
+    # who call this method?
+    def _apply_focus_windows(self, windows: List[Rectangle]) -> None:
+        """
+        Apply focus windows to libcamera controls.
+        """
+        if not windows:
+            # Clear focus windows
+            self._pending_focus_windows = []
+            return
+
+        # Convert to libcamera format
+        libcam_windows = self._convert_focus_windows_to_libcamera(windows)
+        if libcam_windows:
+            self._pending_focus_windows = libcam_windows
+            # Also set metering mode to use windows
+            self._pending_af_controls[libcam.controls.AfMetering] = libcam.controls.AfMeteringEnum.Windows
+
+    def _libcamera_focus_callback(self, lens_position: int) -> None:
+        """
+        Callback function to handle focus position updates from autofocuser.
+        """
+        # Store the pending focus control to be applied on next request
+        # Convert lens position to libcamera diopters (0.0-12.0 range)
+        diopters = max(0.0, min(12.0, lens_position / 100.0))
+        self._pending_focus_position = diopters
+
+    def _trigger_libcamera_autofocus(self) -> None:
+        """
+        Trigger autofocus scan for libcamera backend.
+        """
+        self._pending_af_controls[libcam.controls.AfTrigger] = libcam.controls.AfTriggerEnum.Start
+
+    def _process_autofocus_metadata(self, metadata: Any) -> None:
+        """
+        Process autofocus metadata from libcamera and update autofocuser status.
+        """
+        if not self.auto_focuser:
+            return
+
+        from actfw_core.autofocus import AfState, ScanState
+
+        # Map libcamera AfState to our AfState
+        if libcam.controls.AfState in metadata:
+            libcam_state = metadata[libcam.controls.AfState]
+            state_map = {
+                libcam.controls.AfStateEnum.Idle: AfState.Idle,
+                libcam.controls.AfStateEnum.Scanning: AfState.Scanning,
+                libcam.controls.AfStateEnum.Focused: AfState.Focused,
+                libcam.controls.AfStateEnum.Failed: AfState.Failed,
+            }
+            if libcam_state in state_map:
+                self.auto_focuser.afstatus.state = state_map[libcam_state]
+
+                # Reset scan_state when AF is complete (focused or failed)
+                if libcam_state in [libcam.controls.AfStateEnum.Focused, libcam.controls.AfStateEnum.Failed]:
+                    self.auto_focuser.scan_state = ScanState.Idle
+
+        # Update lens position from metadata
+        if libcam.controls.LensPosition in metadata:
+            diopters = metadata[libcam.controls.LensPosition]
+            # Convert diopters back to lens position (reverse of callback conversion)
+            lens_position = int(diopters * 100)
+            self.auto_focuser.afstatus.lensSetting = lens_position
+
     def cameras(self) -> List[libcam.Camera]:
         return self._cm.cameras  # type: ignore
 
@@ -170,6 +315,9 @@ class LibcameraCapture(Producer[Frame[bytes]]):
     def _handle_camera_event(self) -> None:
         reqs = self._cm.get_ready_requests()
         for req in reqs:
+            # Process autofocus metadata if available
+            if req.metadata and self.auto_focuser:
+                self._process_autofocus_metadata(req.metadata)
             buffers = req.buffers
             assert len(buffers) == 1
             stream, frame_buffer = next(iter(buffers.items()))
@@ -181,6 +329,36 @@ class LibcameraCapture(Producer[Frame[bytes]]):
 
             frame = Frame(dst)
             self._outlet(frame)
+
+            # Process autofocus controls if enabled
+            if self.auto_focuser is not None:
+                # Check for AF trigger requests
+                from actfw_core.autofocus import ScanState
+
+                if self.auto_focuser.scan_state == ScanState.Trigger:
+                    self._pending_af_controls[libcam.controls.AfTrigger] = libcam.controls.AfTriggerEnum.Start
+                    self.auto_focuser.scan_state = ScanState.Settle
+
+                # Check for focus window updates
+                if getattr(self.auto_focuser, "is_pending_window_update", False):
+                    libcam_windows = self._convert_focus_windows_to_libcamera(self.auto_focuser.windows)
+                    if libcam_windows:
+                        self._pending_af_controls[libcam.controls.AfWindows] = libcam_windows
+                        self._pending_af_controls[libcam.controls.AfMetering] = libcam.controls.AfMeteringEnum.Windows
+                    else:
+                        # Clear windows if empty
+                        self._pending_af_controls[libcam.controls.AfMetering] = libcam.controls.AfMeteringEnum.Auto
+                    self.auto_focuser.is_pending_window_update = False
+
+            # Apply pending focus controls to the request before reuse
+            if self._pending_focus_position is not None:
+                req.controls[libcam.controls.LensPosition] = self._pending_focus_position
+                self._pending_focus_position = None
+
+            # Apply other pending AF controls
+            if self._pending_af_controls:
+                req.controls.update(self._pending_af_controls)
+                self._pending_af_controls.clear()
 
             req.reuse()
             self._camera.queue_request(req)
