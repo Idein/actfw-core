@@ -6,9 +6,8 @@ import socket
 from threading import Lock
 from typing import Optional
 
-from PIL.Image import Image as PIL_Image
-
 from actfw_core._private.schema.agent_app_protocol import CommandKind
+from PIL.Image import Image as PIL_Image
 
 from .schema.agent_app_protocol import CommandRequest, CommandResponse, Status
 from .task import Isolated
@@ -61,18 +60,21 @@ class CommandServer(Isolated):
                 if request is None:
                     raise RuntimeError("couldn't parse a request from actcast agent: `CommandRequest.parse()` failed")
 
-                # FIXME: this error handling is anreachable because `CommandRequest.parse()` returns `None` if parsing fails
+                # FIXME: this error handling is unreachable because `CommandRequest.parse()` returns `None` if parsing fails
                 if err:
-                    response = CommandResponse(
+                    error_response = CommandResponse(
                         copy.copy(request.id_),
                         Status.GENERAL_ERROR,
                         b"",
                     )
-                    conn.sendall(response.to_bytes())
+                    conn.sendall(error_response.to_bytes())
                     continue
 
                 if request.kind == CommandKind.TAKE_PHOTO:
                     response = self._handle_take_photo(request)
+
+                if response is None:
+                    continue
 
                 conn.sendall(response.to_bytes())
                 conn.shutdown(socket.SHUT_RDWR)
@@ -81,7 +83,7 @@ class CommandServer(Isolated):
                 pass
         os.remove(self.sock_path)
 
-    def _handle_take_photo(self, request: CommandRequest) -> CommandResponse:
+    def _handle_take_photo(self, request: CommandRequest) -> Optional[CommandResponse]:
         # Wait photo
         while self.running:
             with self.img_lock:
@@ -94,6 +96,8 @@ class CommandServer(Isolated):
                 b64img = base64.b64encode(pngimg.getbuffer())
                 data = header + b64img
                 return CommandResponse(copy.copy(request.id_), Status.OK, data)
+
+        return None
 
     def update_image(self, image: PIL_Image) -> None:
         """

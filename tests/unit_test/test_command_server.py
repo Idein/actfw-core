@@ -8,12 +8,10 @@ import threading
 import time
 from typing import Any
 
-from PIL import Image
-
 import actfw_core
-from actfw_core.application import Application
 from actfw_core.command_server import CommandServer
 from actfw_core.schema.agent_app_protocol import CommandKind, CommandRequest, CommandResponse, RequestId, Status
+from PIL import Image
 
 
 def _connect_to_command_server(sock_path: str) -> socket.socket:
@@ -61,9 +59,7 @@ def test_take_photo_command_succeeds() -> None:
         assert response.id_ == RequestId(1)
         assert response.status == Status.OK
         assert response.data.startswith(b"data:image/png;base64,")
-        returned_image = Image.open(
-            io.BytesIO(base64.b64decode(response.data.removeprefix(b"data:image/png;base64,")))
-        )
+        returned_image = Image.open(io.BytesIO(base64.b64decode(response.data.removeprefix(b"data:image/png;base64,"))))
         assert returned_image.size == expected_image.size
         assert returned_image.mode == expected_image.mode
         assert returned_image.getpixel((0, 0)) == expected_image.getpixel((0, 0))
