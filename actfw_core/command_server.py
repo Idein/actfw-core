@@ -6,10 +6,9 @@ import socket
 from threading import Lock
 from typing import Optional
 
-from actfw_core._private.schema.agent_app_protocol import CommandKind
 from PIL.Image import Image as PIL_Image
 
-from .schema.agent_app_protocol import CommandRequest, CommandResponse, Status
+from .schema.agent_app_protocol import CommandKind, CommandRequest, CommandResponse, Status
 from .task import Isolated
 
 
