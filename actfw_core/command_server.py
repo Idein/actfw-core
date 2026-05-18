@@ -71,6 +71,8 @@ class CommandServer(Isolated):
                     conn.close()
                     continue
 
+                response = None
+
                 if request.kind == CommandKind.TAKE_PHOTO:
                     response = self._handle_take_photo(request)
 
