@@ -68,12 +68,16 @@ class CommandServer(Isolated):
                         b"",
                     )
                     conn.sendall(error_response.to_bytes())
+                    conn.shutdown(socket.SHUT_RDWR)
+                    conn.close()
                     continue
 
                 if request.kind == CommandKind.TAKE_PHOTO:
                     response = self._handle_take_photo(request)
 
                 if response is None:
+                    conn.shutdown(socket.SHUT_RDWR)
+                    conn.close()
                     continue
 
                 conn.sendall(response.to_bytes())
