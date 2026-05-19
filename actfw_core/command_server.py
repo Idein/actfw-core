@@ -8,7 +8,7 @@ from typing import Optional
 
 from PIL.Image import Image as PIL_Image
 
-from .schema.agent_app_protocol import CommandRequest, CommandResponse, Status
+from .schema.agent_app_protocol import CommandKind, CommandRequest, CommandResponse, Status
 from .task import Isolated
 
 
@@ -50,43 +50,36 @@ class CommandServer(Isolated):
         s.bind(self.sock_path)
         s.settimeout(1)
         s.listen(1)
-        while self.running:
-            # Wait photo
-            while self.running:
-                with self.img_lock:
-                    if self.img is None:
-                        continue
-                    else:
-                        break
-            try:
-                if self.img is None:
-                    # this server may be terminating
-                    # re-check self.running
-                    continue  # type: ignore[unreachable]
 
+        while self.running:
+            try:
                 conn, _ = s.accept()
                 request, err = CommandRequest.parse(conn)
 
                 if request is None:
                     raise RuntimeError("couldn't parse a request from actcast agent: `CommandRequest.parse()` failed")
 
+                # FIXME: this error handling is unreachable because `CommandRequest.parse()` returns `None` if parsing fails
                 if err:
-                    response = CommandResponse(
+                    error_response = CommandResponse(
                         copy.copy(request.id_),
                         Status.GENERAL_ERROR,
                         b"",
                     )
-                    conn.sendall(response.to_bytes())
+                    conn.sendall(error_response.to_bytes())
+                    conn.shutdown(socket.SHUT_RDWR)
+                    conn.close()
                     continue
 
-                # Currently, only 'Take Photo' command is supported.
-                header = b"data:image/png;base64,"
-                with self.img_lock:
-                    pngimg = io.BytesIO()
-                    self.img.save(pngimg, format="PNG")
-                    b64img = base64.b64encode(pngimg.getbuffer())
-                data = header + b64img
-                response = CommandResponse(copy.copy(request.id_), Status.OK, data)
+                response = None
+
+                if request.kind == CommandKind.TAKE_PHOTO:
+                    response = self._handle_take_photo(request)
+
+                if response is None:
+                    conn.shutdown(socket.SHUT_RDWR)
+                    conn.close()
+                    continue
 
                 conn.sendall(response.to_bytes())
                 conn.shutdown(socket.SHUT_RDWR)
@@ -94,6 +87,22 @@ class CommandServer(Isolated):
             except socket.timeout:
                 pass
         os.remove(self.sock_path)
+
+    def _handle_take_photo(self, request: CommandRequest) -> Optional[CommandResponse]:
+        # Wait photo
+        while self.running:
+            with self.img_lock:
+                if self.img is None:
+                    continue
+
+                header = b"data:image/png;base64,"
+                pngimg = io.BytesIO()
+                self.img.save(pngimg, format="PNG")
+                b64img = base64.b64encode(pngimg.getbuffer())
+                data = header + b64img
+                return CommandResponse(copy.copy(request.id_), Status.OK, data)
+
+        return None
 
     def update_image(self, image: PIL_Image) -> None:
         """
