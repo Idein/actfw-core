@@ -33,6 +33,7 @@ class RequestId:
 
 class CommandKind(enum.Enum):
     TAKE_PHOTO = 0
+    CUSTOM_COMMAND = 2
 
 
 class Status(enum.Enum):

@@ -4,7 +4,7 @@ import io
 import os
 import socket
 from threading import Lock
-from typing import Optional
+from typing import Callable, Optional
 
 from PIL.Image import Image as PIL_Image
 
@@ -26,7 +26,7 @@ class CommandServer(Isolated):
 
     """
 
-    def __init__(self, sock_path: Optional[str] = None) -> None:
+    def __init__(self, sock_path: Optional[str] = None, custom_command_handler: Optional[Callable[[bytes], bytes]] = None) -> None:
         super().__init__()
         self.sock_path = None
         env = "ACTCAST_COMMAND_SOCK"
@@ -37,6 +37,7 @@ class CommandServer(Isolated):
         self.running = True
         self.img_lock = Lock()
         self.img = None
+        self.custom_command_handler = custom_command_handler
 
     def run(self) -> None:
         """Run and start the activity"""
@@ -75,6 +76,8 @@ class CommandServer(Isolated):
 
                 if request.kind == CommandKind.TAKE_PHOTO:
                     response = self._handle_take_photo(request)
+                elif request.kind == CommandKind.CUSTOM_COMMAND:
+                    response = self._handle_custom_command(request)
 
                 if response is None:
                     conn.shutdown(socket.SHUT_RDWR)
@@ -103,6 +106,16 @@ class CommandServer(Isolated):
                 return CommandResponse(copy.copy(request.id_), Status.OK, data)
 
         return None
+    
+    def _handle_custom_command(self, request: CommandRequest) -> Optional[CommandResponse]:
+        if self.custom_command_handler is None:
+            return None
+
+        try:
+            payload = self.custom_command_handler(request.data)
+            return CommandResponse(copy.copy(request.id_), Status.OK, payload)
+        except Exception:
+            return CommandResponse(copy.copy(request.id_), Status.APP_ERROR, b"")
 
     def update_image(self, image: PIL_Image) -> None:
         """
