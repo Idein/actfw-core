@@ -69,6 +69,72 @@ def test_take_photo_command_succeeds() -> None:
         tmpdir.cleanup()
 
 
+def test_custom_command_succeeds() -> None:
+    # Arrange
+    tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
+    sock_path = f"{tmpdir.name}/command.sock"
+    received_data = None
+
+    def custom_command_handler(data: bytes) -> bytes:
+        nonlocal received_data
+        received_data = data
+        return b"custom response"
+
+    cmd = CommandServer(sock_path, custom_command_handler=custom_command_handler)
+    cmd.start()
+
+    try:
+        # Act
+        with _connect_to_command_server(sock_path) as sock:
+            sock.sendall(CommandRequest(RequestId(1), CommandKind.CUSTOM_COMMAND, b"custom request").to_bytes())
+            response, err = CommandResponse.parse(sock)
+
+        # Assert
+        assert err is None
+        assert response is not None
+        assert response.id_ == RequestId(1)
+        assert response.status == Status.OK
+        assert response.data == b"custom response"
+        assert received_data == b"custom request"
+    finally:
+        cmd.stop()
+        cmd.join()
+        tmpdir.cleanup()
+
+
+def test_custom_command_returns_app_error_when_handler_raises() -> None:
+    # Arrange
+    tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
+    sock_path = f"{tmpdir.name}/command.sock"
+    received_data = None
+
+    def custom_command_handler(data: bytes) -> bytes:
+        nonlocal received_data
+        received_data = data
+        raise RuntimeError("custom command failed")
+
+    cmd = CommandServer(sock_path, custom_command_handler=custom_command_handler)
+    cmd.start()
+
+    try:
+        # Act
+        with _connect_to_command_server(sock_path) as sock:
+            sock.sendall(CommandRequest(RequestId(1), CommandKind.CUSTOM_COMMAND, b"custom request").to_bytes())
+            response, err = CommandResponse.parse(sock)
+
+        # Assert
+        assert err is None
+        assert response is not None
+        assert response.id_ == RequestId(1)
+        assert response.status == Status.APP_ERROR
+        assert response.data == b""
+        assert received_data == b"custom request"
+    finally:
+        cmd.stop()
+        cmd.join()
+        tmpdir.cleanup()
+
+
 def test_parse_error_raises_runtime_error() -> None:
     # Arrange
     exception = None
