@@ -69,6 +69,31 @@ def test_take_photo_command_succeeds() -> None:
         tmpdir.cleanup()
 
 
+def test_check_custom_command_availability_succeeds() -> None:
+    # Arrange
+    tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
+    sock_path = f"{tmpdir.name}/command.sock"
+    cmd = CommandServer(sock_path)
+
+    cmd.start()
+    try:
+        # Act
+        with _connect_to_command_server(sock_path) as sock:
+            sock.sendall(CommandRequest(RequestId(1), CommandKind.CHECK_CUSTOM_COMMAND_AVAILABILITY, b"").to_bytes())
+            response, err = CommandResponse.parse(sock)
+
+        # Assert
+        assert err is None
+        assert response is not None
+        assert response.id_ == RequestId(1)
+        assert response.status == Status.OK
+        assert response.data == b""
+    finally:
+        cmd.stop()
+        cmd.join()
+        tmpdir.cleanup()
+
+
 def test_custom_command_succeeds() -> None:
     # Arrange
     tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
