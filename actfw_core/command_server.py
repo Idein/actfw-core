@@ -26,7 +26,9 @@ class CommandServer(Isolated):
 
     """
 
-    def __init__(self, sock_path: Optional[str] = None, custom_command_handler: Optional[Callable[[bytes], bytes]] = None) -> None:
+    def __init__(
+        self, sock_path: Optional[str] = None, custom_command_handler: Optional[Callable[[bytes], bytes]] = None
+    ) -> None:
         super().__init__()
         self.sock_path = None
         env = "ACTCAST_COMMAND_SOCK"
@@ -76,6 +78,8 @@ class CommandServer(Isolated):
 
                 if request.kind == CommandKind.TAKE_PHOTO:
                     response = self._handle_take_photo(request)
+                elif request.kind == CommandKind.CHECK_CUSTOM_COMMAND_AVAILABILITY:
+                    response = CommandResponse(copy.copy(request.id_), Status.OK, b"")
                 elif request.kind == CommandKind.CUSTOM_COMMAND:
                     response = self._handle_custom_command(request)
 
@@ -106,7 +110,7 @@ class CommandServer(Isolated):
                 return CommandResponse(copy.copy(request.id_), Status.OK, data)
 
         return None
-    
+
     def _handle_custom_command(self, request: CommandRequest) -> Optional[CommandResponse]:
         if self.custom_command_handler is None:
             return None
