@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `set_exposure_settings(shutter_time, analogue_gain)` to `LibcameraCapture`, mirroring the API of `UnicamIspCapture`. When either parameter is set to a concrete value (i.e. not `Auto.AUTO`), `AeEnable=False` is also applied so the AE algorithm does not overwrite the manual setting.
+
 ## 2.15.0 (2026-04-09)
 
 - Add `stop_act` method to ServiceClient for stopping a running act on firmware version 3.70.0+ or 4.23.0+.

@@ -6,12 +6,13 @@ Note:
 """
 import mmap
 import selectors
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import libcamera as libcam
 from actfw_core.capture import Frame
 from actfw_core.system import EnvironmentVariableNotSet, get_actcast_firmware_type
 from actfw_core.task import Producer
+from actfw_core.unicam_isp_capture import Auto
 from actfw_core.util.pad import _PadBase, _PadDiscardingOld
 
 
@@ -101,6 +102,8 @@ class LibcameraCapture(Producer[Frame[bytes]]):
     _requests: Optional[List[libcam.Request]]
     _camera_config: libcam.CameraConfiguration
     _framerate: int
+    _shutter_time: Union[float, Auto]
+    _analogue_gain: Union[float, Auto]
 
     def __init__(
         self,
@@ -146,6 +149,8 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         self._size = size
         self._pixel_format = pixel_format
         self._framerate = framerate
+        self._shutter_time = Auto.AUTO
+        self._analogue_gain = Auto.AUTO
         self._camera = self._cm.cameras[camera_index]
         self._camera.acquire()
         self._camera_config = self._camera.generate_configuration([libcam.StreamRole.Viewfinder])
@@ -166,6 +171,19 @@ class LibcameraCapture(Producer[Frame[bytes]]):
     def capture_size(self) -> Tuple[int, int]:
         stream_config: libcam.StreamConfiguration = self._camera_config.at(0)
         return (stream_config.size.width, stream_config.size.height)
+
+    def set_exposure_settings(self, shutter_time: Union[float, Auto], analogue_gain: Union[float, Auto]) -> None:
+        """Set shutter_time and analogue_gain.
+
+        Must be called before the capture task is started (i.e. before ``run()``),
+        since the controls are applied at ``camera.start()``.
+
+        Args:
+            shutter_time (float or Auto): [μsec] (e.g. 60000). If set to Auto, shutter_time is set with AE algorithm.
+            analogue_gain (float or Auto): (>=1.0) (e.g. 2.5). If set to Auto, analogue_gain is set with AE algorithm.
+        """
+        self._shutter_time = shutter_time
+        self._analogue_gain = analogue_gain
 
     def _handle_camera_event(self) -> None:
         reqs = self._cm.get_ready_requests()
@@ -201,9 +219,21 @@ class LibcameraCapture(Producer[Frame[bytes]]):
                 assert res is None or res == 0
                 requests.append(request)
 
-            controls = {}
+            controls: Dict[Any, Any] = {}
             frame_duration_limit = int(1_000_000 / self._framerate)
             controls[libcam.controls.FrameDurationLimits] = (frame_duration_limit, frame_duration_limit)
+
+            manual_shutter = not isinstance(self._shutter_time, Auto)
+            manual_gain = not isinstance(self._analogue_gain, Auto)
+            if manual_shutter or manual_gain:
+                # AeEnable=False is required so that manual values are not
+                # overwritten by the AE algorithm.
+                controls[libcam.controls.AeEnable] = False
+            if manual_shutter:
+                controls[libcam.controls.ExposureTime] = int(self._shutter_time)  # type: ignore[arg-type]
+            if manual_gain:
+                controls[libcam.controls.AnalogueGain] = float(self._analogue_gain)  # type: ignore[arg-type]
+
             res = self._camera.start(controls=controls)
             if res is not None and res < 0:
                 raise CameraStartError(res)
