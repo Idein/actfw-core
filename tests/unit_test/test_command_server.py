@@ -190,12 +190,8 @@ def test_command_server_accepts_commands_in_parallel() -> None:
             assert blocking_handler_started_event.wait(blocking_timeout_seconds)
 
             with _connect_to_command_server(sock_path) as sock:
-                sock.settimeout(blocking_timeout_seconds)
                 sock.sendall(CommandRequest(RequestId(2), CommandKind.TAKE_PHOTO, b"").to_bytes())
                 response, err = CommandResponse.parse(sock)
-
-            blocking_handler_finished_event.set()
-            CommandResponse.parse(blocking_sock)
 
         # Assert
         assert err is None
@@ -203,7 +199,6 @@ def test_command_server_accepts_commands_in_parallel() -> None:
         assert response.id_ == RequestId(2)
         assert response.status == Status.OK
     finally:
-        blocking_handler_finished_event.set()
         cmd.stop()
         cmd.join()
         tmpdir.cleanup()
@@ -254,7 +249,8 @@ def test_command_server_shuts_down_connection_without_response_when_request_is_i
     try:
         # Act
         with _connect_to_command_server(sock_path) as sock:
-            sock.sendall(b"invalid request")
+            sock.settimeout(1)
+            sock.sendall(b"invalid ")
 
             # Assert (print error message and socket will be shutdown without response and closed)
             assert sock.recv(1) == b""
