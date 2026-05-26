@@ -18,7 +18,19 @@ class DummySocket:
         return self._data.read(1) == b""
 
 
-def test_roundtrip() -> None:
+def test_command_request_roundtrip() -> None:
+    HUGE_DATA_SIZE = 2**13  # 8KB
+    HUGE_DATA = f"0 0 {HUGE_DATA_SIZE} ".encode() + b"a" * HUGE_DATA_SIZE
+
+    DATAS = [b"0 0 0 ", b"0 0 1 a", HUGE_DATA]
+    for data in DATAS:
+        sock = DummySocket(data)
+        x = CommandRequest.parse(sock)
+        assert sock.is_consumed_all()
+        assert x.to_bytes() == data
+
+
+def test_result_tuple_parse_roundtrip() -> None:
     def roundtrip(cls: Any, data: bytes) -> None:
         sock = DummySocket(data)
         x, err = cls.parse(sock)
@@ -29,7 +41,7 @@ def test_roundtrip() -> None:
     HUGE_DATA_SIZE = 2**13  # 8KB
     HUGE_DATA = f"0 0 {HUGE_DATA_SIZE} ".encode() + b"a" * HUGE_DATA_SIZE
 
-    CLASSES = [CommandRequest, CommandResponse, ServiceRequest, ServiceResponse]
+    CLASSES = [CommandResponse, ServiceRequest, ServiceResponse]
     DATAS = [b"0 0 0 ", b"0 0 1 a", HUGE_DATA]
     for cls, data in itertools.product(CLASSES, DATAS):
         roundtrip(cls, data)
