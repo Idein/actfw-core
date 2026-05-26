@@ -127,6 +127,46 @@ def test_custom_command_succeeds() -> None:
         tmpdir.cleanup()
 
 
+def test_command_server_accepts_commands_in_parallel() -> None:
+    # Arrange
+    tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
+    sock_path = f"{tmpdir.name}/command.sock"
+    blocking_handler_started_event = threading.Event()
+    blocking_handler_finished_event = threading.Event()
+    blocking_timeout_seconds = 2
+
+    def blocking_custom_command_handler(_payload: bytes) -> bytes:
+        blocking_handler_started_event.set()
+        # wait forever
+        blocking_handler_finished_event.wait()
+        return b""
+
+    cmd = CommandServer(sock_path, custom_command_handler=blocking_custom_command_handler)
+    cmd.update_image(Image.new("RGB", (1, 1), (0, 255, 0)))
+    cmd.start()
+
+    try:
+        # Act
+        with _connect_to_command_server(sock_path) as blocking_sock:
+            blocking_sock.settimeout(blocking_timeout_seconds)
+            blocking_sock.sendall(CommandRequest(RequestId(1), CommandKind.CUSTOM_COMMAND, b"").to_bytes())
+            blocking_handler_started_event.wait(blocking_timeout_seconds)
+
+            with _connect_to_command_server(sock_path) as sock:
+                sock.sendall(CommandRequest(RequestId(2), CommandKind.TAKE_PHOTO, b"").to_bytes())
+                response, err = CommandResponse.parse(sock)
+
+        # Assert
+        assert err is None
+        assert response is not None
+        assert response.id_ == RequestId(2)
+        assert response.status == Status.OK
+    finally:
+        cmd.stop()
+        cmd.join()
+        tmpdir.cleanup()
+
+
 def test_custom_command_returns_app_error_when_handler_raises() -> None:
     # Arrange
     tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
