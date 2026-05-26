@@ -1,16 +1,22 @@
 import base64
 import copy
 import io
+import json
 import os
 import socket
 import sys
 from threading import Lock, Thread
-from typing import Callable, Optional
+from typing import Callable, Optional, TypedDict
 
 from PIL.Image import Image as PIL_Image
 
 from .schema.agent_app_protocol import CommandKind, CommandRequest, CommandResponse, Status
 from .task import Isolated
+
+
+class CustomCommandRequest(TypedDict):
+    id: str
+    payload: str
 
 
 class CommandServer(Isolated):
@@ -28,7 +34,7 @@ class CommandServer(Isolated):
     """
 
     def __init__(
-        self, sock_path: Optional[str] = None, custom_command_handler: Optional[Callable[[bytes], bytes]] = None
+        self, sock_path: Optional[str] = None, custom_command_handler: Optional[Callable[[CustomCommandRequest], str]] = None
     ) -> None:
         super().__init__()
         self.sock_path = None
@@ -111,20 +117,29 @@ class CommandServer(Isolated):
 
     def _handle_custom_command_availability(self, request: CommandRequest) -> CommandResponse:
         if self.custom_command_handler is None:
-            return CommandResponse(copy.copy(request.id_), Status.UNIMPLEMENTED, b"custom command handler is not set")
+            return CommandResponse(copy.copy(request.id_), Status.UNIMPLEMENTED, b"Custom command handler is not set")
         else:
             return CommandResponse(copy.copy(request.id_), Status.OK, b"")
 
-    def _handle_custom_command(self, request: CommandRequest) -> Optional[CommandResponse]:
+    def _handle_custom_command(self, request: CommandRequest) -> CommandResponse:
         if self.custom_command_handler is None:
-            return None
+            return CommandResponse(
+                copy.copy(request.id_), Status.GENERAL_ERROR, b"Unreachable Error: custom command handler is not set"
+            )
 
         try:
-            payload = self.custom_command_handler(request.data)
-            return CommandResponse(copy.copy(request.id_), Status.OK, payload)
-        except Exception as exception:
-            error_message = str(exception).encode()
-            return CommandResponse(copy.copy(request.id_), Status.APP_ERROR, error_message)
+            command_server_request: CustomCommandRequest = json.loads(request.data.decode())
+        except Exception as e:
+            return CommandResponse(
+                copy.copy(request.id_), Status.GENERAL_ERROR, f"Failed to parse custom command payload: {e}".encode()
+            )
+
+        try:
+            payload = self.custom_command_handler(command_server_request)
+            return CommandResponse(copy.copy(request.id_), Status.OK, payload.encode())
+        except Exception as e:
+            error_message = str(e)
+            return CommandResponse(copy.copy(request.id_), Status.APP_ERROR, error_message.encode())
 
     def update_image(self, image: PIL_Image) -> None:
         """
