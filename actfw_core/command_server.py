@@ -63,19 +63,9 @@ class CommandServer(Isolated):
         os.remove(self.sock_path)
 
     def _handle_request(self, conn: socket.socket) -> None:
-        request, err = CommandRequest.parse(conn)
-
-        if request is None:
-            raise RuntimeError("couldn't parse a request from actcast agent: `CommandRequest.parse()` failed")
-
-        # FIXME: this error handling is unreachable because `CommandRequest.parse()` returns `None` if parsing fails
-        if err:
-            error_response = CommandResponse(
-                copy.copy(request.id_),
-                Status.GENERAL_ERROR,
-                b"",
-            )
-            conn.sendall(error_response.to_bytes())
+        try:
+            request = CommandRequest.parse(conn)
+        except Exception:
             conn.shutdown(socket.SHUT_RDWR)
             conn.close()
             return

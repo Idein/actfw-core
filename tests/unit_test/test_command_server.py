@@ -203,6 +203,26 @@ def test_custom_command_returns_app_error_when_handler_raises() -> None:
         tmpdir.cleanup()
 
 
+def test_command_server_shuts_down_connection_without_response_when_request_is_invalid() -> None:
+    # Arrange
+    tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
+    sock_path = f"{tmpdir.name}/command.sock"
+    cmd = CommandServer(sock_path)
+    cmd.start()
+
+    try:
+        # Act
+        with _connect_to_command_server(sock_path) as sock:
+            sock.sendall(b"invalid request")
+
+            # Assert (socket will be shutdown without response and closed)
+            assert sock.recv(1) == b""
+    finally:
+        cmd.stop()
+        cmd.join()
+        tmpdir.cleanup()
+
+
 def test_socket_timeout_keeps_command_server_running() -> None:
     # Arrange
     tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
