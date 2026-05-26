@@ -3,6 +3,7 @@ import copy
 import io
 import os
 import socket
+import sys
 from threading import Lock, Thread
 from typing import Callable, Optional
 
@@ -60,12 +61,16 @@ class CommandServer(Isolated):
                 Thread(target=self._handle_request, args=(conn,), daemon=True).start()
             except socket.timeout:
                 pass
+            except Exception as e:
+                print(f"Unexpected CommandServer error: {e}", file=sys.stderr, flush=True)
+                pass
         os.remove(self.sock_path)
 
     def _handle_request(self, conn: socket.socket) -> None:
         try:
             request = CommandRequest.parse(conn)
-        except Exception:
+        except Exception as e:
+            print(f"Failed to parse command request: {e}", file=sys.stderr, flush=True)
             conn.shutdown(socket.SHUT_RDWR)
             conn.close()
             return
@@ -75,7 +80,7 @@ class CommandServer(Isolated):
         if request.kind == CommandKind.TAKE_PHOTO:
             response = self._handle_take_photo(request)
         elif request.kind == CommandKind.CHECK_CUSTOM_COMMAND_AVAILABILITY:
-            response = CommandResponse(copy.copy(request.id_), Status.OK, b"")
+            response = self._handle_custom_command_availability(request)
         elif request.kind == CommandKind.CUSTOM_COMMAND:
             response = self._handle_custom_command(request)
 
@@ -104,6 +109,12 @@ class CommandServer(Isolated):
 
         return None
 
+    def _handle_custom_command_availability(self, request: CommandRequest) -> CommandResponse:
+        if self.custom_command_handler is None:
+            return CommandResponse(copy.copy(request.id_), Status.UNIMPLEMENTED, b"custom command handler is not set")
+        else:
+            return CommandResponse(copy.copy(request.id_), Status.OK, b"")
+
     def _handle_custom_command(self, request: CommandRequest) -> Optional[CommandResponse]:
         if self.custom_command_handler is None:
             return None
@@ -111,8 +122,9 @@ class CommandServer(Isolated):
         try:
             payload = self.custom_command_handler(request.data)
             return CommandResponse(copy.copy(request.id_), Status.OK, payload)
-        except Exception:
-            return CommandResponse(copy.copy(request.id_), Status.APP_ERROR, b"")
+        except Exception as exception:
+            error_message = str(exception).encode()
+            return CommandResponse(copy.copy(request.id_), Status.APP_ERROR, error_message)
 
     def update_image(self, image: PIL_Image) -> None:
         """

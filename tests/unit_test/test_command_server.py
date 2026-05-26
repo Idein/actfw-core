@@ -74,7 +74,7 @@ def test_check_custom_command_availability_succeeds() -> None:
     # Arrange
     tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
     sock_path = f"{tmpdir.name}/command.sock"
-    cmd = CommandServer(sock_path)
+    cmd = CommandServer(sock_path, custom_command_handler=lambda _data: b"")
     cmd.start()
 
     try:
@@ -89,6 +89,31 @@ def test_check_custom_command_availability_succeeds() -> None:
         assert response.id_ == RequestId(1)
         assert response.status == Status.OK
         assert response.data == b""
+    finally:
+        cmd.stop()
+        cmd.join()
+        tmpdir.cleanup()
+
+
+def test_check_custom_command_availability_returns_unimplemented_when_handler_is_not_set() -> None:
+    # Arrange
+    tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
+    sock_path = f"{tmpdir.name}/command.sock"
+    cmd = CommandServer(sock_path)
+    cmd.start()
+
+    try:
+        # Act
+        with _connect_to_command_server(sock_path) as sock:
+            sock.sendall(CommandRequest(RequestId(1), CommandKind.CHECK_CUSTOM_COMMAND_AVAILABILITY, b"").to_bytes())
+            response, err = CommandResponse.parse(sock)
+
+        # Assert
+        assert err is None
+        assert response is not None
+        assert response.id_ == RequestId(1)
+        assert response.status == Status.UNIMPLEMENTED
+        assert response.data == b"custom command handler is not set"
     finally:
         cmd.stop()
         cmd.join()
@@ -197,13 +222,14 @@ def test_custom_command_returns_app_error_when_handler_raises() -> None:
         assert response is not None
         assert response.id_ == RequestId(1)
         assert response.status == Status.APP_ERROR
+        assert response.data == b"custom command failed"
     finally:
         cmd.stop()
         cmd.join()
         tmpdir.cleanup()
 
 
-def test_command_server_shuts_down_connection_without_response_when_request_is_invalid() -> None:
+def test_command_server_shuts_down_connection_without_response_when_request_is_invalid(capsys: Any) -> None:
     # Arrange
     tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
     sock_path = f"{tmpdir.name}/command.sock"
@@ -215,8 +241,11 @@ def test_command_server_shuts_down_connection_without_response_when_request_is_i
         with _connect_to_command_server(sock_path) as sock:
             sock.sendall(b"invalid request")
 
-            # Assert (socket will be shutdown without response and closed)
+            # Assert (print error message and socket will be shutdown without response and closed)
             assert sock.recv(1) == b""
+            captured = capsys.readouterr()
+            assert "Failed to parse command request:" in captured.err
+            assert "invalid literal for int()" in captured.err
     finally:
         cmd.stop()
         cmd.join()
