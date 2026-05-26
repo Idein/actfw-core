@@ -153,11 +153,15 @@ def test_command_server_accepts_commands_in_parallel() -> None:
         with _connect_to_command_server(sock_path) as blocking_sock:
             blocking_sock.settimeout(blocking_timeout_seconds)
             blocking_sock.sendall(CommandRequest(RequestId(1), CommandKind.CUSTOM_COMMAND, b"").to_bytes())
-            blocking_handler_started_event.wait(blocking_timeout_seconds)
+            assert blocking_handler_started_event.wait(blocking_timeout_seconds)
 
             with _connect_to_command_server(sock_path) as sock:
+                sock.settimeout(blocking_timeout_seconds)
                 sock.sendall(CommandRequest(RequestId(2), CommandKind.TAKE_PHOTO, b"").to_bytes())
                 response, err = CommandResponse.parse(sock)
+
+            blocking_handler_finished_event.set()
+            CommandResponse.parse(blocking_sock)
 
         # Assert
         assert err is None
@@ -165,6 +169,7 @@ def test_command_server_accepts_commands_in_parallel() -> None:
         assert response.id_ == RequestId(2)
         assert response.status == Status.OK
     finally:
+        blocking_handler_finished_event.set()
         cmd.stop()
         cmd.join()
         tmpdir.cleanup()

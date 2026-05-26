@@ -3,7 +3,7 @@ import copy
 import io
 import os
 import socket
-from threading import Lock
+from threading import Lock, Thread
 from typing import Callable, Optional
 
 from PIL.Image import Image as PIL_Image
@@ -57,43 +57,46 @@ class CommandServer(Isolated):
         while self.running:
             try:
                 conn, _ = s.accept()
-                request, err = CommandRequest.parse(conn)
-
-                if request is None:
-                    raise RuntimeError("couldn't parse a request from actcast agent: `CommandRequest.parse()` failed")
-
-                # FIXME: this error handling is unreachable because `CommandRequest.parse()` returns `None` if parsing fails
-                if err:
-                    error_response = CommandResponse(
-                        copy.copy(request.id_),
-                        Status.GENERAL_ERROR,
-                        b"",
-                    )
-                    conn.sendall(error_response.to_bytes())
-                    conn.shutdown(socket.SHUT_RDWR)
-                    conn.close()
-                    continue
-
-                response = None
-
-                if request.kind == CommandKind.TAKE_PHOTO:
-                    response = self._handle_take_photo(request)
-                elif request.kind == CommandKind.CHECK_CUSTOM_COMMAND_AVAILABILITY:
-                    response = CommandResponse(copy.copy(request.id_), Status.OK, b"")
-                elif request.kind == CommandKind.CUSTOM_COMMAND:
-                    response = self._handle_custom_command(request)
-
-                if response is None:
-                    conn.shutdown(socket.SHUT_RDWR)
-                    conn.close()
-                    continue
-
-                conn.sendall(response.to_bytes())
-                conn.shutdown(socket.SHUT_RDWR)
-                conn.close()
+                Thread(target=self._handle_request, args=(conn,), daemon=True).start()
             except socket.timeout:
                 pass
         os.remove(self.sock_path)
+
+    def _handle_request(self, conn: socket.socket) -> None:
+        request, err = CommandRequest.parse(conn)
+
+        if request is None:
+            raise RuntimeError("couldn't parse a request from actcast agent: `CommandRequest.parse()` failed")
+
+        # FIXME: this error handling is unreachable because `CommandRequest.parse()` returns `None` if parsing fails
+        if err:
+            error_response = CommandResponse(
+                copy.copy(request.id_),
+                Status.GENERAL_ERROR,
+                b"",
+            )
+            conn.sendall(error_response.to_bytes())
+            conn.shutdown(socket.SHUT_RDWR)
+            conn.close()
+            return
+
+        response = None
+
+        if request.kind == CommandKind.TAKE_PHOTO:
+            response = self._handle_take_photo(request)
+        elif request.kind == CommandKind.CHECK_CUSTOM_COMMAND_AVAILABILITY:
+            response = CommandResponse(copy.copy(request.id_), Status.OK, b"")
+        elif request.kind == CommandKind.CUSTOM_COMMAND:
+            response = self._handle_custom_command(request)
+
+        if response is None:
+            conn.shutdown(socket.SHUT_RDWR)
+            conn.close()
+            return
+
+        conn.sendall(response.to_bytes())
+        conn.shutdown(socket.SHUT_RDWR)
+        conn.close()
 
     def _handle_take_photo(self, request: CommandRequest) -> Optional[CommandResponse]:
         # Wait photo
