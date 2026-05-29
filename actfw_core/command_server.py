@@ -68,7 +68,7 @@ class CommandServer(Isolated):
             except socket.timeout:
                 pass
             except Exception as e:
-                print(f"Unexpected CommandServer error: {e}", file=sys.stderr, flush=True)
+                print(f"Unexpected CommandServer error: {e!r}", file=sys.stderr, flush=True)
                 pass
         os.remove(self.sock_path)
 
@@ -76,7 +76,7 @@ class CommandServer(Isolated):
         try:
             request = CommandRequest.parse(conn)
         except Exception as e:
-            print(f"Failed to parse command request: {e}", file=sys.stderr, flush=True)
+            print(f"Failed to parse command request: {e!r}", file=sys.stderr, flush=True)
             conn.shutdown(socket.SHUT_RDWR)
             conn.close()
             return
@@ -131,15 +131,14 @@ class CommandServer(Isolated):
             command_server_request: CustomCommandRequest = json.loads(request.data.decode())
         except Exception as e:
             return CommandResponse(
-                copy.copy(request.id_), Status.GENERAL_ERROR, f"Failed to parse custom command payload: {e}".encode()
+                copy.copy(request.id_), Status.GENERAL_ERROR, f"Failed to parse custom command payload: {e!r}".encode()
             )
 
         try:
             payload = self.custom_command_handler(command_server_request)
             return CommandResponse(copy.copy(request.id_), Status.OK, payload.encode())
         except Exception as e:
-            error_message = str(e)
-            return CommandResponse(copy.copy(request.id_), Status.APP_ERROR, error_message.encode())
+            return CommandResponse(copy.copy(request.id_), Status.APP_ERROR, f"{e!r}".encode())
 
     def update_image(self, image: PIL_Image) -> None:
         """

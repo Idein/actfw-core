@@ -232,7 +232,7 @@ def test_custom_command_returns_app_error_when_handler_raises() -> None:
         assert response is not None
         assert response.id_ == RequestId(1)
         assert response.status == Status.APP_ERROR
-        assert response.data == b"custom command failed"
+        assert response.data == b"RuntimeError('custom command failed')"
     finally:
         cmd.stop()
         cmd.join()
