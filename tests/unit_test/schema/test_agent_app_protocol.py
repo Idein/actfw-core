@@ -19,7 +19,7 @@ class DummySocket:
 
 
 def test_command_request_roundtrip() -> None:
-    HUGE_DATA_SIZE = 2**13  # 8KB
+    HUGE_DATA_SIZE = 1024 * 128  # 128KB
     HUGE_DATA = f"0 0 {HUGE_DATA_SIZE} ".encode() + b"a" * HUGE_DATA_SIZE
 
     DATAS = [b"0 0 0 ", b"0 0 1 a", HUGE_DATA]
@@ -38,7 +38,7 @@ def test_result_tuple_parse_roundtrip() -> None:
         assert sock.is_consumed_all()
         assert x.to_bytes() == data
 
-    HUGE_DATA_SIZE = 2**13  # 8KB
+    HUGE_DATA_SIZE = 1024 * 128  # 128KB
     HUGE_DATA = f"0 0 {HUGE_DATA_SIZE} ".encode() + b"a" * HUGE_DATA_SIZE
 
     CLASSES = [CommandResponse, ServiceRequest, ServiceResponse]

@@ -124,14 +124,16 @@ class CommandServer(Isolated):
     def _handle_custom_command(self, request: CommandRequest) -> CommandResponse:
         if self.custom_command_handler is None:
             return CommandResponse(
-                copy.copy(request.id_), Status.GENERAL_ERROR, b"Unreachable Error: custom command handler is not set"
+                copy.copy(request.id_), Status.GENERAL_ERROR, b"Actfw Internal Error: custom command handler is not set"
             )
 
         try:
             command_server_request: CustomCommandRequest = json.loads(request.data.decode())
         except Exception as e:
             return CommandResponse(
-                copy.copy(request.id_), Status.GENERAL_ERROR, f"Failed to parse custom command payload: {e!r}".encode()
+                copy.copy(request.id_),
+                Status.GENERAL_ERROR,
+                f"Actfw Internal Error: Failed to parse custom command payload: {e!r}".encode(),
             )
 
         try:
