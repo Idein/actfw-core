@@ -15,8 +15,9 @@ repository = "https://github.com/Idein/actfw-core"
 version = "2.16.0"
 
 [tool.poetry.dependencies]
-python = ">=3.7, <3.12"
+python = ">=3.9, <3.12"
 Pillow = ">=5, <11"
+typing-extensions = "^4.15.0"
 
 [tool.poetry.group.dev.dependencies]
 Sphinx = "^4.3.0"
