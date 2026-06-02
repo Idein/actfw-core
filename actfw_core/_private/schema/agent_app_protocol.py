@@ -3,6 +3,8 @@ import io
 import socket
 from dataclasses import dataclass
 
+from typing_extensions import Self
+
 from ..util.result import ResultTuple
 
 
@@ -33,6 +35,8 @@ class RequestId:
 
 class CommandKind(enum.Enum):
     TAKE_PHOTO = 0
+    CHECK_CUSTOM_COMMAND_AVAILABILITY = 1
+    CUSTOM_COMMAND = 2
 
 
 class Status(enum.Enum):
@@ -51,15 +55,12 @@ class CommandRequest:
     data: bytes
 
     @classmethod
-    def parse(cls, stream: socket.socket) -> ResultTuple["CommandRequest", Exception]:
-        try:
-            id_ = RequestId(_read_int(stream))
-            kind = CommandKind(_read_int(stream))
-            data_length = _read_int(stream)
-            data = _read_bytes(stream, data_length)
-            return cls(id_, kind, data), None
-        except Exception as e:
-            return None, e
+    def parse(cls, stream: socket.socket) -> Self:
+        id_ = RequestId(_read_int(stream))
+        kind = CommandKind(_read_int(stream))
+        data_length = _read_int(stream)
+        data = _read_bytes(stream, data_length)
+        return cls(id_, kind, data)
 
     def to_bytes(self) -> bytes:
         id_ = self.id_._id

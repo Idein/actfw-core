@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `CUSTOM_COMMAND` feature to `CommandServer`
+
 ## 2.16.0 (2026-05-26)
 
 - Add `set_exposure_settings(shutter_time, analogue_gain)` to `LibcameraCapture`, mirroring the API of `UnicamIspCapture`. When either parameter is set to a concrete value (i.e. not `Auto.AUTO`), `AeEnable=False` is also applied so the AE algorithm does not overwrite the manual setting.

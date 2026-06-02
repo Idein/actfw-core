@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import base64
 import io
+import json
 import os
 import socket
 import tempfile
@@ -9,7 +10,7 @@ import time
 from typing import Any
 
 import actfw_core
-from actfw_core.command_server import CommandServer
+from actfw_core.command_server import CommandServer, CustomCommandRequest
 from actfw_core.schema.agent_app_protocol import CommandKind, CommandRequest, CommandResponse, RequestId, Status
 from PIL import Image
 
@@ -45,8 +46,8 @@ def test_take_photo_command_succeeds() -> None:
     cmd = CommandServer(sock_path)
     expected_image = Image.new("RGB", (1, 1), (255, 0, 0))
     cmd.update_image(expected_image)
-
     cmd.start()
+
     try:
         # Act
         with _connect_to_command_server(sock_path) as sock:
@@ -59,6 +60,7 @@ def test_take_photo_command_succeeds() -> None:
         assert response.id_ == RequestId(1)
         assert response.status == Status.OK
         assert response.data.startswith(b"data:image/png;base64,")
+
         returned_image = Image.open(io.BytesIO(base64.b64decode(response.data.removeprefix(b"data:image/png;base64,"))))
         assert returned_image.size == expected_image.size
         assert returned_image.mode == expected_image.mode
@@ -69,36 +71,195 @@ def test_take_photo_command_succeeds() -> None:
         tmpdir.cleanup()
 
 
-def test_parse_error_raises_runtime_error() -> None:
+def test_check_custom_command_availability_succeeds() -> None:
     # Arrange
-    exception = None
     tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
     sock_path = f"{tmpdir.name}/command.sock"
-    cmd = CommandServer(sock_path)
-
-    def run_command_server() -> None:
-        nonlocal exception
-        try:
-            cmd.run()
-        except RuntimeError as e:
-            exception = e
-
-    thread = threading.Thread(target=run_command_server)
-    thread.start()
+    cmd = CommandServer(sock_path, custom_command_handler=lambda _request: "")
+    cmd.start()
 
     try:
         # Act
         with _connect_to_command_server(sock_path) as sock:
-            sock.sendall(b"invalid ")
-
-        thread.join(2)
+            sock.sendall(CommandRequest(RequestId(1), CommandKind.CHECK_CUSTOM_COMMAND_AVAILABILITY, b"").to_bytes())
+            response, err = CommandResponse.parse(sock)
 
         # Assert
-        assert isinstance(exception, RuntimeError)
-        assert str(exception) == "couldn't parse a request from actcast agent: `CommandRequest.parse()` failed"
+        assert err is None
+        assert response is not None
+        assert response.id_ == RequestId(1)
+        assert response.status == Status.OK
+        assert response.data == b""
     finally:
         cmd.stop()
-        thread.join()
+        cmd.join()
+        tmpdir.cleanup()
+
+
+def test_check_custom_command_availability_returns_unimplemented_when_handler_is_not_set() -> None:
+    # Arrange
+    tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
+    sock_path = f"{tmpdir.name}/command.sock"
+    cmd = CommandServer(sock_path)
+    cmd.start()
+
+    try:
+        # Act
+        with _connect_to_command_server(sock_path) as sock:
+            sock.sendall(CommandRequest(RequestId(1), CommandKind.CHECK_CUSTOM_COMMAND_AVAILABILITY, b"").to_bytes())
+            response, err = CommandResponse.parse(sock)
+
+        # Assert
+        assert err is None
+        assert response is not None
+        assert response.id_ == RequestId(1)
+        assert response.status == Status.UNIMPLEMENTED
+        assert response.data == b"Custom command handler is not set"
+    finally:
+        cmd.stop()
+        cmd.join()
+        tmpdir.cleanup()
+
+
+def test_custom_command_succeeds() -> None:
+    # Arrange
+    tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
+    sock_path = f"{tmpdir.name}/command.sock"
+    request_payload = {"id": "command-id", "payload": "custom request"}
+    response_payload = "custom response"
+    received_request = None
+
+    def custom_command_handler(request: CustomCommandRequest) -> str:
+        nonlocal received_request
+        received_request = request
+        return response_payload
+
+    cmd = CommandServer(sock_path, custom_command_handler=custom_command_handler)
+    cmd.start()
+
+    try:
+        # Act
+        with _connect_to_command_server(sock_path) as sock:
+            sock.sendall(
+                CommandRequest(RequestId(1), CommandKind.CUSTOM_COMMAND, json.dumps(request_payload).encode()).to_bytes()
+            )
+            response, err = CommandResponse.parse(sock)
+
+        # Assert
+        assert err is None
+        assert response is not None
+        assert response.id_ == RequestId(1)
+        assert response.status == Status.OK
+        assert response.data == response_payload.encode()
+        assert received_request == request_payload
+    finally:
+        cmd.stop()
+        cmd.join()
+        tmpdir.cleanup()
+
+
+def test_command_server_accepts_commands_in_parallel() -> None:
+    # Arrange
+    tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
+    sock_path = f"{tmpdir.name}/command.sock"
+    blocking_handler_started_event = threading.Event()
+    blocking_handler_finished_event = threading.Event()
+    blocking_timeout_seconds = 2
+
+    def blocking_custom_command_handler(_payload: CustomCommandRequest) -> str:
+        blocking_handler_started_event.set()
+        # wait forever
+        blocking_handler_finished_event.wait()
+        return ""
+
+    cmd = CommandServer(sock_path, custom_command_handler=blocking_custom_command_handler)
+    cmd.update_image(Image.new("RGB", (1, 1), (0, 255, 0)))
+    cmd.start()
+
+    try:
+        # Act
+        with _connect_to_command_server(sock_path) as blocking_sock:
+            blocking_sock.settimeout(blocking_timeout_seconds)
+            blocking_sock.sendall(
+                CommandRequest(
+                    RequestId(1),
+                    CommandKind.CUSTOM_COMMAND,
+                    json.dumps({"id": "blocking-command-id", "payload": ""}).encode(),
+                ).to_bytes()
+            )
+            assert blocking_handler_started_event.wait(blocking_timeout_seconds)
+
+            with _connect_to_command_server(sock_path) as sock:
+                sock.sendall(CommandRequest(RequestId(2), CommandKind.TAKE_PHOTO, b"").to_bytes())
+                response, err = CommandResponse.parse(sock)
+
+        # Assert
+        assert err is None
+        assert response is not None
+        assert response.id_ == RequestId(2)
+        assert response.status == Status.OK
+    finally:
+        cmd.stop()
+        cmd.join()
+        tmpdir.cleanup()
+
+
+def test_custom_command_returns_app_error_when_handler_raises() -> None:
+    # Arrange
+    tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
+    sock_path = f"{tmpdir.name}/command.sock"
+
+    def custom_command_handler(request: CustomCommandRequest) -> str:
+        raise RuntimeError("custom command failed")
+
+    cmd = CommandServer(sock_path, custom_command_handler=custom_command_handler)
+    cmd.start()
+
+    try:
+        # Act
+        with _connect_to_command_server(sock_path) as sock:
+            sock.sendall(
+                CommandRequest(
+                    RequestId(1),
+                    CommandKind.CUSTOM_COMMAND,
+                    json.dumps({"id": "command-id", "payload": "custom request"}).encode(),
+                ).to_bytes()
+            )
+            response, err = CommandResponse.parse(sock)
+
+        # Assert
+        assert err is None
+        assert response is not None
+        assert response.id_ == RequestId(1)
+        assert response.status == Status.APP_ERROR
+        assert response.data == b"RuntimeError('custom command failed')"
+    finally:
+        cmd.stop()
+        cmd.join()
+        tmpdir.cleanup()
+
+
+def test_command_server_shuts_down_connection_without_response_when_request_is_invalid(capsys: Any) -> None:
+    # Arrange
+    tmpdir = tempfile.TemporaryDirectory(prefix="actfw-", dir="/tmp")
+    sock_path = f"{tmpdir.name}/command.sock"
+    cmd = CommandServer(sock_path)
+    cmd.start()
+
+    try:
+        # Act
+        with _connect_to_command_server(sock_path) as sock:
+            sock.settimeout(1)
+            sock.sendall(b"invalid ")
+
+            # Assert (print error message and socket will be shutdown without response and closed)
+            assert sock.recv(1) == b""
+            captured = capsys.readouterr()
+            assert "Failed to parse command request:" in captured.err
+            assert "invalid literal for int()" in captured.err
+    finally:
+        cmd.stop()
+        cmd.join()
         tmpdir.cleanup()
 
 
