@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.17.0 (2026-06-02)
+
 - Add `CUSTOM_COMMAND` feature to `CommandServer`
 
 ## 2.16.0 (2026-05-26)
