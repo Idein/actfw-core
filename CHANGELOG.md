@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Strip per-line stride padding in `LibcameraCapture` by default (`depad=True`), so captured frames are tightly packed (`width * 3` per line) regardless of the capture width. This fixes corrupted images at widths whose stride is padded by the ISP (e.g. non-64-byte-aligned widths such as 224 or 800 on Raspberry Pi 5 / PiSP). Pass `depad=False` and use the new `stride()` method to access the raw padded buffer for zero-copy handling.
+
 ## 2.17.0 (2026-06-02)
 
 - Add `CUSTOM_COMMAND` feature to `CommandServer`
