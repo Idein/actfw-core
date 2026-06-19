@@ -94,6 +94,26 @@ class CaptureTimeoutError(Exception):
         return f"{self._msg}: {self._timeout}"
 
 
+def find_csi_camera_index() -> Optional[int]:
+    """Return the index of the first CSI camera, or None if there is none. (Raspberry Pi specific.)
+
+    Intended for selecting a single CSI camera. A CSI camera is identified by its ``platform/`` id
+    prefix (set by the ``rpi/pisp`` / ``rpi/vc4`` pipeline handler); the location property cannot be
+    used since Raspberry Pi CSI cameras report ``Location = External`` just like USB ones. Pass the
+    result to ``LibcameraCapture(..., camera_index=...)`` to avoid accidentally picking a USB camera
+    that libcamera may also enumerate.
+
+    Note:
+        The returned index is not a stable id; it is a position in the libcamera enumeration order
+        and may differ between runs, so use it promptly rather than persisting it.
+    """
+    cm = libcam.CameraManager.singleton()
+    for index, camera in enumerate(cm.cameras):
+        if str(camera.id).startswith("platform/"):
+            return index
+    return None
+
+
 class LibcameraCapture(Producer[Frame[bytes]]):
     _cm: libcam.CameraManager
     _size: Tuple[int, int]
@@ -121,6 +141,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
             pixel_format: The pixel format. Only RGB888 or BGR888 are supported.
                 cf. https://libcamera.org/api-html/classlibcamera_1_1PixelFormat.html
             camera_index: The index of the camera to use. Defaults to 0.
+                See ``find_csi_camera_index()`` to select the CSI camera when a USB camera is also connected.
             orientation: The orientation of the camera. Defaults to Rotate0.
                 cf. https://libcamera.org/api-html/namespacelibcamera.html#a80ea01625b93ecfe879249ac60c79384.
             framerate: The framerate (fps). If not specified, the default setting of the libcamera is used.
