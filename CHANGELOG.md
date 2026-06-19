@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Recognize the Raspberry Pi 5 CSI receiver driver (`rp1-cfe`) as a CSI camera in `find_csi_camera_device()`, so it returns the CSI device node (instead of `None`) on Raspberry Pi 5 when a CSI camera is connected. Note that on Raspberry Pi 5 this node is a raw CFE node used for presence detection; capture should go through `LibcameraCapture`.
+
 ## 2.17.0 (2026-06-02)
 
 - Add `CUSTOM_COMMAND` feature to `CommandServer`
