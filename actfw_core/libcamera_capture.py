@@ -133,7 +133,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
                 When True, the padding is removed and a tightly packed (``width * 3`` per line) buffer is
                 produced, so consumers can read it as a plain ``width x height x 3`` image regardless of
                 the capture width. When False, the raw buffer is passed through unchanged; in that case use
-                ``stride()`` to interpret it yourself (this avoids the copy and is useful for zero-copy paths).
+                ``stride()`` to interpret it yourself (this avoids the per-line depadding repack and is useful when you can handle padded strides).
 
         Note:
             As for pixel_format, if RGB888 is specified, BGR888 is actually obtained,
@@ -220,7 +220,15 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         stride = self._stride
         if stride == packed_bytes_per_line:
             return mm[:]
-        return b"".join(mm[y * stride : y * stride + packed_bytes_per_line] for y in range(height))
+        if stride < packed_bytes_per_line:
+            raise ValueError(f"Invalid stride {stride} for packed line size {packed_bytes_per_line}")
+        mv = memoryview(mm)
+        out = bytearray(packed_bytes_per_line * height)
+        for y in range(height):
+            src = y * stride
+            dst = y * packed_bytes_per_line
+            out[dst : dst + packed_bytes_per_line] = mv[src : src + packed_bytes_per_line]
+        return bytes(out)
 
     def _handle_camera_event(self) -> None:
         reqs = self._cm.get_ready_requests()
