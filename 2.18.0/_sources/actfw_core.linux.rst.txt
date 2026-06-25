@@ -1,0 +1,37 @@
+actfw\_core.linux package
+=========================
+
+Submodules
+----------
+
+actfw\_core.linux.dma\_heap module
+----------------------------------
+
+.. automodule:: actfw_core.linux.dma_heap
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.linux.ioctl module
+------------------------------
+
+.. automodule:: actfw_core.linux.ioctl
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.linux.types module
+------------------------------
+
+.. automodule:: actfw_core.linux.types
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: actfw_core.linux
+   :members:
+   :undoc-members:
+   :show-inheritance:
