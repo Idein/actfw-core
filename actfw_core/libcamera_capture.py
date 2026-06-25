@@ -124,6 +124,8 @@ class LibcameraCapture(Producer[Frame[bytes]]):
     _framerate: int
     _shutter_time: Union[float, Auto]
     _analogue_gain: Union[float, Auto]
+    _depad: bool
+    _stride: int
 
     def __init__(
         self,
@@ -132,6 +134,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         camera_index: int = 0,
         orientation: libcam.Orientation = libcam.Orientation.Rotate0,
         framerate: int = 30,
+        depad: bool = True,
     ) -> None:
         """
         Initialization method for the LibcameraCapture class.
@@ -145,6 +148,14 @@ class LibcameraCapture(Producer[Frame[bytes]]):
             orientation: The orientation of the camera. Defaults to Rotate0.
                 cf. https://libcamera.org/api-html/namespacelibcamera.html#a80ea01625b93ecfe879249ac60c79384.
             framerate: The framerate (fps). If not specified, the default setting of the libcamera is used.
+            depad: Whether to strip the per-line stride padding from captured frames. Defaults to True.
+                The ISP may pad each line of the output buffer up to an alignment boundary
+                (e.g. 64 bytes on Raspberry Pi 5 / PiSP), so the stride can be larger than ``width * 3``.
+                When True, the padding is removed and a tightly packed (``width * 3`` per line) buffer is
+                produced, so consumers can read it as a plain ``width x height x 3`` image regardless of
+                the capture width. When False, the raw buffer is passed through unchanged; in that case use
+                ``stride()`` to interpret it yourself (this avoids the per-line depadding repack and is useful
+                when you can handle padded strides).
 
         Note:
             As for pixel_format, if RGB888 is specified, BGR888 is actually obtained,
@@ -172,6 +183,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         self._framerate = framerate
         self._shutter_time = Auto.AUTO
         self._analogue_gain = Auto.AUTO
+        self._depad = depad
         self._camera = self._cm.cameras[camera_index]
         self._camera.acquire()
         self._camera_config = self._camera.generate_configuration([libcam.StreamRole.Viewfinder])
@@ -185,6 +197,8 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         res = self._camera.configure(self._camera_config)
         if res is not None and res < 0:
             raise CameraConfigureError(res)
+        # The validated stride (bytes per line, including any padding the ISP adds).
+        self._stride = self._camera_config.at(0).stride
 
     def cameras(self) -> List[libcam.Camera]:
         return self._cm.cameras  # type: ignore
@@ -192,6 +206,17 @@ class LibcameraCapture(Producer[Frame[bytes]]):
     def capture_size(self) -> Tuple[int, int]:
         stream_config: libcam.StreamConfiguration = self._camera_config.at(0)
         return (stream_config.size.width, stream_config.size.height)
+
+    def stride(self) -> int:
+        """Return the stride (bytes per line) of the captured buffer, including padding.
+
+        The ISP may align each line of the output buffer up to a boundary (e.g. 64 bytes on
+        Raspberry Pi 5 / PiSP), so this can be larger than ``width * 3``. When the capture is
+        created with ``depad=False``, use this together with ``capture_size()`` to interpret
+        the raw frame buffer (e.g. ``Image.frombuffer(..., "raw", "RGB", stride, 1)`` for PIL,
+        or ``numpy.lib.stride_tricks.as_strided`` for a zero-copy ndarray view).
+        """
+        return self._stride
 
     def set_exposure_settings(self, shutter_time: Union[float, Auto], analogue_gain: Union[float, Auto]) -> None:
         """Set shutter_time and analogue_gain.
@@ -206,6 +231,27 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         self._shutter_time = shutter_time
         self._analogue_gain = analogue_gain
 
+    def _strip_stride_padding(self, mm: mmap.mmap) -> bytes:
+        """Remove the per-line stride padding, returning a tightly packed (width * 3 per line) buffer.
+
+        If the stride already equals ``width * 3`` there is no padding, so the whole buffer is
+        returned as-is (a single copy, same as the previous behaviour).
+        """
+        width, height = self.capture_size()
+        packed_bytes_per_line = width * 3
+        stride = self._stride
+        if stride == packed_bytes_per_line:
+            return mm[:]
+        if stride < packed_bytes_per_line:
+            raise ValueError(f"Invalid stride {stride} for packed line size {packed_bytes_per_line}")
+        mv = memoryview(mm)
+        out = bytearray(packed_bytes_per_line * height)
+        for y in range(height):
+            src = y * stride
+            dst = y * packed_bytes_per_line
+            out[dst : dst + packed_bytes_per_line] = mv[src : src + packed_bytes_per_line]
+        return bytes(out)
+
     def _handle_camera_event(self) -> None:
         reqs = self._cm.get_ready_requests()
         for req in reqs:
@@ -216,7 +262,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
             plane = next(iter(frame_buffer.planes))
 
             with mmap.mmap(plane.fd, plane.length, offset=plane.offset) as mm:
-                dst = mm[:]
+                dst = self._strip_stride_padding(mm) if self._depad else mm[:]
 
             frame = Frame(dst)
             self._outlet(frame)
