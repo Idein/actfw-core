@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.18.0 (2026-06-25)
+
 - Add `find_csi_camera_index()` and support for using CSI cameras on Raspberry Pi 5.
 - Add `depad` option to `LibcameraCapture` to enable or disable stripping per-line stride padding.
 
