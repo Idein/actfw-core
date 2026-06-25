@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `depad` option to `LibcameraCapture` to enable or disable stripping per-line stride padding.
+
 ## 2.17.0 (2026-06-02)
 
 - Add `CUSTOM_COMMAND` feature to `CommandServer`
