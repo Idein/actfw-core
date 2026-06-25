@@ -133,7 +133,8 @@ class LibcameraCapture(Producer[Frame[bytes]]):
                 When True, the padding is removed and a tightly packed (``width * 3`` per line) buffer is
                 produced, so consumers can read it as a plain ``width x height x 3`` image regardless of
                 the capture width. When False, the raw buffer is passed through unchanged; in that case use
-                ``stride()`` to interpret it yourself (this avoids the per-line depadding repack and is useful when you can handle padded strides).
+                ``stride()`` to interpret it yourself (this avoids the per-line depadding repack and is useful
+                when you can handle padded strides).
 
         Note:
             As for pixel_format, if RGB888 is specified, BGR888 is actually obtained,
