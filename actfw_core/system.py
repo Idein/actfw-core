@@ -255,7 +255,14 @@ def find_usb_camera_device() -> Optional[str]:
 
 def find_csi_camera_device() -> Optional[str]:
     """
-    Path of CSI camera device.
+    Path of CSI camera device, or None if no CSI camera is connected.
     Since ACTCAST_PROTOCOL_VERSION 1.3.0.
+
+    Note:
+        On Raspberry Pi 5, the returned path is an ``rp1-cfe`` (RP1 Camera Front End) node, which is a
+        raw CSI-2 receiver configured through libcamera's Media Controller pipeline. It is suitable for
+        checking CSI camera presence and for the V4L-based capture path on older devices, but on
+        Raspberry Pi 5 the capture itself should go through ``LibcameraCapture`` (which selects a camera
+        by index, not by this V4L2 node). See ``actfw_core.libcamera_capture.find_csi_camera_index``.
     """
     return _find_specific_video_device(VideoPort.CSI)

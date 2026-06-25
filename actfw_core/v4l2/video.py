@@ -885,7 +885,10 @@ class Video(object):
         if not (cap.device_caps & _V4L2_CAP_STREAMING):
             raise RuntimeError("The device node doesn't support the streaming I/O method.")
         driver = "".join(map(chr, itertools.takewhile(lambda x: x > 0, cap.driver)))
-        if driver == "bm2835 mmal" or driver == "unicam":
+        # "bm2835 mmal": legacy firmware camera stack (Raspberry Pi OS Buster and earlier)
+        # "unicam": BCM2835 Unicam CSI-2 receiver (Raspberry Pi 0-4)
+        # "rp1-cfe": RP1 Camera Front End CSI-2 receiver (Raspberry Pi 5)
+        if driver in ("bm2835 mmal", "unicam", "rp1-cfe"):
             return VideoPort.CSI
         elif driver[: len("uvcvideo")] == "uvcvideo":
             return VideoPort.USB
