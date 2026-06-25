@@ -2,8 +2,7 @@
 
 ## Unreleased
 
-- Add `find_csi_camera_index()` to `libcamera_capture`. On Raspberry Pi 5, libcamera may also enumerate a USB (UVC) camera, so the default `LibcameraCapture(camera_index=0)` could pick the wrong one when both a CSI and a USB camera are connected. `find_csi_camera_index()` returns the index of the CSI camera (identified by its `platform/` id prefix; the location property is not usable for this since CSI cameras report `Location = External`), which can be passed as `LibcameraCapture(..., camera_index=...)`.
-- Recognize the Raspberry Pi 5 CSI receiver driver (`rp1-cfe`) as a CSI camera in `find_csi_camera_device()`, so it returns the CSI device node (instead of `None`) on Raspberry Pi 5 when a CSI camera is connected. Note that on Raspberry Pi 5 this node is a raw CFE node used for presence detection; capture should go through `LibcameraCapture`.
+- Add `find_csi_camera_index()` and support for using CSI cameras on Raspberry Pi 5.
 
 ## 2.17.0 (2026-06-02)
 
