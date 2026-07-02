@@ -5,7 +5,9 @@ Note:
     This module is only available in ActcastOS4 or later.
 """
 import mmap
+import re
 import selectors
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import libcamera as libcam
@@ -14,6 +16,23 @@ from actfw_core.system import EnvironmentVariableNotSet, get_actcast_firmware_ty
 from actfw_core.task import Producer
 from actfw_core.unicam_isp_capture import Auto
 from actfw_core.util.pad import _PadBase, _PadDiscardingOld
+
+
+_RAW_FORMAT_BIT_DEPTH_RE = re.compile(r"(?<!\d)(8|10|12|14|16)(?!\d)")
+
+
+@dataclass(frozen=True)
+class SensorMode:
+    """Sensor readout mode used by libcamera.
+
+    ``size`` and ``bit_depth`` correspond to ``CameraConfiguration.sensor_config``.
+    ``pixel_format`` is informational and is populated by ``available_sensor_modes()``
+    when libcamera exposes raw formats for the camera.
+    """
+
+    size: Tuple[int, int]
+    pixel_format: Optional[str] = None
+    bit_depth: Optional[int] = None
 
 
 class CameraConfigurationInvalidError(Exception):
@@ -94,6 +113,13 @@ class CaptureTimeoutError(Exception):
         return f"{self._msg}: {self._timeout}"
 
 
+def _parse_bit_depth_from_pixel_format(pixel_format: str) -> Optional[int]:
+    match = _RAW_FORMAT_BIT_DEPTH_RE.search(pixel_format)
+    if match is None:
+        return None
+    return int(match.group(1))
+
+
 def find_csi_camera_index() -> Optional[int]:
     """Return the index of the first CSI camera, or None if there is none. (Raspberry Pi specific.)
 
@@ -135,6 +161,8 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         orientation: libcam.Orientation = libcam.Orientation.Rotate0,
         framerate: int = 30,
         depad: bool = True,
+        sensor_mode: Optional[SensorMode] = None,
+        strict_sensor_mode: bool = True,
     ) -> None:
         """
         Initialization method for the LibcameraCapture class.
@@ -156,6 +184,11 @@ class LibcameraCapture(Producer[Frame[bytes]]):
                 the capture width. When False, the raw buffer is passed through unchanged; in that case use
                 ``stride()`` to interpret it yourself (this avoids the per-line depadding repack and is useful
                 when you can handle padded strides).
+            sensor_mode: Sensor readout mode to request. This is independent of the processed output
+                ``size``; use it to avoid libcamera selecting a narrow sensor mode solely because a small
+                processed output size was requested.
+            strict_sensor_mode: If True, raise CameraConfigurationInvalidError when libcamera adjusts the
+                requested sensor mode during validation.
 
         Note:
             As for pixel_format, if RGB888 is specified, BGR888 is actually obtained,
@@ -191,9 +224,30 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         stream_config: libcam.StreamConfiguration = self._camera_config.at(0)
         stream_config.size = libcam.Size(*self._size)
         stream_config.pixel_format = self._pixel_format
+        if sensor_mode is not None:
+            sensor_config = libcam.SensorConfiguration()
+            sensor_config.output_size = libcam.Size(*sensor_mode.size)
+            if sensor_mode.bit_depth is not None:
+                sensor_config.bit_depth = sensor_mode.bit_depth
+            self._camera_config.sensor_config = sensor_config
         res = self._camera_config.validate()
         if res == libcam.CameraConfiguration.Status.Invalid:
             raise CameraConfigurationInvalidError(self._camera_config)
+        if strict_sensor_mode and sensor_mode is not None:
+            configured_sensor_mode = self.sensor_mode()
+            if configured_sensor_mode is None:
+                raise CameraConfigurationInvalidError(self._camera_config, "SensorMode was not configured")
+            if configured_sensor_mode.size != sensor_mode.size:
+                raise CameraConfigurationInvalidError(
+                    self._camera_config,
+                    f"SensorMode size was adjusted: requested={sensor_mode.size}, configured={configured_sensor_mode.size}",
+                )
+            if sensor_mode.bit_depth is not None and configured_sensor_mode.bit_depth != sensor_mode.bit_depth:
+                raise CameraConfigurationInvalidError(
+                    self._camera_config,
+                    "SensorMode bit_depth was adjusted: "
+                    f"requested={sensor_mode.bit_depth}, configured={configured_sensor_mode.bit_depth}",
+                )
         res = self._camera.configure(self._camera_config)
         if res is not None and res < 0:
             raise CameraConfigureError(res)
@@ -217,6 +271,53 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         or ``numpy.lib.stride_tricks.as_strided`` for a zero-copy ndarray view).
         """
         return self._stride
+
+    @staticmethod
+    def available_sensor_modes(camera_index: int = 0) -> List[SensorMode]:
+        """Return sensor readout modes exposed by libcamera for a camera.
+
+        The modes are queried from the Raw stream configuration instead of hard-coded per sensor.
+        ``pixel_format`` and ``bit_depth`` are informational; ``LibcameraCapture`` requests the
+        mode through ``CameraConfiguration.sensor_config`` using ``size`` and optionally ``bit_depth``.
+        """
+        cm = libcam.CameraManager.singleton()
+        camera = cm.cameras[camera_index]
+        camera.acquire()
+        try:
+            raw_config = camera.generate_configuration([libcam.StreamRole.Raw])
+            raw_formats = raw_config.at(0).formats
+            sensor_modes: List[SensorMode] = []
+            for pix in raw_formats.pixel_formats:
+                pixel_format = str(pix)
+                bit_depth = _parse_bit_depth_from_pixel_format(pixel_format)
+                for size in raw_formats.sizes(pix):
+                    sensor_modes.append(
+                        SensorMode(
+                            size=(size.width, size.height),
+                            pixel_format=pixel_format,
+                            bit_depth=bit_depth,
+                        )
+                    )
+            return sensor_modes
+        finally:
+            camera.release()
+
+    def sensor_mode(self) -> Optional[SensorMode]:
+        """Return the configured sensor readout mode, if libcamera exposes one."""
+        sensor_config = getattr(self._camera_config, "sensor_config", None)
+        if sensor_config is None:
+            return None
+        output_size = getattr(sensor_config, "output_size", None)
+        if output_size is None:
+            return None
+        width = getattr(output_size, "width", 0)
+        height = getattr(output_size, "height", 0)
+        if width == 0 or height == 0:
+            return None
+        bit_depth = getattr(sensor_config, "bit_depth", None)
+        if bit_depth == 0:
+            bit_depth = None
+        return SensorMode(size=(width, height), bit_depth=bit_depth)
 
     def set_exposure_settings(self, shutter_time: Union[float, Auto], analogue_gain: Union[float, Auto]) -> None:
         """Set shutter_time and analogue_gain.
