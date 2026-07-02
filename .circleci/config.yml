@@ -61,8 +61,7 @@ jobs:
       - poetry-install
       - run:
           name: Lint
-          command: |
-            poetry run pysen run lint
+          command: make lint
 
   test:
     parameters:

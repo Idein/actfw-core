@@ -80,7 +80,14 @@ poetry install
 ### Running tests
 
 ```console
-poetry run pytest -v
+make test
+```
+
+### Running lint
+
+```console
+make lint
+make fix
 ```
 
 ### Releasing package & API doc

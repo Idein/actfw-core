@@ -23,13 +23,9 @@ typing-extensions = "^4.15.0"
 Sphinx = "^4.3.0"
 cryptography = "^3.4.7"
 pyOpenSSL = "^20.0.1"
-pysen = { version = "^0.11" }
 pytest = "^6.2.3"
+ruff = "^0.15"
 sphinx-theme = "^1.0"
-black = "^23"
-flake8 = "3.9.2"
-flake8-bugbear = "21.9.2"
-isort = "5.1.4"
 mypy = "^1"
 types-pillow = ">=5"
 types-pyopenssl = ">=20"
@@ -39,20 +35,23 @@ types-pyopenssl = ">=20"
 "Documentation" = "https://idein.github.io/actfw-core/latest/"
 "Changelog" = "https://github.com/Idein/actfw-core/blob/master/CHANGELOG.md"
 
-[tool.pysen]
-version = "0.11"
+[tool.ruff]
+line-length = 128
+target-version = "py39"
 
-[tool.pysen.lint]
-enable_black = true
-enable_flake8 = true
-enable_isort = true
-enable_mypy = true
-mypy_preset = "strict"
-line_length = 128
-py_version = "py38"
+[tool.ruff.lint]
+select = ["E", "F", "B"]
+ignore = ["B028", "B904", "E501", "E721"]
+external = ["B950"]
 
-[[tool.pysen.lint.mypy_targets]]
-paths = ["actfw_core/"]
+[tool.mypy]
+strict = true
+python_version = "3.9"
+files = ["actfw_core/"]
+disallow_any_generics = false
+ignore_missing_imports = true
+implicit_reexport = true
+warn_unused_ignores = false
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
