@@ -6,33 +6,27 @@ references:
     - "python:3.11-bookworm"
 
 commands:
-  install-python-dev-tools:
+  install-uv:
     steps:
       - run:
-          name: Install python dev tools and dependencies
+          name: Install uv
+          environment:
+            UV_VERSION: "0.11.26"
           command: |
-            apt-get update
-            apt-get install -y --no-install-recommends python3-pip
-  install-poetry:
+            curl -LsSf "https://astral.sh/uv/${UV_VERSION}/install.sh" | sh
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_ENV"
+            # Use the Docker image's "python" instead of letting uv download its own Python.
+            echo 'export UV_PYTHON=python' >> "$BASH_ENV"
+  uv-sync:
     steps:
-      - run:
-          name: Install poetry
-          command: |
-            curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.8.4 python -
-            echo 'export PATH=$HOME/.local/bin:$PATH' >> $BASH_ENV
-            source $BASH_ENV
-  poetry-install:
-    steps:
-      # See: https://circleci.com/docs/2.0/language-python/#cache-dependencies
       - restore_cache:
-          key: &cache-key-poetry cache-poetry-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "poetry.lock" }}
+          key: &cache-key-uv cache-uv-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "uv.lock" }}
       - run:
-          name: poetry install
+          name: uv sync
           command: |
-            poetry config virtualenvs.in-project true
-            poetry install --no-ansi
+            uv sync --frozen
       - save_cache:
-          key: *cache-key-poetry
+          key: *cache-key-uv
           paths:
             - ".venv"
 
@@ -56,9 +50,8 @@ jobs:
           password: $DOCKER_PASS
     steps:
       - checkout
-      - install-python-dev-tools
-      - install-poetry
-      - poetry-install
+      - install-uv
+      - uv-sync
       - run:
           name: Lint
           command: make lint
@@ -72,12 +65,11 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
-      - install-poetry
-      - poetry-install
+      - install-uv
+      - uv-sync
       - run:
           name: Test
-          command: poetry run pytest -v
+          command: make test
   test-with-up-to-date-dependencies:
     parameters:
       image-tag:
@@ -89,13 +81,14 @@ jobs:
       - checkout
       - run:
           name: remove lock file to get up-to-date dependencies
-          command: rm poetry.lock
-      - install-python-dev-tools
-      - install-poetry
-      - poetry-install
+          command: rm uv.lock
+      - install-uv
+      - run:
+          name: uv sync
+          command: uv sync
       - run:
           name: Test
-          command: poetry run pytest -v
+          command: make test
 
   build-api-doc:
     docker:
@@ -104,21 +97,21 @@ jobs:
     resource_class: arm.medium
     steps:
       - checkout
-      - install-python-dev-tools
       - run:
           name: Install python
           command: |
             apt-get update
             apt-get install -y --no-install-recommends python-is-python3 curl
-      - install-poetry
+      - install-uv
       - run:
+          name: uv sync with system site packages
           command: |
-            poetry config virtualenvs.options.system-site-packages true
-      - poetry-install
+            uv venv --clear --system-site-packages
+            uv sync --frozen
       - run:
           name: sphinx-build
           command: |
-            poetry run sphinx-build docs build/sphinx/html
+            uv run --frozen sphinx-build docs build/sphinx/html
       - persist_to_workspace:
           root: build/sphinx
           paths:
@@ -133,13 +126,12 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
-      - install-poetry
-      - poetry-install
+      - install-uv
       - run:
           name: Make wheel & sdist
           command: |
-            poetry build
+            # Ignore local source overrides so release artifacts are built only from publishable dependencies.
+            uv build --no-sources
       - persist_to_workspace:
           root: .
           paths:
@@ -151,14 +143,13 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
-      - install-poetry
-      - poetry-install
+      - install-uv
+      - uv-sync
       - run:
           name: Check if git tag name is appropriate for package version
           command: |
             TAG=$(echo ${CIRCLE_TAG} |sed -e 's/release-//')
-            VERSION=$(poetry run python -c 'from importlib.metadata import version; print(version("actfw-core"))')
+            VERSION=$(uv run --frozen python -c 'from importlib.metadata import version; print(version("actfw-core"))')
             echo "Git tag: $TAG"
             echo "Package version: $VERSION"
             test "$VERSION" = "$TAG"
@@ -196,16 +187,14 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
-      - install-poetry
-      - poetry-install
+      - install-uv
       - attach_workspace:
           at: /tmp/workspace
       - run:
           name: Publish wheel & sdist to PyPI
           command: |
             mv /tmp/workspace/dist .
-            poetry publish --username "__token__" --password "$PYPI_API_TOKEN" --no-interaction
+            uv publish --token "$PYPI_API_TOKEN"
 
 workflows:
   version: 2
