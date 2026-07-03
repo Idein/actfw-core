@@ -115,17 +115,11 @@ jobs:
             apt-get update
             apt-get install -y --no-install-recommends python-is-python3 python3-pip python3-venv
       - install-uv
-      - restore_cache:
-          key: cache-uv-system-site-packages-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "uv.lock" }}
       - run:
           name: uv sync with system site packages
           command: |
-            uv venv --system-site-packages --python python
+            uv venv --clear --system-site-packages --python python
             uv sync --frozen --python python
-      - save_cache:
-          key: cache-uv-system-site-packages-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.CIRCLECI_CACHE_VERSION }}-{{ checksum "uv.lock" }}
-          paths:
-            - ".venv"
       - run:
           name: sphinx-build
           command: |
