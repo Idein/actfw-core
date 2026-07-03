@@ -6,13 +6,6 @@ references:
     - "python:3.11-bookworm"
 
 commands:
-  install-python-dev-tools:
-    steps:
-      - run:
-          name: Install python dev tools and dependencies
-          command: |
-            apt-get update
-            apt-get install -y --no-install-recommends python3-pip python3-venv
   install-uv:
     steps:
       - run:
@@ -20,10 +13,10 @@ commands:
           environment:
             UV_VERSION: "0.11.26"
           command: |
-            # Install uv into its own venv to avoid PEP 668's externally managed system Python restriction.
-            python -m venv /tmp/uv
-            /tmp/uv/bin/python -m pip install --upgrade "uv==${UV_VERSION}"
-            echo 'export PATH="/tmp/uv/bin:$PATH"' >> "$BASH_ENV"
+            curl -LsSf "https://astral.sh/uv/${UV_VERSION}/install.sh" | sh
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_ENV"
+            # Use the Docker image's "python" instead of letting uv download its own Python.
+            echo 'export UV_PYTHON=python' >> "$BASH_ENV"
   uv-sync:
     steps:
       - restore_cache:
@@ -31,8 +24,7 @@ commands:
       - run:
           name: uv sync
           command: |
-            # Use the Docker image's "python" instead of letting uv download its own Python.
-            uv sync --frozen --python python
+            uv sync --frozen
       - save_cache:
           key: *cache-key-uv
           paths:
@@ -58,7 +50,6 @@ jobs:
           password: $DOCKER_PASS
     steps:
       - checkout
-      - install-python-dev-tools
       - install-uv
       - uv-sync
       - run:
@@ -74,7 +65,6 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
       - install-uv
       - uv-sync
       - run:
@@ -92,11 +82,10 @@ jobs:
       - run:
           name: remove lock file to get up-to-date dependencies
           command: rm uv.lock
-      - install-python-dev-tools
       - install-uv
       - run:
           name: uv sync
-          command: uv sync --python python
+          command: uv sync
       - run:
           name: Test
           command: make test
@@ -108,18 +97,17 @@ jobs:
     resource_class: arm.medium
     steps:
       - checkout
-      - install-python-dev-tools
       - run:
           name: Install python
           command: |
             apt-get update
-            apt-get install -y --no-install-recommends python-is-python3 python3-pip python3-venv
+            apt-get install -y --no-install-recommends python-is-python3 curl
       - install-uv
       - run:
           name: uv sync with system site packages
           command: |
-            uv venv --clear --system-site-packages --python python
-            uv sync --frozen --python python
+            uv venv --clear --system-site-packages
+            uv sync --frozen
       - run:
           name: sphinx-build
           command: |
@@ -139,13 +127,12 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
       - install-uv
       - run:
           name: Make wheel & sdist
           command: |
             # Ignore local source overrides so release artifacts are built only from publishable dependencies.
-            uv build --no-sources --python python
+            uv build --no-sources
       - persist_to_workspace:
           root: .
           paths:
@@ -157,7 +144,6 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
       - install-uv
       - uv-sync
       - run:
@@ -202,7 +188,6 @@ jobs:
         auth: *docker-hub-auth
     steps:
       - checkout
-      - install-python-dev-tools
       - install-uv
       - attach_workspace:
           at: /tmp/workspace
