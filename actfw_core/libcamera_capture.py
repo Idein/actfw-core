@@ -4,6 +4,7 @@ LibcameraCapture module.
 Note:
     This module is only available in ActcastOS4 or later.
 """
+from dataclasses import dataclass
 import mmap
 import selectors
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -15,6 +16,29 @@ from actfw_core.task import Producer
 from actfw_core.unicam_isp_capture import Auto
 from actfw_core.util.pad import _PadBase, _PadDiscardingOld
 
+@dataclass(frozen=True)
+class SensorMode:
+  bit_depth: int
+  output_size: Tuple[int,int]
+
+  def to_libcamera(self) -> libcam.SensorConfiguration:
+      width, height = self.output_size
+
+      sensor = libcam.SensorConfiguration()
+      sensor.bit_depth = self.bit_depth
+      sensor.output_size = libcam.Size(width, height)
+      return sensor
+
+
+@dataclass(frozen=True)
+class ScalerCrop:
+  x: int
+  y: int
+  width: int
+  height: int
+
+  def to_libcamera(self) -> libcam.Rectangle:
+      return libcam.Rectangle(self.x, self.y, self.width, self.height)
 
 class CameraConfigurationInvalidError(Exception):
     _config: libcam.CameraConfiguration
@@ -126,6 +150,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
     _analogue_gain: Union[float, Auto]
     _depad: bool
     _stride: int
+    _scaler_crop: Optional[ScalerCrop]
 
     def __init__(
         self,
@@ -135,6 +160,8 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         orientation: libcam.Orientation = libcam.Orientation.Rotate0,
         framerate: int = 30,
         depad: bool = True,
+        sensor_mode: Optional[SensorMode] = None,
+        scaler_crop: Optional[ScalerCrop] = None,
     ) -> None:
         """
         Initialization method for the LibcameraCapture class.
@@ -184,6 +211,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         self._shutter_time = Auto.AUTO
         self._analogue_gain = Auto.AUTO
         self._depad = depad
+        self._scaler_crop = scaler_crop
         self._camera = self._cm.cameras[camera_index]
         self._camera.acquire()
         self._camera_config = self._camera.generate_configuration([libcam.StreamRole.Viewfinder])
@@ -191,6 +219,10 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         stream_config: libcam.StreamConfiguration = self._camera_config.at(0)
         stream_config.size = libcam.Size(*self._size)
         stream_config.pixel_format = self._pixel_format
+
+        if sensor_mode is not None:
+            self._camera_config.sensor_config = sensor_mode.to_libcamera()
+
         res = self._camera_config.validate()
         if res == libcam.CameraConfiguration.Status.Invalid:
             raise CameraConfigurationInvalidError(self._camera_config)
@@ -289,6 +321,9 @@ class LibcameraCapture(Producer[Frame[bytes]]):
             controls: Dict[Any, Any] = {}
             frame_duration_limit = int(1_000_000 / self._framerate)
             controls[libcam.controls.FrameDurationLimits] = (frame_duration_limit, frame_duration_limit)
+
+            if self._scaler_crop is not None:
+                controls[libcam.controls.ScalerCrop] = self._scaler_crop.to_libcamera()
 
             manual_shutter = not isinstance(self._shutter_time, Auto)
             manual_gain = not isinstance(self._analogue_gain, Auto)
