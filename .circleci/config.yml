@@ -129,7 +129,8 @@ jobs:
       - run:
           name: sphinx-build
           command: |
-            uv run --frozen sphinx-build docs build/sphinx/html
+            # Use the venv directly to preserve --system-site-packages; `uv run` may recreate .venv without it.
+            .venv/bin/sphinx-build docs build/sphinx/html
       - persist_to_workspace:
           root: build/sphinx
           paths:
