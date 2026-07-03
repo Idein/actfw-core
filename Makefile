@@ -1,5 +1,5 @@
-POETRY ?= poetry
-RUN := $(POETRY) run
+UV ?= uv
+RUN := $(UV) run --frozen
 
 .PHONY: lint ruff-check type-check fix ruff-fix test
 

@@ -1,39 +1,50 @@
-[tool.poetry]
-authors = ["Idein Inc."]
+[project]
+authors = [{ name = "Idein Inc." }]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
+    # Keep the version classifiers poetry used to generate automatically; hatchling does not add them.
+    "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "Pillow>=5,<11",
+    "typing-extensions>=4.15,<5",
 ]
 description = "Core components of actfw, independent of specific devices"
-keywords = ['actcast']
+keywords = ["actcast"]
 license = "MIT"
 name = "actfw-core"
 readme = "README.md"
-repository = "https://github.com/Idein/actfw-core"
+requires-python = ">=3.9, <3.12"
 version = "2.18.0"
 
-[tool.poetry.dependencies]
-python = ">=3.9, <3.12"
-Pillow = ">=5, <11"
-typing-extensions = "^4.15.0"
-
-[tool.poetry.group.dev.dependencies]
-Sphinx = "^4.3.0"
-cryptography = "^3.4.7"
-pyOpenSSL = "^20.0.1"
-pytest = "^6.2.3"
-ruff = "^0.15"
-sphinx-theme = "^1.0"
-mypy = "^1"
-types-pillow = ">=5"
-types-pyopenssl = ">=20"
-
-[tool.poetry.urls]
+[project.urls]
 "Repository" = "https://github.com/Idein/actfw-core"
 "Documentation" = "https://idein.github.io/actfw-core/latest/"
 "Changelog" = "https://github.com/Idein/actfw-core/blob/master/CHANGELOG.md"
+
+[dependency-groups]
+dev = [
+    "Sphinx>=4.3,<5",
+    "cryptography>=3.4.7,<4",
+    "pyOpenSSL>=20.0.1,<21",
+    "pytest>=6.2.3,<7",
+    "ruff>=0.15,<0.16",
+    "sphinx-theme>=1.0,<2",
+    "sphinxcontrib-applehelp<1.0.3",
+    "sphinxcontrib-devhelp<1.0.3",
+    "sphinxcontrib-htmlhelp<2.0.1",
+    "sphinxcontrib-qthelp<1.0.4",
+    "sphinxcontrib-serializinghtml<1.1.6",
+    "mypy>=1,<2",
+    "types-pillow>=5",
+    "types-pyopenssl>=20",
+]
 
 [tool.ruff]
 line-length = 128
@@ -54,5 +65,8 @@ implicit_reexport = true
 warn_unused_ignores = false
 
 [build-system]
-build-backend = "poetry.core.masonry.api"
-requires = ["poetry-core>=1.0.0"]
+build-backend = "hatchling.build"
+requires = ["hatchling>=1.27"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["actfw_core"]
