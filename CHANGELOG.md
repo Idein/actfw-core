@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.19.0 (2026-07-06)
+
 - Add `sensor_config` and `scaler_crop` option to `LibcameraCapture`
 
 ## 2.18.0 (2026-06-25)
