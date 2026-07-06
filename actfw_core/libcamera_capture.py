@@ -17,7 +17,7 @@ from actfw_core.unicam_isp_capture import Auto
 from actfw_core.util.pad import _PadBase, _PadDiscardingOld
 
 @dataclass(frozen=True)
-class SensorConnfig:
+class SensorConfig:
   bit_depth: int
   output_size: Tuple[int,int]
 
@@ -160,7 +160,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         orientation: libcam.Orientation = libcam.Orientation.Rotate0,
         framerate: int = 30,
         depad: bool = True,
-        sensor_connfig: Optional[SensorConnfig] = None,
+        sensor_config: Optional[SensorConfig] = None,
         scaler_crop: Optional[ScalerCrop] = None,
     ) -> None:
         """
@@ -183,7 +183,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
                 the capture width. When False, the raw buffer is passed through unchanged; in that case use
                 ``stride()`` to interpret it yourself (this avoids the per-line depadding repack and is useful
                 when you can handle padded strides).
-            sensor_connfig: The sensor configuration used to adjust the field of view. See the libcamera
+            sensor_config: The sensor configuration used to adjust the field of view. See the libcamera
                 documentation for details about sensor configuration.
             scaler_crop: The scaler crop rectangle used to adjust the field of view. See the libcamera
                 documentation for details about ``ScalerCrop``.
@@ -224,8 +224,8 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         stream_config.size = libcam.Size(*self._size)
         stream_config.pixel_format = self._pixel_format
 
-        if sensor_connfig is not None:
-            self._camera_config.sensor_config = sensor_connfig.to_libcamera()
+        if sensor_config is not None:
+            self._camera_config.sensor_config = sensor_config.to_libcamera()
 
         res = self._camera_config.validate()
         if res == libcam.CameraConfiguration.Status.Invalid:
