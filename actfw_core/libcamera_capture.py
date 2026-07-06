@@ -17,7 +17,7 @@ from actfw_core.unicam_isp_capture import Auto
 from actfw_core.util.pad import _PadBase, _PadDiscardingOld
 
 @dataclass(frozen=True)
-class SensorMode:
+class SensorConnfig:
   bit_depth: int
   output_size: Tuple[int,int]
 
@@ -160,7 +160,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         orientation: libcam.Orientation = libcam.Orientation.Rotate0,
         framerate: int = 30,
         depad: bool = True,
-        sensor_mode: Optional[SensorMode] = None,
+        sensor_connfig: Optional[SensorConnfig] = None,
         scaler_crop: Optional[ScalerCrop] = None,
     ) -> None:
         """
@@ -220,8 +220,8 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         stream_config.size = libcam.Size(*self._size)
         stream_config.pixel_format = self._pixel_format
 
-        if sensor_mode is not None:
-            self._camera_config.sensor_config = sensor_mode.to_libcamera()
+        if sensor_connfig is not None:
+            self._camera_config.sensor_config = sensor_connfig.to_libcamera()
 
         res = self._camera_config.validate()
         if res == libcam.CameraConfiguration.Status.Invalid:
