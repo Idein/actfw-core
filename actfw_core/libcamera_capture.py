@@ -183,6 +183,10 @@ class LibcameraCapture(Producer[Frame[bytes]]):
                 the capture width. When False, the raw buffer is passed through unchanged; in that case use
                 ``stride()`` to interpret it yourself (this avoids the per-line depadding repack and is useful
                 when you can handle padded strides).
+            sensor_connfig: The sensor configuration used to adjust the field of view. See the libcamera
+                documentation for details about sensor configuration.
+            scaler_crop: The scaler crop rectangle used to adjust the field of view. See the libcamera
+                documentation for details about ``ScalerCrop``.
 
         Note:
             As for pixel_format, if RGB888 is specified, BGR888 is actually obtained,
