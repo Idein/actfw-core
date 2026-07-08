@@ -73,8 +73,8 @@ app.run()
 ### Installation of dev requirements
 
 ```console
-pip3 install poetry
-poetry install
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv sync --python python3.11
 ```
 
 ### Running tests
