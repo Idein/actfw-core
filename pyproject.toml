@@ -21,7 +21,7 @@ license = "MIT"
 name = "actfw-core"
 readme = "README.md"
 requires-python = ">=3.9, <3.12"
-version = "2.18.0"
+version = "2.19.0"
 
 [project.urls]
 "Repository" = "https://github.com/Idein/actfw-core"
