@@ -71,3 +71,24 @@ def test_service_client_stop_act_raises_on_error_status() -> None:
         # Act & Assert
         with pytest.raises(RuntimeError):
             client.stop_act()
+
+
+def test_service_client_stop_act_sends_reason_to_agent() -> None:
+    # Arrange
+    with TemporaryDirectory() as temp_dir:
+        socket_path, requests = create_socket_for_test(
+            temp_dir,
+            lambda request: ServiceResponse(request.id_, Status.OK, b""),
+        )
+        client = ServiceClient(socket_path)
+
+        # Act
+        with pytest.raises(SystemExit) as exc_info:
+            client.stop_act("停止理由テスト")
+
+        # Assert
+        assert exc_info.value.code == 0
+        assert len(requests) == 1
+        assert requests[0].kind == ServiceKind.STOP_ACT
+        # reason は UTF-8 で payload に載る（日本語で UTF-8 経路も確認）
+        assert requests[0].data == "停止理由テスト".encode("utf-8")

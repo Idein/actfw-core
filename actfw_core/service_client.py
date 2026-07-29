@@ -82,18 +82,23 @@ class ServiceClient:
             raise RuntimeError(f"service request failed: request = {request}, response = {response}")
         return response.data.decode()
 
-    def stop_act(self) -> NoReturn:
+    def stop_act(self, reason: Optional[str] = None) -> NoReturn:
         """
 
         Request actcast agent to stop the act.
 
+        Args:
+            reason (Optional[str]): Optional reason for stopping, shown to device operators.
+                If omitted, the act stops without a reason (same behavior as before).
+
         Exceptions:
             RuntimeError
         """
+        payload = reason.encode("utf-8") if reason is not None else b""
         request = ServiceRequest(
             self._get_request_id(),
             ServiceKind.STOP_ACT,
-            b"",
+            payload,
         )
         response, err = self._sendrecv(request)
         if err:
