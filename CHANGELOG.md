@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add optional `reason` argument to `ServiceClient.stop_act`, sent to the actcast agent so the stop reason can be shown to device operators. Omitting `reason` preserves the previous behavior.
+
 ## 2.19.0 (2026-07-06)
 
 - Add `sensor_config` and `scaler_crop` option to `LibcameraCapture`
