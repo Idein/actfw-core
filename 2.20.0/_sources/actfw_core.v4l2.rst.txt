@@ -1,0 +1,37 @@
+actfw\_core.v4l2 package
+========================
+
+Submodules
+----------
+
+actfw\_core.v4l2.control module
+-------------------------------
+
+.. automodule:: actfw_core.v4l2.control
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.v4l2.types module
+-----------------------------
+
+.. automodule:: actfw_core.v4l2.types
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+actfw\_core.v4l2.video module
+-----------------------------
+
+.. automodule:: actfw_core.v4l2.video
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: actfw_core.v4l2
+   :members:
+   :undoc-members:
+   :show-inheritance:
