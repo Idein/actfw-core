@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add optional `reason` argument to `ServiceClient.stop_act`, sent to the actcast agent so the stop reason can be shown to device operators. Omitting `reason` preserves the previous behavior.
+- Add optional `reason` argument to `ServiceClient.stop_act`. The reason is sent to the actcast agent and, on agents that support it, shown to device operators. Agents without support ignore it and stop the act as before, so passing a reason is always safe. Omitting `reason` preserves the previous behavior.
 
 ## 2.19.0 (2026-07-06)
 
