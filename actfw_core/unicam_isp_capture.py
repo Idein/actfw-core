@@ -488,12 +488,12 @@ class UnicamIspCapture(Producer[Frame[bytes]]):
 
     def __v4l2_control_value_for_analogue_gain(self, analogue_gain: float) -> float:
         if self.sensor_name == "imx219":
-            return 256 - (
-                256 / analogue_gain
+            return (
+                256 - (256 / analogue_gain)
             )  # https://github.com/raspberrypi/libcamera/blob/3fad116f89e0d3497567043cbf6d8c49f1c102db/src/ipa/raspberrypi/cam_helper_imx219.cpp#L67 # noqa: E501, B950
         elif self.sensor_name == "imx708":
-            return 1024 - (
-                1024 / analogue_gain
+            return (
+                1024 - (1024 / analogue_gain)
             )  # https://github.com/raspberrypi/libcamera/blob/6ddd79b5bdbedc1f61007aed35391f1559f9e29a/src/ipa/rpi/cam_helper/cam_helper_imx708.cpp#L103-L106 # noqa: E501, B950
         elif self.sensor_name == "ov5647":
             return (

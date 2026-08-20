@@ -4,6 +4,7 @@ LibcameraCapture module.
 Note:
     This module is only available in ActcastOS4 or later.
 """
+
 from dataclasses import dataclass
 import mmap
 import selectors
@@ -16,29 +17,31 @@ from actfw_core.task import Producer
 from actfw_core.unicam_isp_capture import Auto
 from actfw_core.util.pad import _PadBase, _PadDiscardingOld
 
+
 @dataclass(frozen=True)
 class SensorConfig:
-  bit_depth: int
-  output_size: Tuple[int,int]
+    bit_depth: int
+    output_size: Tuple[int, int]
 
-  def to_libcamera(self) -> libcam.SensorConfiguration:
-      width, height = self.output_size
+    def to_libcamera(self) -> libcam.SensorConfiguration:
+        width, height = self.output_size
 
-      sensor = libcam.SensorConfiguration()
-      sensor.bit_depth = self.bit_depth
-      sensor.output_size = libcam.Size(width, height)
-      return sensor
+        sensor = libcam.SensorConfiguration()
+        sensor.bit_depth = self.bit_depth
+        sensor.output_size = libcam.Size(width, height)
+        return sensor
 
 
 @dataclass(frozen=True)
 class ScalerCrop:
-  x: int
-  y: int
-  width: int
-  height: int
+    x: int
+    y: int
+    width: int
+    height: int
 
-  def to_libcamera(self) -> libcam.Rectangle:
-      return libcam.Rectangle(self.x, self.y, self.width, self.height)
+    def to_libcamera(self) -> libcam.Rectangle:
+        return libcam.Rectangle(self.x, self.y, self.width, self.height)
+
 
 class CameraConfigurationInvalidError(Exception):
     _config: libcam.CameraConfiguration
@@ -204,9 +207,9 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         except EnvironmentVariableNotSet:
             # No error for when running on Raspberry Pi OS
             pass
-        assert pixel_format == libcam.PixelFormat("RGB888") or pixel_format == libcam.PixelFormat(
-            "BGR888"
-        ), "Only RGB888 or BGR888 are supported"
+        assert pixel_format == libcam.PixelFormat("RGB888") or pixel_format == libcam.PixelFormat("BGR888"), (
+            "Only RGB888 or BGR888 are supported"
+        )
         super().__init__()
         self._cm = libcam.CameraManager.singleton()
         self._size = size

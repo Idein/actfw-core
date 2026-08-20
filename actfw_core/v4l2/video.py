@@ -434,7 +434,7 @@ class RawVideo(object):
         while True:
             result = _v4l2.ioctl(self.device_fd, request, arg)
             e = get_errno()
-            if not (((-1 == result) and ((e == errno.EINTR)))):
+            if not ((-1 == result) and (e == errno.EINTR)):
                 break
         return result
 
@@ -873,7 +873,7 @@ class Video(object):
         while True:
             result = _v4l2.ioctl(self.device_fd, request, arg)
             e = get_errno()
-            if not (((-1 == result) and ((e == errno.EINTR) or (e == errno.EAGAIN)))):
+            if not ((-1 == result) and ((e == errno.EINTR) or (e == errno.EAGAIN))):
                 break
         return result
 
