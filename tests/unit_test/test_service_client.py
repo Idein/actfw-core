@@ -3,6 +3,7 @@ import threading
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Callable, List
+from unittest.mock import MagicMock
 
 import pytest
 from actfw_core.schema.agent_app_protocol import ServiceKind, ServiceRequest, ServiceResponse, Status
@@ -161,3 +162,20 @@ def test_service_client_device_shutdown_raises_on_error_status() -> None:
         # Assert
         with pytest.raises(RuntimeError):
             act()
+
+
+def test_service_client_times_out_when_agent_does_not_respond(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange
+    expected_timeout = 10.0
+    mock_socket = MagicMock(spec=socket.socket)
+    monkeypatch.setattr(socket, "socket", lambda *args: mock_socket)
+    monkeypatch.setattr(ServiceResponse, "parse", lambda stream: (None, socket.timeout()))
+    client = ServiceClient(Path("unused.sock"))
+
+    # Act
+    with pytest.raises(RuntimeError) as exc_info:
+        client.device_shutdown()
+
+    # Assert
+    mock_socket.settimeout.assert_called_once_with(expected_timeout)
+    assert "timed out" in str(exc_info.value)

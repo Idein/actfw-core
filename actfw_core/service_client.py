@@ -9,6 +9,8 @@ from typing import NoReturn, Optional
 from ._private.util.result import ResultTuple
 from .schema.agent_app_protocol import RequestId, ServiceKind, ServiceRequest, ServiceResponse, Status
 
+_SERVICE_REQUEST_TIMEOUT_SECONDS = 10.0
+
 
 class ServiceClient:
     _socket_path: Path
@@ -40,22 +42,27 @@ class ServiceClient:
 
     def _sendrecv(self, request: ServiceRequest) -> ResultTuple[ServiceResponse, RuntimeError]:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.connect(str(self._socket_path))
+        sock.settimeout(_SERVICE_REQUEST_TIMEOUT_SECONDS)
+        try:
+            sock.connect(str(self._socket_path))
+            sock.sendall(request.to_bytes())
 
-        sock.sendall(request.to_bytes())
+            response, err = ServiceResponse.parse(sock)
+            if isinstance(err, socket.timeout):
+                return None, RuntimeError("service request timed out waiting for a response from actcast agent")
+            if err:
+                return None, RuntimeError("couldn't parse a response from actcast agent: `ServiceResponse.parse()` failed")
+            if response is None:
+                return None, RuntimeError(f"service request failed: request = {request}, response = {response}")
+            if response.status != Status.OK:
+                return None, RuntimeError(f"service request failed: request = {request}, response = {response}")
 
-        response, err = ServiceResponse.parse(sock)
-        if err:
-            return None, RuntimeError("couldn't parse a response from actcast agent: `ServiceResponse.parse()` failed")
-        if response is None:
-            return None, RuntimeError(f"service request failed: request = {request}, response = {response}")
-        if response.status != Status.OK:
-            return None, RuntimeError(f"service request failed: request = {request}, response = {response}")
-
-        sock.shutdown(socket.SHUT_RDWR)
-        sock.close()
-
-        return response, None
+            sock.shutdown(socket.SHUT_RDWR)
+            return response, None
+        except socket.timeout:
+            return None, RuntimeError("service request timed out communicating with actcast agent")
+        finally:
+            sock.close()
 
     def rs256(self, payload: bytes) -> str:
         """
