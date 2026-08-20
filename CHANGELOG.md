@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add `ServiceClient.device_shutdown` with an optional `reason` argument for requesting the actcast agent to shut down the device.
+- Add a 10-second timeout to `ServiceClient` socket communication so requests fail with `RuntimeError` when the actcast agent does not respond.
+
 ## 2.20.0 (2026-08-04)
 
 - Add optional `reason` argument to `ServiceClient.stop_act`. The reason is sent to the actcast agent and, on agents that support it, shown to device operators. Agents without support ignore it and stop the act as before, so passing a reason is always safe. Omitting `reason` preserves the previous behavior.
