@@ -22,6 +22,8 @@ class ServiceClient:
         * sign a message with an actcast device specific secret key.
     * 'Stop Act'
         * request actcast agent to stop the act.
+    * 'Device Shutdown'
+        * request actcast agent to shut down the device.
 
     """
 
@@ -98,6 +100,31 @@ class ServiceClient:
         request = ServiceRequest(
             self._get_request_id(),
             ServiceKind.STOP_ACT,
+            payload,
+        )
+        response, err = self._sendrecv(request)
+        if err:
+            raise err
+        if response is None:
+            raise RuntimeError(f"service request failed: request = {request}, response = {response}")
+        sys.exit(0)
+
+    def device_shutdown(self, reason: Optional[str] = None) -> NoReturn:
+        """
+
+        Request actcast agent to shut down the device.
+
+        Args:
+            reason (Optional[str]): Optional reason for shutting down, shown to device operators.
+                If omitted, the device shuts down without a reason.
+
+        Exceptions:
+            RuntimeError
+        """
+        payload = reason.encode("utf-8") if reason is not None else b""
+        request = ServiceRequest(
+            self._get_request_id(),
+            ServiceKind.DEVICE_SHUTDOWN,
             payload,
         )
         response, err = self._sendrecv(request)

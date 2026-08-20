@@ -92,3 +92,72 @@ def test_service_client_stop_act_sends_reason_to_agent() -> None:
         assert requests[0].kind == ServiceKind.STOP_ACT
         # reason は UTF-8 で payload に載る（日本語で UTF-8 経路も確認）
         assert requests[0].data == "停止理由テスト".encode("utf-8")
+
+
+def test_service_kind_device_shutdown_has_value_2() -> None:
+    # Arrange
+    expected_value = 2
+
+    # Act
+    actual_value = ServiceKind.DEVICE_SHUTDOWN.value
+
+    # Assert
+    assert actual_value == expected_value
+
+
+def test_service_client_device_shutdown_sends_request_to_agent() -> None:
+    # Arrange
+    with TemporaryDirectory() as temp_dir:
+        socket_path, requests = create_socket_for_test(
+            temp_dir,
+            lambda request: ServiceResponse(request.id_, Status.OK, b""),
+        )
+        client = ServiceClient(socket_path)
+
+        # Act
+        with pytest.raises(SystemExit) as exc_info:
+            client.device_shutdown()
+
+        # Assert
+        assert exc_info.value.code == 0
+        assert len(requests) == 1
+        assert requests[0].kind == ServiceKind.DEVICE_SHUTDOWN
+        assert requests[0].data == b""
+
+
+def test_service_client_device_shutdown_sends_reason_to_agent() -> None:
+    # Arrange
+    with TemporaryDirectory() as temp_dir:
+        socket_path, requests = create_socket_for_test(
+            temp_dir,
+            lambda request: ServiceResponse(request.id_, Status.OK, b""),
+        )
+        client = ServiceClient(socket_path)
+
+        # Act
+        with pytest.raises(SystemExit) as exc_info:
+            client.device_shutdown("シャットダウン理由テスト")
+
+        # Assert
+        assert exc_info.value.code == 0
+        assert len(requests) == 1
+        assert requests[0].kind == ServiceKind.DEVICE_SHUTDOWN
+        assert requests[0].data == "シャットダウン理由テスト".encode("utf-8")
+
+
+def test_service_client_device_shutdown_raises_on_error_status() -> None:
+    # Arrange
+    with TemporaryDirectory() as temp_dir:
+        socket_path, _ = create_socket_for_test(
+            temp_dir,
+            lambda request: ServiceResponse(request.id_, Status.GENERAL_ERROR, b""),
+        )
+        client = ServiceClient(socket_path)
+
+        # Act
+        def act() -> None:
+            client.device_shutdown()
+
+        # Assert
+        with pytest.raises(RuntimeError):
+            act()
