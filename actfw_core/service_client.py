@@ -40,7 +40,7 @@ class ServiceClient:
         self._request_id = self._request_id.next_()
         return copy.copy(self._request_id)
 
-    def _sendrecv(self, request: ServiceRequest) -> ResultTuple[ServiceResponse, RuntimeError]:
+    def _sendrecv(self, request: ServiceRequest) -> ResultTuple[ServiceResponse, Exception]:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.settimeout(_SERVICE_REQUEST_TIMEOUT_SECONDS)
         try:
@@ -50,6 +50,8 @@ class ServiceClient:
             response, err = ServiceResponse.parse(sock)
             if isinstance(err, socket.timeout):
                 return None, RuntimeError("service request timed out waiting for a response from actcast agent")
+            if isinstance(err, EOFError):
+                return None, err
             if err:
                 return None, RuntimeError("couldn't parse a response from actcast agent: `ServiceResponse.parse()` failed")
             if response is None:

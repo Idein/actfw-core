@@ -2,7 +2,7 @@ import socket
 import threading
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Callable, List
+from typing import Callable, List, Union
 from unittest.mock import MagicMock
 
 import pytest
@@ -12,7 +12,7 @@ from actfw_core.service_client import ServiceClient
 
 def create_socket_for_test(
     temp_dir: str,
-    response_factory: Callable[[ServiceRequest], ServiceResponse],
+    response_factory: Callable[[ServiceRequest], Union[ServiceResponse, bytes]],
 ) -> tuple[Path, List[ServiceRequest]]:
     socket_path = Path(temp_dir) / "actcast-service.sock"
     requests: List[ServiceRequest] = []
@@ -29,6 +29,9 @@ def create_socket_for_test(
                 assert request is not None
                 requests.append(request)
                 response = response_factory(request)
+                if isinstance(response, bytes):
+                    conn.sendall(response)
+                    return
                 conn.sendall(response.to_bytes())
                 if response.status == Status.OK:
                     # Keep the peer connected until ServiceClient._sendrecv() finishes shutdown().
@@ -179,3 +182,17 @@ def test_service_client_times_out_when_agent_does_not_respond(monkeypatch: pytes
     # Assert
     mock_socket.settimeout.assert_called_once_with(expected_timeout)
     assert "timed out" in str(exc_info.value)
+
+
+def test_service_client_propagates_eof_error_when_agent_closes_connection() -> None:
+    # Arrange
+    with TemporaryDirectory() as temp_dir:
+        socket_path, _ = create_socket_for_test(temp_dir, lambda request: b"")
+        client = ServiceClient(socket_path)
+
+        # Act
+        with pytest.raises(EOFError) as exc_info:
+            client.device_shutdown()
+
+        # Assert
+        assert str(exc_info.value) == "actcast agent closed the connection"
