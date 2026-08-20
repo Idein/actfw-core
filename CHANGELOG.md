@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add `ServiceClient.device_shutdown` with an optional `reason` argument for requesting the actcast agent to shut down the device.
+- Add `ServiceClient.shutdown_device` with an optional `reason` argument for requesting the actcast agent to shut down the device.
 - Add a 10-second timeout to `ServiceClient` socket communication so requests fail with `RuntimeError` when the actcast agent does not respond.
 
 ## 2.20.0 (2026-08-04)

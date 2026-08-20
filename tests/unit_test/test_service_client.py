@@ -98,18 +98,18 @@ def test_service_client_stop_act_sends_reason_to_agent() -> None:
         assert requests[0].data == "停止理由テスト".encode("utf-8")
 
 
-def test_service_kind_device_shutdown_has_value_2() -> None:
+def test_service_kind_shutdown_device_has_value_2() -> None:
     # Arrange
     expected_value = 2
 
     # Act
-    actual_value = ServiceKind.DEVICE_SHUTDOWN.value
+    actual_value = ServiceKind.SHUTDOWN_DEVICE.value
 
     # Assert
     assert actual_value == expected_value
 
 
-def test_service_client_device_shutdown_sends_request_to_agent() -> None:
+def test_service_client_shutdown_device_sends_request_to_agent() -> None:
     # Arrange
     with TemporaryDirectory() as temp_dir:
         socket_path, requests = create_socket_for_test(
@@ -120,16 +120,16 @@ def test_service_client_device_shutdown_sends_request_to_agent() -> None:
 
         # Act
         with pytest.raises(SystemExit) as exc_info:
-            client.device_shutdown()
+            client.shutdown_device()
 
         # Assert
         assert exc_info.value.code == 0
         assert len(requests) == 1
-        assert requests[0].kind == ServiceKind.DEVICE_SHUTDOWN
+        assert requests[0].kind == ServiceKind.SHUTDOWN_DEVICE
         assert requests[0].data == b""
 
 
-def test_service_client_device_shutdown_sends_reason_to_agent() -> None:
+def test_service_client_shutdown_device_sends_reason_to_agent() -> None:
     # Arrange
     with TemporaryDirectory() as temp_dir:
         socket_path, requests = create_socket_for_test(
@@ -140,16 +140,16 @@ def test_service_client_device_shutdown_sends_reason_to_agent() -> None:
 
         # Act
         with pytest.raises(SystemExit) as exc_info:
-            client.device_shutdown("シャットダウン理由テスト")
+            client.shutdown_device("シャットダウン理由テスト")
 
         # Assert
         assert exc_info.value.code == 0
         assert len(requests) == 1
-        assert requests[0].kind == ServiceKind.DEVICE_SHUTDOWN
+        assert requests[0].kind == ServiceKind.SHUTDOWN_DEVICE
         assert requests[0].data == "シャットダウン理由テスト".encode("utf-8")
 
 
-def test_service_client_device_shutdown_raises_on_error_status() -> None:
+def test_service_client_shutdown_device_raises_on_error_status() -> None:
     # Arrange
     with TemporaryDirectory() as temp_dir:
         socket_path, _ = create_socket_for_test(
@@ -160,7 +160,7 @@ def test_service_client_device_shutdown_raises_on_error_status() -> None:
 
         # Act
         def act() -> None:
-            client.device_shutdown()
+            client.shutdown_device()
 
         # Assert
         with pytest.raises(RuntimeError):
@@ -177,7 +177,7 @@ def test_service_client_times_out_when_agent_does_not_respond(monkeypatch: pytes
 
     # Act
     with pytest.raises(RuntimeError) as exc_info:
-        client.device_shutdown()
+        client.shutdown_device()
 
     # Assert
     mock_socket.settimeout.assert_called_once_with(expected_timeout)
@@ -192,7 +192,7 @@ def test_service_client_propagates_eof_error_when_agent_closes_connection() -> N
 
         # Act
         with pytest.raises(EOFError) as exc_info:
-            client.device_shutdown()
+            client.shutdown_device()
 
         # Assert
         assert str(exc_info.value) == "actcast agent closed the connection"
