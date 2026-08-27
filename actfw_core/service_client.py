@@ -78,7 +78,8 @@ class ServiceClient:
             str: signature (base64url encoded)
 
         Exceptions:
-            RuntimeError
+            RuntimeError: If the service request fails or times out.
+            EOFError: If the actcast agent closes the connection before completing a response.
         """
         payload = base64.urlsafe_b64encode(payload).rstrip(b"=")
         request = ServiceRequest(
@@ -103,7 +104,8 @@ class ServiceClient:
                 If omitted, the act stops without a reason (same behavior as before).
 
         Exceptions:
-            RuntimeError
+            RuntimeError: If the service request fails or times out.
+            EOFError: If the actcast agent closes the connection before completing a response.
         """
         payload = reason.encode("utf-8") if reason is not None else b""
         request = ServiceRequest(
@@ -128,7 +130,8 @@ class ServiceClient:
                 If omitted, the device shuts down without a reason.
 
         Exceptions:
-            RuntimeError
+            RuntimeError: If the service request fails or times out.
+            EOFError: If the actcast agent closes the connection before completing a response.
         """
         payload = reason.encode("utf-8") if reason is not None else b""
         request = ServiceRequest(
