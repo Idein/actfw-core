@@ -12,6 +12,8 @@ def _read_int(stream: socket.socket) -> int:
     bs = b""
     while True:
         b = stream.recv(1)
+        if b == b"":
+            raise EOFError("actcast agent closed the connection")
         if b == b" ":
             return int(bs)
         else:
@@ -21,7 +23,10 @@ def _read_int(stream: socket.socket) -> int:
 def _read_bytes(stream: socket.socket, n: int) -> bytes:
     bs = io.BytesIO()
     while n > 0:
-        n -= bs.write(stream.recv(min(n, 1024)))
+        data = stream.recv(min(n, 1024))
+        if data == b"":
+            raise EOFError("actcast agent closed the connection")
+        n -= bs.write(data)
     return bs.getvalue()
 
 
@@ -96,6 +101,7 @@ class CommandResponse:
 class ServiceKind(enum.Enum):
     RS_256 = 0
     STOP_ACT = 1
+    SHUTDOWN_DEVICE = 2
 
 
 @dataclass(frozen=True, eq=False)

@@ -1,6 +1,8 @@
 import io
 import itertools
+import socket
 from typing import Any
+from unittest.mock import MagicMock
 
 from actfw_core.schema.agent_app_protocol import CommandRequest, CommandResponse, ServiceRequest, ServiceResponse
 
@@ -45,3 +47,41 @@ def test_result_tuple_parse_roundtrip() -> None:
     DATAS = [b"0 0 0 ", b"0 0 1 a", HUGE_DATA]
     for cls, data in itertools.product(CLASSES, DATAS):
         roundtrip(cls, data)
+
+
+def test_service_response_parse_returns_eof_error_when_connection_is_closed() -> None:
+    # Arrange
+    closed_socket = MagicMock(spec=socket.socket)
+    closed_socket.recv.side_effect = [b"", AssertionError("recv called again after EOF")]
+
+    # Act
+    response, error = ServiceResponse.parse(closed_socket)
+
+    # Assert
+    assert response is None
+    assert isinstance(error, EOFError)
+    assert closed_socket.recv.call_count == 1
+
+
+def test_service_response_parse_returns_eof_error_when_payload_is_truncated() -> None:
+    # Arrange
+    closed_socket = MagicMock(spec=socket.socket)
+    closed_socket.recv.side_effect = [
+        b"1",
+        b" ",
+        b"0",
+        b" ",
+        b"3",
+        b" ",
+        b"a",
+        b"",
+        AssertionError("recv called again after EOF"),
+    ]
+
+    # Act
+    response, error = ServiceResponse.parse(closed_socket)
+
+    # Assert
+    assert response is None
+    assert isinstance(error, EOFError)
+    assert closed_socket.recv.call_count == 8
