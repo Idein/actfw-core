@@ -11,17 +11,14 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
 ]
-dependencies = [
-    "Pillow>=5,<11",
-    "typing-extensions>=4.15,<5",
-]
+dependencies = ["Pillow>=5,<11", "typing-extensions>=4.15,<5"]
 description = "Core components of actfw, independent of specific devices"
 keywords = ["actcast"]
 license = "MIT"
 name = "actfw-core"
 readme = "README.md"
 requires-python = ">=3.9, <3.12"
-version = "2.20.0"
+version = "2.21.0"
 
 [project.urls]
 "Repository" = "https://github.com/Idein/actfw-core"

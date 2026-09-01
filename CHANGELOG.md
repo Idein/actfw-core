@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.21.0 (2026-09-01)
+
 - Add `ServiceKind.SHUTDOWN_DEVICE = 2` and `ServiceClient.shutdown_device(reason=None)`.
 - Add a 10-second timeout to `ServiceClient` requests.
 - Raise `EOFError` when the actcast agent closes a service connection before completing a response.
