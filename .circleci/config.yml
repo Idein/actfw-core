@@ -11,7 +11,7 @@ commands:
       - run:
           name: Install uv
           environment:
-            UV_VERSION: "0.11.26"
+            UV_VERSION: "0.13.6"
           command: |
             curl -LsSf "https://astral.sh/uv/${UV_VERSION}/install.sh" | sh
             echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_ENV"
