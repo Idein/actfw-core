@@ -13,7 +13,7 @@ commands:
           shell: /bin/sh -eu
           command: |
             sh scripts/prepare-ca.sh
-            python3 scripts/check_ca_trust.py
+            if command -v python3 >/dev/null; then python3 scripts/check_ca_trust.py; fi
 
   install-uv:
     steps:

@@ -18,7 +18,13 @@ def check_bundle(label: str, path: str) -> str:
     context = ssl.create_default_context(cafile=str(path))
     hashes = {hashlib.sha256(cert).hexdigest() for cert in context.get_ca_certs(binary_form=True)}
     if hashes & BAD_ROOTS or AMAZON_ROOT not in hashes:
-        raise RuntimeError(label + ": distrusted root present or Amazon Root CA 1 missing")
+        raise RuntimeError(
+            label
+            + ": bad roots="
+            + str(sorted(hashes & BAD_ROOTS))
+            + "; Amazon Root CA 1 present="
+            + str(AMAZON_ROOT in hashes)
+        )
     return str(path)
 
 
