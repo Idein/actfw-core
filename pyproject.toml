@@ -27,6 +27,7 @@ version = "2.21.0"
 
 [dependency-groups]
 dev = [
+    "certifi>=2026.10.19",
     "Sphinx>=4.3,<5",
     "cryptography>=3.4.7,<4",
     "pyOpenSSL>=20.0.1,<21",

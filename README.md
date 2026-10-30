@@ -72,9 +72,11 @@ app.run()
 
 ### Installation of dev requirements
 
+Update the operating system CA store before installing development tools. Use uv 0.13.6 or later and certifi 2026.10.19 or later in existing virtual environments as well. CI checks both the OS store and the project certifi bundle using public certificates.
+
 ```console
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv sync --python python3.11
+curl -LsSf https://astral.sh/uv/0.13.6/install.sh | sh
+uv sync --frozen --python python3.11
 ```
 
 ### Running tests
