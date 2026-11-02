@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2.22.0 (2026-11-02)
+
+- Harden CA trust in development and CI against compromised eMudhra certificate chains, with checks for the OS and certifi CA stores.
+
 ## 2.21.0 (2026-09-01)
 
 - Add `ServiceKind.SHUTDOWN_DEVICE = 2` and `ServiceClient.shutdown_device(reason=None)`.
