@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.9, <3.12"
 resolution-markers = [
     "python_full_version >= '3.10'",
@@ -8,7 +8,7 @@ resolution-markers = [
 
 [[package]]
 name = "actfw-core"
-version = "2.21.0"
+version = "2.22.0"
 source = { editable = "." }
 dependencies = [
     { name = "pillow" },
