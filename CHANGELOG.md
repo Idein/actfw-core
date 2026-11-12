@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add white-balance controls to `LibcameraCapture`: an `awb` constructor argument, runtime `set_awb_settings()`, and `awb_status()` metadata snapshots. Support libcamera AWB modes, `AwbManual`, and `AwbGreyWorld` with configurable initial gains and damping (defaults: 1.6, 1.6, and 0.45).
+- Add NumPy as a runtime dependency for grey-world pixel statistics.
+
 ## 2.22.0 (2026-11-02)
 
 - Harden CA trust in development and CI against compromised eMudhra certificate chains, with checks for the OS and certifi CA stores.

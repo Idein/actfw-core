@@ -5,17 +5,84 @@ Note:
     This module is only available in ActcastOS4 or later.
 """
 
+from collections import deque
 from dataclasses import dataclass
+import math
 import mmap
 import selectors
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Deque, Dict, List, Optional, Tuple, Union
 
 import libcamera as libcam
+import numpy as np
 from actfw_core.capture import Frame
 from actfw_core.system import EnvironmentVariableNotSet, get_actcast_firmware_type
 from actfw_core.task import Producer
 from actfw_core.unicam_isp_capture import Auto
 from actfw_core.util.pad import _PadBase, _PadDiscardingOld
+
+
+def _validate_awb_gain(gain: float) -> None:
+    if not math.isfinite(gain) or gain <= 0:
+        raise ValueError("AWB gains must be finite and greater than zero")
+
+
+@dataclass(frozen=True)
+class AwbManual:
+    """Disable libcamera AWB and apply fixed red and blue gains.
+
+    Gains must be positive and finite, and within the camera's supported range.
+    """
+
+    gain_r: float
+    gain_b: float
+
+    def __post_init__(self) -> None:
+        _validate_awb_gain(self.gain_r)
+        _validate_awb_gain(self.gain_b)
+
+
+@dataclass(frozen=True)
+class AwbGreyWorld:
+    """Estimate white balance from the output image, sampled every eight pixels.
+
+    ``gain_r`` and ``gain_b`` are the initial gains. ``k`` damps the multiplicative
+    correction: ``next_gain = applied_gain * (sum_g / (sum_channel + 1)) ** k``.
+    It must be in (0, 1]; smaller values make the adjustment more gradual.
+    Updated gains are limited to [0.5, 8.0]. Initial gains must also be in this range.
+
+    Updates wait until metadata confirms that the preceding gains were applied.
+    As with other grey-world algorithms, scenes dominated by a single colour can
+    produce a colour cast; convergence depends on the scene and camera processing.
+    """
+
+    gain_r: float = 1.6
+    gain_b: float = 1.6
+    k: float = 0.45
+
+    def __post_init__(self) -> None:
+        for gain in (self.gain_r, self.gain_b):
+            _validate_awb_gain(gain)
+            if not 0.5 <= gain <= 8.0:
+                raise ValueError("Grey-world initial gains must be in [0.5, 8.0]")
+        if not math.isfinite(self.k) or not 0 < self.k <= 1:
+            raise ValueError("Grey-world k must be finite and in (0, 1]")
+
+
+@dataclass(frozen=True)
+class AwbStatus:
+    """White-balance metadata of the latest frame; absent values are None.
+
+    This reports applied gains, rather than the gains requested for a later frame.
+    ``colour_temperature`` is in kelvin and ``lux`` is in lux.
+    """
+
+    gain_r: Optional[float]
+    gain_b: Optional[float]
+    colour_temperature: Optional[int]
+    lux: Optional[float]
+
+
+AwbSettings = Union[Auto, libcam.controls.AwbModeEnum, AwbManual, AwbGreyWorld]
 
 
 @dataclass(frozen=True)
@@ -165,6 +232,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         depad: bool = True,
         sensor_config: Optional[SensorConfig] = None,
         scaler_crop: Optional[ScalerCrop] = None,
+        awb: AwbSettings = Auto.AUTO,
     ) -> None:
         """
         Initialization method for the LibcameraCapture class.
@@ -190,6 +258,10 @@ class LibcameraCapture(Producer[Frame[bytes]]):
                 documentation for details about sensor configuration.
             scaler_crop: The scaler crop rectangle used to adjust the field of view. See the libcamera
                 documentation for details about ``ScalerCrop``.
+            awb: White balance: ``Auto.AUTO`` (the unchanged libcamera default),
+                ``libcam.controls.AwbModeEnum`` (automatic AWB with an illuminant range),
+                ``AwbManual(gain_r, gain_b)``, or ``AwbGreyWorld(gain_r=1.6, gain_b=1.6, k=0.45)``.
+                Can also be changed while capturing via ``set_awb_settings()``.
 
         Note:
             As for pixel_format, if RGB888 is specified, BGR888 is actually obtained,
@@ -211,6 +283,14 @@ class LibcameraCapture(Producer[Frame[bytes]]):
             "Only RGB888 or BGR888 are supported"
         )
         super().__init__()
+        self._awb_pending: Deque[AwbSettings] = deque(maxlen=1)
+        # Only the capture thread changes the active settings and target.
+        self._awb_settings: AwbSettings = Auto.AUTO
+        self._awb_configured = False
+        self._awb_target: Optional[Tuple[float, float]] = None
+        self._awb_status: Optional[AwbStatus] = None
+        if awb is not Auto.AUTO:
+            self.set_awb_settings(awb)
         self._cm = libcam.CameraManager.singleton()
         self._size = size
         self._pixel_format = pixel_format
@@ -270,6 +350,97 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         self._shutter_time = shutter_time
         self._analogue_gain = analogue_gain
 
+    def set_awb_settings(self, awb: AwbSettings) -> None:
+        """Queue white-balance settings before or during capture.
+
+        Accepts the same values as the constructor's ``awb`` argument. The capture
+        thread takes the latest queued settings at camera start or at the beginning
+        of the next completed-frame processing. Changes queued during a frame's
+        processing wait until the next frame. Controls can take several frames to
+        appear in ``awb_status()``. Selecting ``AwbGreyWorld`` resets its target to
+        the supplied initial gains when the queued settings are taken. Only one
+        pending setting is kept; a new setting replaces the previous pending one.
+        """
+        if not isinstance(awb, (Auto, libcam.controls.AwbModeEnum, AwbManual, AwbGreyWorld)):
+            raise TypeError("awb must be Auto.AUTO, AwbModeEnum, AwbManual, or AwbGreyWorld")
+        self._awb_pending.append(awb)
+
+    def _apply_pending_awb_settings(self) -> None:
+        """Called only by the capture thread, between frame processing steps."""
+        try:
+            awb = self._awb_pending.popleft()
+        except IndexError:
+            return
+        self._awb_settings = awb
+        self._awb_configured = True
+        self._awb_target = (awb.gain_r, awb.gain_b) if isinstance(awb, AwbGreyWorld) else None
+
+    def awb_status(self) -> Optional[AwbStatus]:
+        """Return metadata of the latest completed frame, or None before the first frame.
+
+        The returned immutable snapshot may be read from another thread.
+        """
+        return self._awb_status
+
+    def _awb_controls(self, awb: AwbSettings) -> Dict[Any, Any]:
+        if isinstance(awb, Auto):
+            # Preserve the existing camera defaults when AWB was not specified.
+            if not self._awb_configured:
+                return {}
+            return {libcam.controls.AwbEnable: True, libcam.controls.AwbMode: libcam.controls.AwbModeEnum.Auto}
+        if isinstance(awb, libcam.controls.AwbModeEnum):
+            return {libcam.controls.AwbEnable: True, libcam.controls.AwbMode: awb}
+        gains = (awb.gain_r, awb.gain_b) if isinstance(awb, AwbManual) else self._awb_target
+        return {libcam.controls.AwbEnable: False, libcam.controls.ColourGains: gains}
+
+    def _update_awb(self, frame: bytes, metadata: Dict[Any, Any], awb: AwbSettings) -> None:
+        """Record applied metadata and update feedback for the selected AWB mode.
+
+        ``awb`` is selected at the start of this frame's processing and is also
+        used to generate controls for requeueing. Metadata describes this completed
+        frame, which may still reflect older settings due to controls latency.
+        Auto/AwbModeEnum are handled by libcamera and AwbManual uses fixed gains;
+        only AwbGreyWorld computes feedback from the output image.
+        """
+        gains = metadata.get(libcam.controls.ColourGains)
+        gain_r, gain_b = (float(gains[0]), float(gains[1])) if gains is not None else (None, None)
+        temperature = metadata.get(libcam.controls.ColourTemperature)
+        lux = metadata.get(libcam.controls.Lux)
+        # Publish a complete immutable snapshot for readers on other threads.
+        self._awb_status = AwbStatus(
+            gain_r, gain_b, int(temperature) if temperature is not None else None, float(lux) if lux is not None else None
+        )
+        if isinstance(awb, AwbGreyWorld):
+            self._update_greyworld(frame, self._awb_status, awb)
+
+    def _update_greyworld(self, frame: bytes, status: AwbStatus, settings: AwbGreyWorld) -> None:
+        """Update the next target using applied gains and the selected damping.
+
+        Initial gains in ``settings`` are used only when the settings are taken
+        from the queue. Feedback uses ``status`` gains from the completed frame.
+        """
+        gain_r, gain_b = status.gain_r, status.gain_b
+        target = self._awb_target
+        if target is None or gain_r is None or gain_b is None:
+            return
+        # Older requests remain in flight after setting gains. Never compute
+        # another correction until the preceding target appears in metadata.
+        applied = (gain_r, gain_b)
+        if not all(math.isfinite(g) and abs(g - t) < 1e-3 * max(1.0, t) for g, t in zip(applied, target)):
+            return
+        width, height = self.capture_size()
+        stride = width * 3 if self._depad else self._stride
+        # libcamera's BGR888 is RGB in memory; RGB888 is BGR in memory.
+        red, blue = (0, 2) if self._pixel_format == libcam.PixelFormat("BGR888") else (2, 0)
+        pixels = np.ndarray((height, width, 3), dtype=np.uint8, buffer=frame, strides=(stride, 3, 1))
+        sums = tuple(int(value) for value in pixels[::8, ::8].sum(axis=(0, 1), dtype=np.int64))
+        # Output pixels already include the applied gain, hence the
+        # multiplicative correction rather than an absolute G/R or G/B gain.
+        self._awb_target = (
+            min(8.0, max(0.5, gain_r * (sums[1] / (sums[red] + 1)) ** settings.k)),
+            min(8.0, max(0.5, gain_b * (sums[1] / (sums[blue] + 1)) ** settings.k)),
+        )
+
     def _strip_stride_padding(self, mm: mmap.mmap) -> bytes:
         """Remove the per-line stride padding, returning a tightly packed (width * 3 per line) buffer.
 
@@ -294,6 +465,8 @@ class LibcameraCapture(Producer[Frame[bytes]]):
     def _handle_camera_event(self) -> None:
         reqs = self._cm.get_ready_requests()
         for req in reqs:
+            self._apply_pending_awb_settings()
+            awb = self._awb_settings
             buffers = req.buffers
             assert len(buffers) == 1
             stream, frame_buffer = next(iter(buffers.items()))
@@ -303,11 +476,16 @@ class LibcameraCapture(Producer[Frame[bytes]]):
             with mmap.mmap(plane.fd, plane.length, offset=plane.offset) as mm:
                 dst = self._strip_stride_padding(mm) if self._depad else mm[:]
 
+            self._update_awb(dst, req.metadata, awb=awb)
             frame = Frame(dst)
             self._outlet(frame)
 
             req.reuse()
-            self._camera.queue_request(req)
+            for control, value in self._awb_controls(awb=awb).items():
+                req.set_control(control, value)
+            res = self._camera.queue_request(req)
+            if res is not None and res < 0:
+                raise QueueRequestError(res)
 
     def run(self) -> None:
         requests = []
@@ -343,6 +521,8 @@ class LibcameraCapture(Producer[Frame[bytes]]):
             if manual_gain:
                 controls[libcam.controls.AnalogueGain] = float(self._analogue_gain)  # type: ignore[arg-type]
 
+            self._apply_pending_awb_settings()
+            controls.update(self._awb_controls(awb=self._awb_settings))
             res = self._camera.start(controls=controls)
             if res is not None and res < 0:
                 raise CameraStartError(res)

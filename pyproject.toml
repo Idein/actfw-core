@@ -11,7 +11,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
 ]
-dependencies = ["Pillow>=5,<11", "typing-extensions>=4.15,<5"]
+dependencies = ["numpy>=1.23,<3", "Pillow>=5,<11", "typing-extensions>=4.15,<5"]
 description = "Core components of actfw, independent of specific devices"
 keywords = ["actcast"]
 license = "MIT"
