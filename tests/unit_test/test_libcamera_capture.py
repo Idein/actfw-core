@@ -78,7 +78,7 @@ def test_defaults_and_validation(capture_module):
     m = capture_module
     assert (m.AwbGreyWorld().gain_r, m.AwbGreyWorld().gain_b, m.AwbGreyWorld().k) == (1.6, 1.6, 0.45)
     cap = make_capture(m)
-    assert cap._awb_controls() == {}
+    assert cap._awb_controls(awb=cap._awb_settings) == {}
     assert cap.awb_status() is None
     for value in (0, -1, math.inf, math.nan):
         with pytest.raises(ValueError):
@@ -97,54 +97,73 @@ def test_defaults_and_validation(capture_module):
     for value in (None, "greyworld", 4, object()):
         with pytest.raises(TypeError):
             cap.set_awb_settings(value)
-    assert cap._awb_controls() == {}
+    assert cap._awb_controls(awb=cap._awb_settings) == {}
 
 
 def test_runtime_switches_and_status(capture_module):
     m = capture_module
     cap = make_capture(m, awb=m.AwbManual(1.04, 2.30))
-    assert cap._awb_controls() == {"AwbEnable": False, "ColourGains": (1.04, 2.30)}
-    cap._update_awb(image(), {"ColourGains": (1.04, 2.30), "ColourTemperature": 4200, "Lux": 200.5})
+    assert cap._awb_controls(awb=cap._awb_settings) == {"AwbEnable": False, "ColourGains": (1.04, 2.30)}
+    cap._update_awb(image(), {"ColourGains": (1.04, 2.30), "ColourTemperature": 4200, "Lux": 200.5}, awb=cap._awb_settings)
     snapshot = cap.awb_status()
     assert snapshot == m.AwbStatus(1.04, 2.30, 4200, 200.5)
     with pytest.raises(FrozenInstanceError):
         snapshot.gain_r = 2
     cap.set_awb_settings(m.libcam.controls.AwbModeEnum.Indoor)
     cap._apply_pending_awb_settings()
-    assert cap._awb_controls() == {"AwbEnable": True, "AwbMode": m.libcam.controls.AwbModeEnum.Indoor}
+    assert cap._awb_controls(awb=cap._awb_settings) == {"AwbEnable": True, "AwbMode": m.libcam.controls.AwbModeEnum.Indoor}
     cap.set_awb_settings(m.Auto.AUTO)
     cap._apply_pending_awb_settings()
-    assert cap._awb_controls() == {"AwbEnable": True, "AwbMode": m.libcam.controls.AwbModeEnum.Auto}
+    assert cap._awb_controls(awb=cap._awb_settings) == {"AwbEnable": True, "AwbMode": m.libcam.controls.AwbModeEnum.Auto}
     cap.set_awb_settings(m.AwbGreyWorld(1.2, 2.2, k=0.7))
     cap._apply_pending_awb_settings()
-    assert cap._awb_controls() == {"AwbEnable": False, "ColourGains": (1.2, 2.2)}
+    assert cap._awb_controls(awb=cap._awb_settings) == {"AwbEnable": False, "ColourGains": (1.2, 2.2)}
     # Switching changes requested controls, not the most recently applied status.
     assert cap.awb_status() is snapshot
-    cap._update_awb(image(), {})
+    cap._update_awb(image(), {}, awb=cap._awb_settings)
     assert cap.awb_status() == m.AwbStatus(None, None, None, None)
     assert snapshot == m.AwbStatus(1.04, 2.30, 4200, 200.5)
+
+
+def test_update_uses_explicit_mode_and_damping(capture_module):
+    m = capture_module
+    cap = make_capture(m, awb=m.AwbGreyWorld(k=1))
+    metadata = {"ColourGains": (1.6, 1.6), "ColourTemperature": 4200, "Lux": 200}
+    # The selected mode is an explicit input, rather than a hidden state read.
+    manual = m.AwbManual(1.04, 2.30)
+    for mode in (m.Auto.AUTO, m.libcam.controls.AwbModeEnum.Indoor, manual):
+        cap._update_awb(image(), metadata, awb=mode)
+        assert cap._awb_target == (1.6, 1.6)
+        assert cap.awb_status() == m.AwbStatus(1.6, 1.6, 4200, 200)
+    assert cap._awb_controls(awb=manual) == {"AwbEnable": False, "ColourGains": (1.04, 2.30)}
+
+    selected = m.AwbGreyWorld(k=0.45)
+    cap._update_awb(image(), metadata, awb=selected)
+    assert cap._awb_controls(awb=selected)["ColourGains"] == pytest.approx(
+        (1.6 * (400 / 121) ** 0.45, 1.6 * (400 / 641) ** 0.45)
+    )
 
 
 def test_queued_settings_take_latest_at_frame_boundary(capture_module):
     m = capture_module
     cap = make_capture(m, awb=m.AwbGreyWorld())
-    cap._update_awb(image(), {"ColourGains": (1.6, 1.6)})
-    previous = cap._awb_controls()
+    cap._update_awb(image(), {"ColourGains": (1.6, 1.6)}, awb=cap._awb_settings)
+    previous = cap._awb_controls(awb=cap._awb_settings)
     status = cap.awb_status()
     cap.set_awb_settings(m.AwbManual(1, 2))
     cap.set_awb_settings(m.Auto.AUTO)
     cap.set_awb_settings(m.AwbGreyWorld(2, 3, k=0.7))
     assert list(cap._awb_pending) == [m.AwbGreyWorld(2, 3, k=0.7)]
     # Enqueueing alone cannot alter the state used by the current frame.
-    assert cap._awb_controls() == previous
+    assert cap._awb_controls(awb=cap._awb_settings) == previous
     assert cap.awb_status() is status
     cap._apply_pending_awb_settings()
-    assert cap._awb_controls() == {"AwbEnable": False, "ColourGains": (2, 3)}
+    assert cap._awb_controls(awb=cap._awb_settings) == {"AwbEnable": False, "ColourGains": (2, 3)}
     assert cap._awb_settings.k == 0.7
-    cap._update_awb(image(), {"ColourGains": (2, 3)})
-    updated = cap._awb_controls()
+    cap._update_awb(image(), {"ColourGains": (2, 3)}, awb=cap._awb_settings)
+    updated = cap._awb_controls(awb=cap._awb_settings)
     cap._apply_pending_awb_settings()
-    assert cap._awb_controls() == updated  # An empty queue does not reset gains.
+    assert cap._awb_controls(awb=cap._awb_settings) == updated  # An empty queue does not reset gains.
 
 
 def test_setting_can_be_queued_during_greyworld_calculation(capture_module, monkeypatch):
@@ -161,7 +180,7 @@ def test_setting_can_be_queued_during_greyworld_calculation(capture_module, monk
 
     def calculate():
         try:
-            cap._update_awb(image(), {"ColourGains": (1.6, 1.6)})
+            cap._update_awb(image(), {"ColourGains": (1.6, 1.6)}, awb=cap._awb_settings)
         except Exception as error:
             errors.append(error)
 
@@ -178,7 +197,7 @@ def test_setting_can_be_queued_during_greyworld_calculation(capture_module, monk
         assert calculating.wait(2)
         setter.start()
         assert queued.wait(1)  # Setting and status reading do not wait for image processing.
-        assert cap._awb_controls()["ColourGains"] == (1.6, 1.6)
+        assert cap._awb_controls(awb=cap._awb_settings)["ColourGains"] == (1.6, 1.6)
     finally:
         proceed.set()
         worker.join(2)
@@ -186,9 +205,9 @@ def test_setting_can_be_queued_during_greyworld_calculation(capture_module, monk
             setter.join(2)
     assert not worker.is_alive() and not setter.is_alive()
     assert errors == []
-    assert cap._awb_controls()["ColourGains"] != (2, 3)
+    assert cap._awb_controls(awb=cap._awb_settings)["ColourGains"] != (2, 3)
     cap._apply_pending_awb_settings()
-    assert cap._awb_controls()["ColourGains"] == (2, 3)
+    assert cap._awb_controls(awb=cap._awb_settings)["ColourGains"] == (2, 3)
     assert cap._awb_settings.k == 0.7
 
 
@@ -198,8 +217,10 @@ def test_setting_can_be_queued_during_greyworld_calculation(capture_module, monk
 def test_greyworld_pixels_and_applied_gain(capture_module, pixel_format, depad, k):
     m = capture_module
     cap = make_capture(m, awb=m.AwbGreyWorld(1.2, 2.2, k), pixel_format=pixel_format, depad=depad)
-    cap._update_awb(image(pixel_format, depad), {"ColourGains": (1.2, 2.2)})
-    assert cap._awb_controls()["ColourGains"] == pytest.approx((1.2 * (400 / 121) ** k, 2.2 * (400 / 641) ** k))
+    cap._update_awb(image(pixel_format, depad), {"ColourGains": (1.2, 2.2)}, awb=cap._awb_settings)
+    assert cap._awb_controls(awb=cap._awb_settings)["ColourGains"] == pytest.approx(
+        (1.2 * (400 / 121) ** k, 2.2 * (400 / 641) ** k)
+    )
     assert cap.awb_status().gain_r == 1.2
 
 
@@ -208,32 +229,32 @@ def test_greyworld_waits_for_metadata_without_forced_updates(capture_module):
     cap = make_capture(m, awb=m.AwbGreyWorld())
     frame = image()
     for metadata in ({}, {"ColourGains": (1.0, 1.0)}, {"ColourGains": (math.nan, 1.6)}):
-        cap._update_awb(frame, metadata)
-        assert cap._awb_controls()["ColourGains"] == (1.6, 1.6)
-    cap._update_awb(frame, {"ColourGains": (1.6, 1.6)})
-    target = cap._awb_controls()["ColourGains"]
+        cap._update_awb(frame, metadata, awb=cap._awb_settings)
+        assert cap._awb_controls(awb=cap._awb_settings)["ColourGains"] == (1.6, 1.6)
+    cap._update_awb(frame, {"ColourGains": (1.6, 1.6)}, awb=cap._awb_settings)
+    target = cap._awb_controls(awb=cap._awb_settings)["ColourGains"]
     assert target != (1.6, 1.6)
     for _ in range(35):
-        cap._update_awb(frame, {"ColourGains": (1.6, 1.6)})
-        assert cap._awb_controls()["ColourGains"] == target
+        cap._update_awb(frame, {"ColourGains": (1.6, 1.6)}, awb=cap._awb_settings)
+        assert cap._awb_controls(awb=cap._awb_settings)["ColourGains"] == target
     # Metadata is float32 on the actual camera; allow small rounding differences.
     applied = tuple(g + 0.00001 for g in target)
-    cap._update_awb(frame, {"ColourGains": applied})
-    assert cap._awb_controls()["ColourGains"] != target
+    cap._update_awb(frame, {"ColourGains": applied}, awb=cap._awb_settings)
+    assert cap._awb_controls(awb=cap._awb_settings)["ColourGains"] != target
     cap.set_awb_settings(m.AwbGreyWorld(2, 3, k=1))
     cap._apply_pending_awb_settings()
-    assert cap._awb_controls()["ColourGains"] == (2, 3)
-    cap._update_awb(frame, {"ColourGains": target})
-    assert cap._awb_controls()["ColourGains"] == (2, 3)
+    assert cap._awb_controls(awb=cap._awb_settings)["ColourGains"] == (2, 3)
+    cap._update_awb(frame, {"ColourGains": target}, awb=cap._awb_settings)
+    assert cap._awb_controls(awb=cap._awb_settings)["ColourGains"] == (2, 3)
 
 
 def test_greyworld_clips_and_handles_black(capture_module):
     m = capture_module
     cap = make_capture(m, awb=m.AwbGreyWorld(k=1))
-    cap._update_awb(bytes([0, 255, 0] * 130), {"ColourGains": (1.6, 1.6)})
-    assert cap._awb_controls()["ColourGains"] == (8, 8)
-    cap._update_awb(bytes(390), {"ColourGains": (8, 8)})
-    assert cap._awb_controls()["ColourGains"] == (0.5, 0.5)
+    cap._update_awb(bytes([0, 255, 0] * 130), {"ColourGains": (1.6, 1.6)}, awb=cap._awb_settings)
+    assert cap._awb_controls(awb=cap._awb_settings)["ColourGains"] == (8, 8)
+    cap._update_awb(bytes(390), {"ColourGains": (8, 8)}, awb=cap._awb_settings)
+    assert cap._awb_controls(awb=cap._awb_settings)["ColourGains"] == (0.5, 0.5)
 
 
 @pytest.mark.parametrize("mode", ["default", "auto", "indoor", "manual", "greyworld"])
