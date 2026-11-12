@@ -5,12 +5,12 @@ Note:
     This module is only available in ActcastOS4 or later.
 """
 
+from collections import deque
 from dataclasses import dataclass
 import math
 import mmap
-from queue import Empty, SimpleQueue
 import selectors
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Deque, Dict, List, Optional, Tuple, Union
 
 import libcamera as libcam
 from actfw_core.capture import Frame
@@ -282,7 +282,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
             "Only RGB888 or BGR888 are supported"
         )
         super().__init__()
-        self._awb_pending: SimpleQueue[AwbSettings] = SimpleQueue()
+        self._awb_pending: Deque[AwbSettings] = deque(maxlen=1)
         # Only the capture thread changes the active settings and target.
         self._awb_settings: AwbSettings = Auto.AUTO
         self._awb_configured = False
@@ -357,24 +357,22 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         of the next completed-frame processing. Changes queued during a frame's
         processing wait until the next frame. Controls can take several frames to
         appear in ``awb_status()``. Selecting ``AwbGreyWorld`` resets its target to
-        the supplied initial gains when the queued settings are taken.
+        the supplied initial gains when the queued settings are taken. Only one
+        pending setting is kept; a new setting replaces the previous pending one.
         """
         if not isinstance(awb, (Auto, libcam.controls.AwbModeEnum, AwbManual, AwbGreyWorld)):
             raise TypeError("awb must be Auto.AUTO, AwbModeEnum, AwbManual, or AwbGreyWorld")
-        self._awb_pending.put(awb)
+        self._awb_pending.append(awb)
 
     def _apply_pending_awb_settings(self) -> None:
         """Called only by the capture thread, between frame processing steps."""
-        awb: Optional[AwbSettings] = None
-        while True:
-            try:
-                awb = self._awb_pending.get_nowait()
-            except Empty:
-                break
-        if awb is not None:
-            self._awb_settings = awb
-            self._awb_configured = True
-            self._awb_target = (awb.gain_r, awb.gain_b) if isinstance(awb, AwbGreyWorld) else None
+        try:
+            awb = self._awb_pending.popleft()
+        except IndexError:
+            return
+        self._awb_settings = awb
+        self._awb_configured = True
+        self._awb_target = (awb.gain_r, awb.gain_b) if isinstance(awb, AwbGreyWorld) else None
 
     def awb_status(self) -> Optional[AwbStatus]:
         """Return metadata of the latest completed frame, or None before the first frame.

@@ -134,6 +134,7 @@ def test_queued_settings_take_latest_at_frame_boundary(capture_module):
     cap.set_awb_settings(m.AwbManual(1, 2))
     cap.set_awb_settings(m.Auto.AUTO)
     cap.set_awb_settings(m.AwbGreyWorld(2, 3, k=0.7))
+    assert list(cap._awb_pending) == [m.AwbGreyWorld(2, 3, k=0.7)]
     # Enqueueing alone cannot alter the state used by the current frame.
     assert cap._awb_controls() == previous
     assert cap.awb_status() is status

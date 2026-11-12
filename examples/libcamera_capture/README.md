@@ -58,8 +58,8 @@ The initial gains must also be within 0.5–8.0.
 gains, colour temperature (kelvin), and illuminance (lux). Missing metadata fields
 are `None`. Requested settings can take several frames to appear in the status.
 Setting changes are queued and taken by the capture thread at camera start or
-at the beginning of the next completed-frame processing. If several changes are
-waiting, the latest takes precedence. A change made during frame processing waits
+at the beginning of the next completed-frame processing. Only the latest pending
+setting is kept; a new setting replaces it. A change made during frame processing waits
 until the next frame, so it does not interrupt the current calculation or requeue.
 Switching to `AwbGreyWorld` restarts it from the supplied initial gains when the
 queued settings are taken.
