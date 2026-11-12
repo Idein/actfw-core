@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+import numpy as np
 
 
 @pytest.fixture
@@ -222,6 +223,35 @@ def test_greyworld_pixels_and_applied_gain(capture_module, pixel_format, depad, 
         (1.2 * (400 / 121) ** k, 2.2 * (400 / 641) ** k)
     )
     assert cap.awb_status().gain_r == 1.2
+
+
+@pytest.mark.parametrize("size", [(13, 10), (1280, 960)])
+@pytest.mark.parametrize("depad", [True, False])
+@pytest.mark.parametrize("pixel_format", ["BGR888", "RGB888"])
+def test_greyworld_matches_original_reshape_and_sum(capture_module, size, depad, pixel_format):
+    m = capture_module
+    cap = make_capture(m, awb=m.AwbGreyWorld(), depad=depad, pixel_format=pixel_format)
+    width, height = size
+    cap._camera_config.at(0).size = m.libcam.Size(width, height)
+    cap._stride = ((width * 3 + 63) // 64) * 64
+    stride = width * 3 if depad else cap._stride
+    frame = np.random.default_rng(0).integers(0, 256, height * stride, dtype=np.uint8).tobytes()
+
+    # Reference pipeline: remove padding, subsample, flatten, then sum channels.
+    if depad:
+        pixels = np.frombuffer(frame, np.uint8).reshape(height, width, 3)
+    else:
+        pixels = np.frombuffer(frame, np.uint8).reshape(height, stride)[:, : width * 3].reshape(height, width, 3)
+    sub = pixels[::8, ::8].reshape(-1, 3)
+    sum_r, sum_g, sum_b = (int(v) for v in sub.sum(axis=0, dtype=np.int64))
+    if pixel_format == "RGB888":
+        sum_r, sum_b = sum_b, sum_r
+    expected = (
+        min(max(1.6 * (sum_g / (sum_r + 1)) ** 0.45, 0.5), 8.0),
+        min(max(1.6 * (sum_g / (sum_b + 1)) ** 0.45, 0.5), 8.0),
+    )
+    cap._update_awb(frame, {"ColourGains": (1.6, 1.6)}, awb=cap._awb_settings)
+    assert cap._awb_controls(awb=cap._awb_settings)["ColourGains"] == expected
 
 
 def test_greyworld_waits_for_metadata_without_forced_updates(capture_module):
