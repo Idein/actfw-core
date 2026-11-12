@@ -8,8 +8,8 @@ Note:
 from dataclasses import dataclass
 import math
 import mmap
+from queue import Empty, SimpleQueue
 import selectors
-from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import libcamera as libcam
@@ -282,7 +282,8 @@ class LibcameraCapture(Producer[Frame[bytes]]):
             "Only RGB888 or BGR888 are supported"
         )
         super().__init__()
-        self._awb_lock = Lock()
+        self._awb_pending: SimpleQueue[AwbSettings] = SimpleQueue()
+        # Only the capture thread changes the active settings and target.
         self._awb_settings: AwbSettings = Auto.AUTO
         self._awb_configured = False
         self._awb_target: Optional[Tuple[float, float]] = None
@@ -349,16 +350,28 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         self._analogue_gain = analogue_gain
 
     def set_awb_settings(self, awb: AwbSettings) -> None:
-        """Set white balance before or during capture.
+        """Queue white-balance settings before or during capture.
 
-        Accepts the same values as the constructor's ``awb`` argument. Controls
-        are applied at camera start or when requests are requeued, so a change
-        can take several frames to appear in ``awb_status()``. Selecting
-        ``AwbGreyWorld`` resets its target to the supplied initial gains.
+        Accepts the same values as the constructor's ``awb`` argument. The capture
+        thread takes the latest queued settings at camera start or at the beginning
+        of the next completed-frame processing. Changes queued during a frame's
+        processing wait until the next frame. Controls can take several frames to
+        appear in ``awb_status()``. Selecting ``AwbGreyWorld`` resets its target to
+        the supplied initial gains when the queued settings are taken.
         """
         if not isinstance(awb, (Auto, libcam.controls.AwbModeEnum, AwbManual, AwbGreyWorld)):
             raise TypeError("awb must be Auto.AUTO, AwbModeEnum, AwbManual, or AwbGreyWorld")
-        with self._awb_lock:
+        self._awb_pending.put(awb)
+
+    def _apply_pending_awb_settings(self) -> None:
+        """Called only by the capture thread, between frame processing steps."""
+        awb: Optional[AwbSettings] = None
+        while True:
+            try:
+                awb = self._awb_pending.get_nowait()
+            except Empty:
+                break
+        if awb is not None:
             self._awb_settings = awb
             self._awb_configured = True
             self._awb_target = (awb.gain_r, awb.gain_b) if isinstance(awb, AwbGreyWorld) else None
@@ -368,57 +381,55 @@ class LibcameraCapture(Producer[Frame[bytes]]):
 
         The returned immutable snapshot may be read from another thread.
         """
-        with self._awb_lock:
-            return self._awb_status
+        return self._awb_status
 
     def _awb_controls(self) -> Dict[Any, Any]:
-        with self._awb_lock:
-            awb = self._awb_settings
-            if isinstance(awb, Auto):
-                # Preserve the existing camera defaults when AWB was not specified.
-                if not self._awb_configured:
-                    return {}
-                return {libcam.controls.AwbEnable: True, libcam.controls.AwbMode: libcam.controls.AwbModeEnum.Auto}
-            if isinstance(awb, libcam.controls.AwbModeEnum):
-                return {libcam.controls.AwbEnable: True, libcam.controls.AwbMode: awb}
-            gains = (awb.gain_r, awb.gain_b) if isinstance(awb, AwbManual) else self._awb_target
-            return {libcam.controls.AwbEnable: False, libcam.controls.ColourGains: gains}
+        awb = self._awb_settings
+        if isinstance(awb, Auto):
+            # Preserve the existing camera defaults when AWB was not specified.
+            if not self._awb_configured:
+                return {}
+            return {libcam.controls.AwbEnable: True, libcam.controls.AwbMode: libcam.controls.AwbModeEnum.Auto}
+        if isinstance(awb, libcam.controls.AwbModeEnum):
+            return {libcam.controls.AwbEnable: True, libcam.controls.AwbMode: awb}
+        gains = (awb.gain_r, awb.gain_b) if isinstance(awb, AwbManual) else self._awb_target
+        return {libcam.controls.AwbEnable: False, libcam.controls.ColourGains: gains}
 
     def _update_awb(self, frame: bytes, metadata: Dict[Any, Any]) -> None:
         gains = metadata.get(libcam.controls.ColourGains)
         gain_r, gain_b = (float(gains[0]), float(gains[1])) if gains is not None else (None, None)
         temperature = metadata.get(libcam.controls.ColourTemperature)
         lux = metadata.get(libcam.controls.Lux)
-        with self._awb_lock:
-            self._awb_status = AwbStatus(
-                gain_r, gain_b, int(temperature) if temperature is not None else None, float(lux) if lux is not None else None
-            )
-            awb = self._awb_settings
-            target = self._awb_target
-            if not isinstance(awb, AwbGreyWorld) or target is None or gain_r is None or gain_b is None:
-                return
-            # Older requests remain in flight after setting gains. Never compute
-            # another correction until the preceding target appears in metadata.
-            applied = (gain_r, gain_b)
-            if not all(math.isfinite(g) and abs(g - t) < 1e-3 * max(1.0, t) for g, t in zip(applied, target)):
-                return
-            width, height = self.capture_size()
-            stride = width * 3 if self._depad else self._stride
-            # libcamera's BGR888 is RGB in memory; RGB888 is BGR in memory.
-            red, blue = (0, 2) if self._pixel_format == libcam.PixelFormat("BGR888") else (2, 0)
-            sums = [0, 0, 0]
-            view = memoryview(frame)
-            for y in range(0, height, 8):
-                start = y * stride
-                end = start + width * 3
-                for channel in range(3):
-                    sums[channel] += sum(view[start + channel : end : 8 * 3])
-            # Output pixels already include the applied gain, hence the
-            # multiplicative correction rather than an absolute G/R or G/B gain.
-            self._awb_target = (
-                min(8.0, max(0.5, gain_r * (sums[1] / (sums[red] + 1)) ** awb.k)),
-                min(8.0, max(0.5, gain_b * (sums[1] / (sums[blue] + 1)) ** awb.k)),
-            )
+        # Publish a complete immutable snapshot for readers on other threads.
+        self._awb_status = AwbStatus(
+            gain_r, gain_b, int(temperature) if temperature is not None else None, float(lux) if lux is not None else None
+        )
+        awb = self._awb_settings
+        target = self._awb_target
+        if not isinstance(awb, AwbGreyWorld) or target is None or gain_r is None or gain_b is None:
+            return
+        # Older requests remain in flight after setting gains. Never compute
+        # another correction until the preceding target appears in metadata.
+        applied = (gain_r, gain_b)
+        if not all(math.isfinite(g) and abs(g - t) < 1e-3 * max(1.0, t) for g, t in zip(applied, target)):
+            return
+        width, height = self.capture_size()
+        stride = width * 3 if self._depad else self._stride
+        # libcamera's BGR888 is RGB in memory; RGB888 is BGR in memory.
+        red, blue = (0, 2) if self._pixel_format == libcam.PixelFormat("BGR888") else (2, 0)
+        sums = [0, 0, 0]
+        view = memoryview(frame)
+        for y in range(0, height, 8):
+            start = y * stride
+            end = start + width * 3
+            for channel in range(3):
+                sums[channel] += sum(view[start + channel : end : 8 * 3])
+        # Output pixels already include the applied gain, hence the
+        # multiplicative correction rather than an absolute G/R or G/B gain.
+        self._awb_target = (
+            min(8.0, max(0.5, gain_r * (sums[1] / (sums[red] + 1)) ** awb.k)),
+            min(8.0, max(0.5, gain_b * (sums[1] / (sums[blue] + 1)) ** awb.k)),
+        )
 
     def _strip_stride_padding(self, mm: mmap.mmap) -> bytes:
         """Remove the per-line stride padding, returning a tightly packed (width * 3 per line) buffer.
@@ -444,6 +455,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
     def _handle_camera_event(self) -> None:
         reqs = self._cm.get_ready_requests()
         for req in reqs:
+            self._apply_pending_awb_settings()
             buffers = req.buffers
             assert len(buffers) == 1
             stream, frame_buffer = next(iter(buffers.items()))
@@ -498,6 +510,7 @@ class LibcameraCapture(Producer[Frame[bytes]]):
             if manual_gain:
                 controls[libcam.controls.AnalogueGain] = float(self._analogue_gain)  # type: ignore[arg-type]
 
+            self._apply_pending_awb_settings()
             controls.update(self._awb_controls())
             res = self._camera.start(controls=controls)
             if res is not None and res < 0:

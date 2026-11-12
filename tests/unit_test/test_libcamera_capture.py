@@ -7,6 +7,7 @@ import tempfile
 from dataclasses import FrozenInstanceError
 from enum import Enum
 from pathlib import Path
+from threading import Event, Thread
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -49,13 +50,16 @@ def capture_module(monkeypatch):
     return module
 
 
-def make_capture(module, *, awb=None, pixel_format="BGR888", depad=True):
+def make_capture(module, *, awb=None, pixel_format="BGR888", depad=True, apply_pending=True):
     camera = module.libcam.CameraManager.singleton.return_value.cameras[0]
     camera.configure.return_value = None
     config = camera.generate_configuration.return_value
     config.at.return_value.stride = 64
     kwargs = {} if awb is None else {"awb": awb}
-    return module.LibcameraCapture((13, 10), pixel_format, depad=depad, **kwargs)
+    cap = module.LibcameraCapture((13, 10), pixel_format, depad=depad, **kwargs)
+    if apply_pending:
+        cap._apply_pending_awb_settings()
+    return cap
 
 
 def image(pixel_format="BGR888", depad=True):
@@ -106,16 +110,85 @@ def test_runtime_switches_and_status(capture_module):
     with pytest.raises(FrozenInstanceError):
         snapshot.gain_r = 2
     cap.set_awb_settings(m.libcam.controls.AwbModeEnum.Indoor)
+    cap._apply_pending_awb_settings()
     assert cap._awb_controls() == {"AwbEnable": True, "AwbMode": m.libcam.controls.AwbModeEnum.Indoor}
     cap.set_awb_settings(m.Auto.AUTO)
+    cap._apply_pending_awb_settings()
     assert cap._awb_controls() == {"AwbEnable": True, "AwbMode": m.libcam.controls.AwbModeEnum.Auto}
     cap.set_awb_settings(m.AwbGreyWorld(1.2, 2.2, k=0.7))
+    cap._apply_pending_awb_settings()
     assert cap._awb_controls() == {"AwbEnable": False, "ColourGains": (1.2, 2.2)}
     # Switching changes requested controls, not the most recently applied status.
     assert cap.awb_status() is snapshot
     cap._update_awb(image(), {})
     assert cap.awb_status() == m.AwbStatus(None, None, None, None)
     assert snapshot == m.AwbStatus(1.04, 2.30, 4200, 200.5)
+
+
+def test_queued_settings_take_latest_at_frame_boundary(capture_module):
+    m = capture_module
+    cap = make_capture(m, awb=m.AwbGreyWorld())
+    cap._update_awb(image(), {"ColourGains": (1.6, 1.6)})
+    previous = cap._awb_controls()
+    status = cap.awb_status()
+    cap.set_awb_settings(m.AwbManual(1, 2))
+    cap.set_awb_settings(m.Auto.AUTO)
+    cap.set_awb_settings(m.AwbGreyWorld(2, 3, k=0.7))
+    # Enqueueing alone cannot alter the state used by the current frame.
+    assert cap._awb_controls() == previous
+    assert cap.awb_status() is status
+    cap._apply_pending_awb_settings()
+    assert cap._awb_controls() == {"AwbEnable": False, "ColourGains": (2, 3)}
+    assert cap._awb_settings.k == 0.7
+    cap._update_awb(image(), {"ColourGains": (2, 3)})
+    updated = cap._awb_controls()
+    cap._apply_pending_awb_settings()
+    assert cap._awb_controls() == updated  # An empty queue does not reset gains.
+
+
+def test_setting_can_be_queued_during_greyworld_calculation(capture_module, monkeypatch):
+    m = capture_module
+    cap = make_capture(m, awb=m.AwbGreyWorld())
+    calculating, proceed, queued = Event(), Event(), Event()
+    errors = []
+
+    def capture_size():
+        calculating.set()
+        if not proceed.wait(2):
+            raise RuntimeError("Timed out waiting to finish the frame")
+        return (13, 10)
+
+    def calculate():
+        try:
+            cap._update_awb(image(), {"ColourGains": (1.6, 1.6)})
+        except Exception as error:
+            errors.append(error)
+
+    def configure():
+        cap.set_awb_settings(m.AwbGreyWorld(2, 3, k=0.7))
+        assert cap.awb_status() == m.AwbStatus(1.6, 1.6, None, None)
+        queued.set()
+
+    monkeypatch.setattr(cap, "capture_size", capture_size)
+    worker = Thread(target=calculate)
+    setter = Thread(target=configure)
+    worker.start()
+    try:
+        assert calculating.wait(2)
+        setter.start()
+        assert queued.wait(1)  # Setting and status reading do not wait for image processing.
+        assert cap._awb_controls()["ColourGains"] == (1.6, 1.6)
+    finally:
+        proceed.set()
+        worker.join(2)
+        if setter.ident is not None:
+            setter.join(2)
+    assert not worker.is_alive() and not setter.is_alive()
+    assert errors == []
+    assert cap._awb_controls()["ColourGains"] != (2, 3)
+    cap._apply_pending_awb_settings()
+    assert cap._awb_controls()["ColourGains"] == (2, 3)
+    assert cap._awb_settings.k == 0.7
 
 
 @pytest.mark.parametrize("pixel_format", ["BGR888", "RGB888"])
@@ -147,6 +220,7 @@ def test_greyworld_waits_for_metadata_without_forced_updates(capture_module):
     cap._update_awb(frame, {"ColourGains": applied})
     assert cap._awb_controls()["ColourGains"] != target
     cap.set_awb_settings(m.AwbGreyWorld(2, 3, k=1))
+    cap._apply_pending_awb_settings()
     assert cap._awb_controls()["ColourGains"] == (2, 3)
     cap._update_awb(frame, {"ColourGains": target})
     assert cap._awb_controls()["ColourGains"] == (2, 3)
@@ -172,7 +246,7 @@ def test_controls_at_camera_start(capture_module, mode, monkeypatch):
         "greyworld": (m.AwbGreyWorld(2, 3, 0.5), {"AwbEnable": False, "ColourGains": (2, 3)}),
     }
     awb, expected = options[mode]
-    cap = make_capture(m, awb=awb)
+    cap = make_capture(m, awb=awb, apply_pending=False)
     if mode == "auto":
         cap.set_awb_settings(m.Auto.AUTO)
     cap._camera.start.return_value = None
@@ -205,7 +279,7 @@ def test_completed_request_metadata_and_requeue(capture_module, monkeypatch):
         def outlet(output):
             assert output.getvalue() == frame
             assert cap.awb_status() == m.AwbStatus(1.6, 1.6, 4500, 100)
-            # A concurrent application switch must win over the previous GW update.
+            # Changes during this frame must wait for the next frame boundary.
             cap.set_awb_settings(m.AwbManual(1.04, 2.30))
             calls.append("outlet")
 
@@ -213,6 +287,11 @@ def test_completed_request_metadata_and_requeue(capture_module, monkeypatch):
         request.reuse.side_effect = lambda: calls.append("reuse")
         request.set_control.side_effect = lambda key, value: calls.append((key, value))
         cap._camera.queue_request.side_effect = lambda req: calls.append("queue")
+        cap._handle_camera_event()
+        assert calls[:3] == ["outlet", "reuse", ("AwbEnable", False)]
+        assert calls[3][0] == "ColourGains" and calls[3][1] != (1.04, 2.30)
+        assert calls[4] == "queue"
+        calls.clear()
         cap._handle_camera_event()
         assert calls == ["outlet", "reuse", ("AwbEnable", False), ("ColourGains", (1.04, 2.30)), "queue"]
 
