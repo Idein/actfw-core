@@ -13,6 +13,7 @@ import selectors
 from typing import Any, Deque, Dict, List, Optional, Tuple, Union
 
 import libcamera as libcam
+import numpy as np
 from actfw_core.capture import Frame
 from actfw_core.system import EnvironmentVariableNotSet, get_actcast_firmware_type
 from actfw_core.task import Producer
@@ -431,13 +432,8 @@ class LibcameraCapture(Producer[Frame[bytes]]):
         stride = width * 3 if self._depad else self._stride
         # libcamera's BGR888 is RGB in memory; RGB888 is BGR in memory.
         red, blue = (0, 2) if self._pixel_format == libcam.PixelFormat("BGR888") else (2, 0)
-        sums = [0, 0, 0]
-        view = memoryview(frame)
-        for y in range(0, height, 8):
-            start = y * stride
-            end = start + width * 3
-            for channel in range(3):
-                sums[channel] += sum(view[start + channel : end : 8 * 3])
+        pixels = np.ndarray((height, width, 3), dtype=np.uint8, buffer=frame, strides=(stride, 3, 1))
+        sums = tuple(int(value) for value in pixels[::8, ::8].sum(axis=(0, 1), dtype=np.int64))
         # Output pixels already include the applied gain, hence the
         # multiplicative correction rather than an absolute G/R or G/B gain.
         self._awb_target = (
