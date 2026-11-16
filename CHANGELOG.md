@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.23.0 (2026-11-16)
+
 - Add white-balance controls to `LibcameraCapture`: an `awb` constructor argument, runtime `set_awb_settings()`, and `awb_status()` metadata snapshots. Support libcamera AWB modes, `AwbManual`, and `AwbGreyWorld` with configurable initial gains and damping (defaults: 1.6, 1.6, and 0.45).
 
 ## 2.22.0 (2026-11-02)
