@@ -13,7 +13,8 @@ import time
 import warnings
 from ctypes import *
 from ctypes.util import find_library
-from typing import List
+from dataclasses import dataclass
+from typing import Dict, Iterable, List, Optional
 
 from actfw_core.linux.ioctl import _IOR, _IOW, _IOWR
 from actfw_core.v4l2.control import *
@@ -836,6 +837,30 @@ class VideoConfig(object):
         self.interval.denominator = framerate
 
 
+@dataclass(frozen=True)
+class ControlReset:
+    """
+    A control that :meth:`Video.reset_controls` tried to reset to its default value.
+
+    Attributes:
+        id (int): control ID (:class:`~actfw_core.v4l2.control.V4L2_CID`)
+        name (str): control name reported by the driver (e.g. ``"Auto Exposure"``)
+        before (int or None): value before the reset (None if it could not be read)
+        default (int): default value reported by the driver
+        ok (bool): whether the driver accepted the default value
+    """
+
+    id: int
+    name: str
+    before: Optional[int]
+    default: int
+    ok: bool
+
+    def __str__(self) -> str:
+        result = "" if self.ok else " (failed)"
+        return f"{self.name}: {self.before} -> {self.default}{result}"
+
+
 class Video(object):
     def __init__(self, device="/dev/video0", blocking=False):
         self.device = device
@@ -1259,6 +1284,87 @@ class Video(object):
                 return False
 
         return True
+
+    # Control types whose value fits in `struct v4l2_control` and can be reset by VIDIOC_S_CTRL.
+    _RESETTABLE_CTRL_TYPES = (
+        V4L2_CTRL_TYPE.INTEGER,
+        V4L2_CTRL_TYPE.BOOLEAN,
+        V4L2_CTRL_TYPE.MENU,
+        V4L2_CTRL_TYPE.INTEGER_MENU,
+    )
+    # Controls that cannot be written now. Inactive controls are driven by an automatic mode
+    # (e.g. the exposure time while the exposure mode is automatic).
+    _UNRESETTABLE_CTRL_FLAGS = (
+        V4L2_CTRL_FLAG_DISABLED | V4L2_CTRL_FLAG_READ_ONLY | V4L2_CTRL_FLAG_WRITE_ONLY | V4L2_CTRL_FLAG_INACTIVE
+    )
+
+    def reset_controls(self, exclude: Iterable[int] = ()) -> List[ControlReset]:
+        """
+        Reset the controls of the camera to the default values reported by the driver.
+
+        USB (UVC) cameras keep their control values (exposure mode, backlight compensation, ...)
+        while they stay powered, so values set by a previous app survive app restarts and even
+        device reboots. For example, once an app sets a manual exposure time, the camera stays in
+        manual exposure until it is unplugged, even if the next app does not touch the exposure.
+        Calling this right after opening the camera makes the app start from the camera's defaults.
+
+        The default values are queried from the driver (``VIDIOC_QUERYCTRL``). Only integer, boolean
+        and menu controls are reset. Controls that are disabled, read-only, write-only or inactive
+        (driven by an automatic mode, e.g. the exposure time in automatic exposure) are left as they
+        are. Since resetting an automatic mode changes which controls are inactive, the controls are
+        scanned twice.
+
+        Example:
+
+            >>> cap = V4LCameraCapture(device, (640, 480))
+            >>> for r in cap.configure(lambda video: video.reset_controls()):
+            ...     print(r)
+            Backlight Compensation: 0 -> 55
+            Auto Exposure: 1 -> 3
+
+        Args:
+            exclude (iterable of int): IDs of controls to leave as they are
+                (e.g. ``[V4L2_CID.FOCUS_ABSOLUTE]`` to keep a focus adjusted on site)
+
+        Returns:
+            list of :class:`ControlReset`: controls whose value differed from the default,
+            in the order they were found. Empty if every control already had its default value.
+        """
+        exclude = set(int(cid) for cid in exclude)
+        resets: Dict[int, ControlReset] = {}
+        for _ in range(2):
+            qctrl = queryctrl()
+            qctrl.id = V4L2_CTRL_FLAG_NEXT_CTRL
+            while self._ioctl(_VIDIOC.QUERYCTRL, byref(qctrl)) != -1:
+                cid = qctrl.id
+                if (
+                    cid not in exclude
+                    and qctrl.type in self._RESETTABLE_CTRL_TYPES
+                    and not qctrl.flags & self._UNRESETTABLE_CTRL_FLAGS
+                ):
+                    reset = self._reset_control(qctrl)
+                    if reset is not None:
+                        # keep the value before the first attempt
+                        before = resets[cid].before if cid in resets else reset.before
+                        resets[cid] = ControlReset(reset.id, reset.name, before, reset.default, reset.ok)
+                qctrl = queryctrl()
+                qctrl.id = cid | V4L2_CTRL_FLAG_NEXT_CTRL
+        return list(resets.values())
+
+    def _reset_control(self, qctrl: queryctrl) -> Optional[ControlReset]:
+        """Reset a control to its default value. Return None if it already has the default value."""
+        name = bytes(qctrl.name).split(b"\0")[0].decode(errors="replace")
+        ctrl = control()
+        ctrl.id = qctrl.id
+        if -1 == self._ioctl(_VIDIOC.G_CTRL, byref(ctrl)):
+            before = None
+        elif ctrl.value == qctrl.default_value:
+            return None
+        else:
+            before = ctrl.value
+        ctrl.value = qctrl.default_value
+        ok = -1 != self._ioctl(_VIDIOC.S_CTRL, byref(ctrl))
+        return ControlReset(qctrl.id, name, before, qctrl.default_value, ok)
 
     def request_buffers(self, n):
         req = requestbuffers()
