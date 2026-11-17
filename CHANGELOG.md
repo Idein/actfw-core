@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Add `Video.reset_controls(exclude=())` to reset the controls of a V4L2 camera to the default values reported by the driver, and `ControlReset` for its result. USB cameras keep control values set by a previous app (e.g. manual exposure) until they are unplugged, and some of them (e.g. SANWA CMS-V51BK, Logitech C922 / C615) reject `V4L2_EXPOSURE_AUTO`, so `set_exposure_time(None)` cannot bring them back to automatic exposure. Call it via `V4LCameraCapture.configure(lambda video: video.reset_controls())` right after opening the camera.
+- Add `Video.reset_controls(exclude=())` to reset the controls of a V4L2 camera to the default values reported by the driver, and `ControlReset` for its result. USB cameras keep control values set by a previous app (e.g. manual exposure) until they are unplugged. Call it via `V4LCameraCapture.configure(lambda video: video.reset_controls())` right after opening the camera.
+- `Video.set_exposure_time(None)` now falls back to `V4L2_EXPOSURE_APERTURE_PRIORITY` when the camera rejects `V4L2_EXPOSURE_AUTO`. Many USB cameras (e.g. SANWA CMS-V51BK, Logitech C922 / C615) accept only aperture priority as automatic exposure, so they could not be brought back from manual exposure.
 
 ## 2.23.0 (2026-11-16)
 

@@ -1,7 +1,7 @@
 """Exercise V4L2 control handling of `Video` without camera hardware."""
 
-import errno
 import ctypes
+import errno
 from typing import Dict, List, Optional, Set
 
 import pytest
@@ -110,13 +110,54 @@ def cms_v51bk(exposure_auto: int, exposure_absolute: int, backlight: int) -> Fak
     )
 
 
-def test_set_exposure_time_none_cannot_restore_automatic_exposure() -> None:
-    # The problem `reset_controls` solves: AUTO (0) is rejected, so the camera stays in manual exposure.
+def exposure_camera(rejected: Set[int]) -> FakeCamera:
+    return FakeCamera(
+        [FakeControl(V4L2_CID.EXPOSURE_AUTO, "Auto Exposure", V4L2_EXPOSURE.MANUAL, 3, V4L2_CTRL_TYPE.MENU)],
+        rejected={V4L2_CID.EXPOSURE_AUTO: rejected},
+    )
+
+
+def test_set_exposure_time_none_falls_back_to_aperture_priority() -> None:
+    # CMS-V51BK rejects AUTO (0): it used to stay in manual exposure.
     camera = cms_v51bk(exposure_auto=V4L2_EXPOSURE.MANUAL, exposure_absolute=10, backlight=55)
+    video = make_video(camera)
+
+    assert video.set_exposure_time(None) is True
+    assert camera.controls[V4L2_CID.EXPOSURE_AUTO].value == V4L2_EXPOSURE.APERTURE_PRIORITY
+
+
+@pytest.mark.parametrize(
+    "rejected, expected",
+    [
+        # accepts both: AUTO as before
+        (set(), V4L2_EXPOSURE.AUTO),
+        # e.g. Arducam B0474
+        ({V4L2_EXPOSURE.SHUTTER_PRIORITY, V4L2_EXPOSURE.APERTURE_PRIORITY}, V4L2_EXPOSURE.AUTO),
+        # e.g. Logitech C922 / C615
+        ({V4L2_EXPOSURE.AUTO, V4L2_EXPOSURE.SHUTTER_PRIORITY}, V4L2_EXPOSURE.APERTURE_PRIORITY),
+    ],
+)
+def test_set_exposure_time_none(rejected: Set[int], expected: int) -> None:
+    camera = exposure_camera(rejected)
+    video = make_video(camera)
+
+    assert video.set_exposure_time(None) is True
+    assert camera.controls[V4L2_CID.EXPOSURE_AUTO].value == expected
+    assert camera.writes == [("Auto Exposure", expected)]
+
+
+def test_set_exposure_time_none_fails_without_automatic_mode() -> None:
+    camera = exposure_camera({V4L2_EXPOSURE.AUTO, V4L2_EXPOSURE.APERTURE_PRIORITY})
     video = make_video(camera)
 
     assert video.set_exposure_time(None) is False
     assert camera.controls[V4L2_CID.EXPOSURE_AUTO].value == V4L2_EXPOSURE.MANUAL
+
+
+def test_set_exposure_time_none_fails_without_exposure_control() -> None:
+    video = make_video(FakeCamera([FakeControl(V4L2_CID.BRIGHTNESS, "Brightness", 0, 0)]))
+
+    assert video.set_exposure_time(None) is False
 
 
 def test_reset_controls_restores_automatic_exposure() -> None:

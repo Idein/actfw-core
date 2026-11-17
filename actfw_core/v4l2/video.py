@@ -1245,18 +1245,22 @@ class Video(object):
         """
 
         if ms is None:
-            ctrl = control()
-            ctrl.id = V4L2_CID.EXPOSURE_AUTO
-            ctrl.value = V4L2_EXPOSURE.AUTO
-            result = self._ioctl(_VIDIOC.S_CTRL, byref(ctrl))
-            if -1 == result:
-                return False
-            expected = ctrl.value
-            result = self._ioctl(_VIDIOC.G_CTRL, byref(ctrl))
-            if -1 == result:
-                return False
-            if expected != ctrl.value:
-                return False
+            # Which exposure mode means "automatic" depends on the camera, so two modes are tried:
+            #
+            # - V4L2_EXPOSURE_AUTO (automatic exposure time and iris): some cameras (e.g. Arducam
+            #   B0474) accept only this one.
+            # - V4L2_EXPOSURE_APERTURE_PRIORITY (automatic exposure time, manual iris): many UVC
+            #   cameras (e.g. SANWA CMS-V51BK, Logitech C922 / C615) accept only this one and reject
+            #   V4L2_EXPOSURE_AUTO with EINVAL. Writing only V4L2_EXPOSURE_AUTO leaves these cameras
+            #   in manual exposure, and they keep it until they are unplugged.
+            #
+            # USB cameras have a fixed iris, so both modes control the exposure time automatically.
+            # V4L2_EXPOSURE_AUTO is tried first so that the behavior does not change on cameras
+            # which accept it.
+            for mode in (V4L2_EXPOSURE.AUTO, V4L2_EXPOSURE.APERTURE_PRIORITY):
+                if self._set_control(V4L2_CID.EXPOSURE_AUTO, mode):
+                    return True
+            return False
         else:
             ctrl = control()
             ctrl.id = V4L2_CID.EXPOSURE_AUTO
@@ -1284,6 +1288,17 @@ class Video(object):
                 return False
 
         return True
+
+    def _set_control(self, cid, value) -> bool:
+        """Set a control and check that the driver keeps the value."""
+        ctrl = control()
+        ctrl.id = cid
+        ctrl.value = value
+        if -1 == self._ioctl(_VIDIOC.S_CTRL, byref(ctrl)):
+            return False
+        if -1 == self._ioctl(_VIDIOC.G_CTRL, byref(ctrl)):
+            return False
+        return ctrl.value == value
 
     # Control types whose value fits in `struct v4l2_control` and can be reset by VIDIOC_S_CTRL.
     _RESETTABLE_CTRL_TYPES = (
